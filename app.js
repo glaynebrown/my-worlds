@@ -354,11 +354,9 @@ function tileHtml(w) {
 function renderLibrary() {
   const worlds = sortedWorlds();
   view.innerHTML = `<div class="library">
-    <header class="lib-head"><a class="lib-crest crest-link" href="#/wishlist" aria-label="Wishlist">${CREST}</a>
+    <header class="lib-head"><button class="lib-crest crest-link" id="crest" aria-label="Menu">${CREST}</button>
       <h1 class="lib-title">My Worlds</h1><p class="lib-sub">Pick a door and step inside — there’s no knowing where you might be swept off to.</p></header>
-    <div class="shelf">${worlds.map(tileHtml).join('')}
-      <a class="tile add-tile" href="#/new"><span class="plus" aria-hidden="true">+</span><span class="tile-name">Add a world</span></a></div>
-    <p class="center lib-foot"><button class="linkish" id="out">Sign out</button></p></div>`;
+    <div class="shelf">${worlds.map(tileHtml).join('')}</div></div>`;
   // Each tile wears its own world's look.
   $$('.tile[data-world]').forEach(el => {
     const w = worldById(el.dataset.world);
@@ -366,7 +364,13 @@ function renderLibrary() {
     if (w.cardPhoto) el.style.setProperty('--card-photo', `url('${w.cardPhoto.thumbUrl}')`);
     cardInk(el, w.cardInk);
   });
-  $('#out').onclick = () => confirmBox('Sign out?', 'Your worlds stay saved in your account.', 'Sign out', () => DB.signOut());
+  // The doorway icon hides everything that isn't a door.
+  $('#crest').onclick = () => openModal(`<div class="crest-menu">
+      <a class="btn block" href="#/new" data-close>+ Add a world</a>
+      <a class="btn block" href="#/wishlist" data-close>Wishlist</a>
+      <button class="btn block ghost" id="out">Sign out</button></div>`, (root, close) => {
+    $('#out', root).onclick = () => { close(); confirmBox('Sign out?', 'Your worlds stay saved in your account.', 'Sign out', () => DB.signOut()); };
+  }, 'small-modal');
   enableTileDrag($('.shelf'));
 }
 
