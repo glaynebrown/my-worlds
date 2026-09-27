@@ -7,10 +7,10 @@
      so boards load fast and work with no signal. Cleared on sign-out.
    - Everything else (database, login) goes straight to the network.
      Firestore keeps its own offline copy of your worlds. */
-const APP_CACHE = 'fw-app-v1';
+const APP_CACHE = 'fw-app-v2';
 const PHOTO_CACHE = 'fw-photos-v1';
 const APP_FILES = [
-  './', 'index.html', 'styles.css', 'themes.css', 'themes.js', 'app.js', 'world.js', 'store.js', 'demo.js', 'photos.js',
+  './', 'index.html', 'styles.css', 'themes.css', 'themes.js', 'app.js', 'world.js', 'share.js', 'store.js', 'demo.js', 'photos.js',
   'firebase-config.js', 'manifest.json', 'icon-192.png', 'apple-touch-icon.png',
 ];
 const SDK = ['app', 'auth', 'firestore', 'storage']

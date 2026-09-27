@@ -152,5 +152,65 @@ const Store = (() => {
       await write(items().doc(item.id).delete());
       await removePhoto(item.photo);
     },
+
+    // ----- sharing a copy with someone (see share.js) -----
+    // Writes shares/{email} plus its worlds and items, in batches.
+    async createShare(email, worldList, itemList) {
+      needOnline('Sharing');
+      const root = db.collection('shares').doc(email);
+      // Sending again replaces the old copy completely.
+      const old = await root.get().catch(() => null);
+      if (old && old.exists) {
+        const [ow, oi] = await Promise.all([root.collection('worlds').get(), root.collection('items').get()]);
+        const refs = [...ow.docs, ...oi.docs].map(d => d.ref);
+        for (let k = 0; k < refs.length; k += 400) {
+          const batch = db.batch();
+          refs.slice(k, k + 400).forEach(r => batch.delete(r));
+          await batch.commit();
+        }
+      }
+      await root.set({ from: uid(), createdAt: firebase.firestore.FieldValue.serverTimestamp(), worlds: worldList.length, items: itemList.length });
+      const writes = [
+        ...worldList.map(w => [root.collection('worlds').doc(w.id), w]),
+        ...itemList.map(i => [root.collection('items').doc(i.id), i]),
+      ];
+      for (let k = 0; k < writes.length; k += 400) {
+        const batch = db.batch();
+        writes.slice(k, k + 400).forEach(([ref, { id, ...data }]) => batch.set(ref, data));
+        await batch.commit();
+      }
+    },
+
+    // A copy waiting for whoever is signed in, or null.
+    async loadShare() {
+      const email = (auth.currentUser.email || '').toLowerCase();
+      if (!email) return null;
+      const root = db.collection('shares').doc(email);
+      const snap = await root.get({ source: 'server' }).catch(() => null);
+      if (!snap || !snap.exists) return null;
+      const [ws, is] = await Promise.all([root.collection('worlds').get(), root.collection('items').get()]);
+      return { email, worlds: ws.docs.map(withId), items: is.docs.map(withId) };
+    },
+
+    async deleteShare(share) {
+      const root = db.collection('shares').doc(share.email);
+      const refs = [...share.worlds.map(w => root.collection('worlds').doc(w.id)), ...share.items.map(i => root.collection('items').doc(i.id))];
+      for (let k = 0; k < refs.length; k += 400) {
+        const batch = db.batch();
+        refs.slice(k, k + 400).forEach(r => batch.delete(r));
+        await batch.commit();
+      }
+      await root.delete();
+    },
+
+    // Copies a photo (by its download links) into the signed-in person's own storage.
+    async copyPhoto(folder, id, photo) {
+      const get = async url => { const r = await fetch(url); if (!r.ok) throw new Error('photo'); return r.blob(); };
+      const [full, thumb] = await Promise.all([get(photo.url), get(photo.thumbUrl || photo.url)]);
+      return uploadPhoto(folder, id, { full: { blob: full, w: photo.w, h: photo.h }, thumb: { blob: thumb } });
+    },
+    newId: kind => userDoc().collection(kind).doc().id,
+    setWorld: (id, data) => write(worlds().doc(id).set(data)),
+    setItem: (id, data) => write(items().doc(id).set(data)),
   };
 })();

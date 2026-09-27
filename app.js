@@ -190,6 +190,7 @@ function route() {
     return page === 'reset' ? renderReset() : renderLogin();
   }
   if (!state.loaded) { setPageTheme(null); view.innerHTML = '<p class="loading">Opening the library…</p>'; return; }
+  if (state.importing) return; // share.js shows its own progress
 
   if (page === 'w') {
     const world = worldById(id);
@@ -202,6 +203,7 @@ function route() {
   if (page !== 'new') wishToOpen = null;
   if (page === 'new') return renderWorldForm(null);
   if (page === 'wishlist') return renderWishlist();
+  if (page === 'share') return renderShare();
   renderLibrary();
 }
 
@@ -248,7 +250,7 @@ function startSession() {
       if (got.worlds && got.items) {
         setTimeout(savePhotosForOffline, 3000);
         state.loaded = true;
-        seedStarters();
+        firstRun();
         route();
       }
     };
@@ -258,6 +260,17 @@ function startSession() {
       DB.watchItems(list => arrived('items', list), onError),
     ];
   });
+}
+
+// First time on a brand-new account: a copy someone shared (share.js) wins
+// over the built-in starters.
+async function firstRun() {
+  const s = state.settings;
+  if (!s.seeded && !state.worlds.length && DB.loadShare) {
+    const share = await DB.loadShare().catch(e => { console.error(e); return null; });
+    if (share) return importShare(share);
+  }
+  seedStarters();
 }
 
 // The built-in worlds (themes.js STARTERS). The first sign-in gets all of
