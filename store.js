@@ -7,7 +7,8 @@
           { bg, card, ink, accent, font, photo }), order, canonOn,
           cutoff (step index or null), ending, track (see themes.js),
           cardPhoto (the world's card on the home page),
-          watched (list of watched step indexes), rounds (finished rewatches), t }
+          watched (list of watched step indexes), rounds (finished rewatches),
+          firstWatch (made while watching for the first time), t }
      users/{uid}/items/{id}       everything inside a world:
         { world: worldId, kind, t, ...fields, photo?: { path, thumbPath, url, thumbUrl, w, h } }
           kind 'pin'       mood board photo   { caption }
@@ -17,6 +18,7 @@
           kind 'ship'      { name, note, colors: [a, b] }
           kind 'shippic'   a photo on a ship's page { ship: shipId, caption }
           kind 'headcanon' { text }
+          kind 'wish'      wishlist entry (world: null) { text, note, toWatch }
           kind 'epnote'    rewatch notes { step: full episode/film label, text }
 
    Storage: users/{uid}/items/{id}/... and users/{uid}/worlds/{id}/...

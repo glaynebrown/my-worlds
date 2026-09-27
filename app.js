@@ -102,6 +102,9 @@ function formModal({ title, fields, values = {}, onSave, onDelete, deleteLabel =
         <div class="photo-btns"><label class="btn small">Choose photo<input type="file" accept="image/*" hidden data-photo></label>
         <button type="button" class="btn small ghost" data-drop ${cur ? '' : 'hidden'}>Remove</button></div></div></div>`;
     }
+    if (f.type === 'check') {
+      return `<label class="switch modal-switch"><input type="checkbox" name="${f.key}" ${v ? 'checked' : ''}><span class="track"></span><span>${esc(f.label)}</span></label>`;
+    }
     if (f.type === 'colors') {
       const pal = f.palette, cur = v || [pal[0][1], pal[1][1]];
       const row = (n) => `<div class="swatches" data-slot="${n}">${pal.map(([name, c]) =>
@@ -151,6 +154,7 @@ function formModal({ title, fields, values = {}, onSave, onDelete, deleteLabel =
       fields.forEach(f => {
         if (f.type === 'photo') return;
         if (f.type === 'colors') out[f.key] = [colorPick[0], colorPick[1]];
+        else if (f.type === 'check') out[f.key] = root.querySelector(`[name="${f.key}"]`).checked;
         else out[f.key] = root.querySelector(`[name="${f.key}"]`).value.trim();
       });
       busy($('#save', root), async () => {
@@ -195,7 +199,9 @@ function route() {
     return sub === 'settings' ? renderWorldForm(world) : renderWorld(world, sub);
   }
   setPageTheme(null);
+  if (page !== 'new') wishToOpen = null;
   if (page === 'new') return renderWorldForm(null);
+  if (page === 'wishlist') return renderWishlist();
   renderLibrary();
 }
 
@@ -337,7 +343,7 @@ function tileHtml(w) {
 function renderLibrary() {
   const worlds = sortedWorlds();
   view.innerHTML = `<div class="library">
-    <header class="lib-head"><div class="lib-crest" aria-hidden="true">${CREST}</div>
+    <header class="lib-head"><a class="lib-crest crest-link" href="#/wishlist" aria-label="Wishlist">${CREST}</a>
       <h1 class="lib-title">My Worlds</h1><p class="lib-sub">Pick a door and step inside — there’s no knowing where you might be swept off to.</p></header>
     <div class="shelf">${worlds.map(tileHtml).join('')}
       <a class="tile add-tile" href="#/new"><span class="plus" aria-hidden="true">+</span><span class="tile-name">Add a world</span></a></div>
@@ -471,6 +477,47 @@ function cardInk(el, ink) {
   if (ink) el.style.setProperty('--card-ink', ink); else el.style.removeProperty('--card-ink');
 }
 
+// ---------- wishlist (tap the doorway above "My Worlds") ----------
+// Ideas for future worlds: items of kind 'wish' that belong to no world.
+let wishToOpen = null;
+
+function wishForm(w) {
+  formModal({
+    title: w ? 'Edit' : 'Add to the wishlist',
+    values: w || {},
+    fields: [
+      { key: 'text', label: 'Show, movie or book', placeholder: 'Bridgerton' },
+      { key: 'toWatch', label: 'I haven’t watched it yet', type: 'check' },
+      { key: 'note', label: 'Notes (optional)', type: 'textarea', placeholder: 'Who recommended it, the look, ships…' },
+    ],
+    onSave: async v => {
+      if (!v.text) throw new Error('Name the world.');
+      if (w) await DB.updateItem(w, v); else await DB.addItem({ world: null, kind: 'wish', ...v });
+    },
+    onDelete: w && (() => confirmBox(`Remove ${w.text}?`, '', 'Remove', () => DB.deleteItem(w))),
+  });
+}
+
+function renderWishlist() {
+  const wishes = state.items.filter(i => i.kind === 'wish').sort((a, b) => (a.t || 0) - (b.t || 0));
+  const card = w => `<div class="wish card">
+      <button class="wish-main" data-id="${w.id}"><span class="wish-name">${esc(w.text)}</span>${w.note ? `<span class="wish-note">${esc(w.note)}</span>` : ''}</button>
+      <button class="btn small wish-open" data-open="${w.id}">${w.toWatch ? 'Start watching · open a door' : 'Open this door'}</button></div>`;
+  const group = (title, list) => (list.length ? `<h2 class="sec-h">${title}</h2><div class="wishes">${list.map(card).join('')}</div>` : '');
+  view.innerHTML = `<div class="page wishlist">
+    <header class="w-head"><a class="back" href="#/">‹ Worlds</a></header>
+    <header class="lib-head"><div class="lib-crest" aria-hidden="true">${CREST}</div>
+      <h1 class="lib-title">Wishlist</h1><p class="lib-sub">Things to watch, and doors I’d like to open someday.</p></header>
+    <button class="btn primary add-btn" id="addw"><span aria-hidden="true">+</span> Add to the wishlist</button>
+    ${wishes.length
+      ? group('To watch', wishes.filter(w => w.toWatch)) + group('Door ideas', wishes.filter(w => !w.toWatch))
+      : '<p class="empty">Nothing yet. What world comes next?</p>'}
+  </div>`;
+  $('#addw').onclick = () => wishForm();
+  $$('.wish-main').forEach(b => { b.onclick = () => wishForm(state.items.find(i => i.id === b.dataset.id)); });
+  $$('.wish-open').forEach(b => { b.onclick = () => { wishToOpen = b.dataset.open; location.hash = '#/new'; }; });
+}
+
 // ---------- add / edit a world ----------
 function trackToFields(track) {
   if (!track) return { type: 'none', seasons: '', noun: 'Film', items: '' };
@@ -495,6 +542,8 @@ function readTrack(root, old) {
 
 function renderWorldForm(world) {
   const isNew = !world;
+  // Opened from a wishlist idea: its name is filled in, and it leaves the list once the world exists.
+  const fromWish = isNew && wishToOpen ? state.items.find(i => i.id === wishToOpen) : null;
   const custom = isNew || world.theme === 'custom';
   const look = { ...Themes.PRESETS[0], ...(world && world.look) };
   const tf = trackToFields(world ? world.track : { type: 'episodes', seasons: [] });
@@ -519,7 +568,7 @@ function renderWorldForm(world) {
     <header class="w-head"><a class="back" href="${isNew ? '#/' : `#/w/${world.id}`}">‹ ${isNew ? 'Worlds' : 'Back'}</a></header>
     <h1 class="w-title small-title">${isNew ? 'Add a world' : 'World settings'}</h1>
     <form id="wf" novalidate class="card form-card">
-      <label class="field"><span class="field-label">Name</span><input id="name" value="${esc(world ? world.name : '')}" placeholder="Narnia, Bridgerton, Star Wars…"></label>
+      <label class="field"><span class="field-label">Name</span><input id="name" value="${esc(world ? world.name : (fromWish && fromWish.text) || '')}" placeholder="Narnia, Bridgerton, Star Wars…"></label>
       ${lookHtml}
       ${isNew ? '' : `<h2 class="form-h">Home page card</h2>
       <div class="card-pick">
@@ -543,6 +592,7 @@ function renderWorldForm(world) {
         <label class="field"><span class="field-label">Each one is a…</span><input id="t-noun" value="${esc(tf.noun)}" placeholder="Film"></label>
         <label class="field"><span class="field-label">Titles in order, one per line</span><textarea id="t-items" rows="6">${esc(tf.items)}</textarea></label>
       </div>
+      ${isNew || !(world.rounds > 0) ? `<label class="switch" data-t-any><input type="checkbox" id="first" ${(world && world.firstWatch) || (fromWish && fromWish.toWatch) ? 'checked' : ''}><span class="track"></span><span>I’m watching this for the first time</span></label>` : ''}
       <h2 class="form-h">My Canon</h2>
       <label class="switch"><input type="checkbox" id="canon" ${!world || world.canonOn ? 'checked' : ''}><span class="track"></span><span>Include a My Canon section</span></label>
       <div class="canon-parts" id="parts">
@@ -561,6 +611,8 @@ function renderWorldForm(world) {
   const showTrack = () => {
     const t = $('input[name=ttype]:checked', root).value;
     $$('[data-t]', root).forEach(el => { el.hidden = el.dataset.t !== t; });
+    const fw = $('[data-t-any]', root);
+    if (fw) fw.hidden = t === 'none';
   };
   $$('input[name=ttype]', root).forEach(r => { r.onchange = showTrack; });
   showTrack();
@@ -641,11 +693,13 @@ function renderWorldForm(world) {
       const canonPicked = Object.fromEntries($$('[data-part]', root).map(c => [c.dataset.part, c.checked]));
       const data = { name, track, canonOn: $('#canon').checked, canonParts: canonPicked };
       if (!isNew) data.cardInk = ink;
+      if ($('#first')) data.firstWatch = $('#first').checked;
       if (data.canonOn && !Object.values(canonPicked).some(Boolean)) throw new Error('Pick at least one thing to show on My Canon, or turn it off.');
       if (custom) data.look = { ...root._readLook(), photo: dropPhoto ? null : (look.photo || null) };
       if (isNew) {
         const order = Math.max(-1, ...state.worlds.map(w => w.order ?? 0)) + 1;
         const id = await DB.addWorld({ ...data, theme: 'custom', order, cutoff: null, ending: '', watched: [], rounds: 0 }, prepared);
+        if (fromWish) { await DB.deleteItem(fromWish); wishToOpen = null; toast('Door opened. It’s off your wishlist.'); }
         location.hash = `#/w/${id}`;
       } else {
         // A shorter tracker can't point past its end.

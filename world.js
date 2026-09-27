@@ -413,7 +413,9 @@ function drawRewatch(world, body) {
   const watched = watchedOf(world);
   const cutoff = world.canonOn && canonParts(world).ending && world.cutoff != null ? world.cutoff : null;
   const end = cutoff ?? steps.length - 1;
-  const round = (world.rounds || 0) + 1;
+  // A world made while watching for the first time counts "First watch", then Rewatch #1, #2…
+  const rounds = world.rounds || 0;
+  const roundName = n => (world.firstWatch ? (n === 0 ? 'First watch' : `Rewatch #${n}`) : `Rewatch #${n + 1}`);
   const info = Themes.info(world);
   const isList = world.track.type === 'list';
   const notes = new Map(itemsIn(world.id, 'epnote').map(n => [n.step, n]));
@@ -433,7 +435,7 @@ function drawRewatch(world, body) {
   const theEnd = cur === end && curSeen;
 
   const hero = `<div class="card rw-hero${theEnd ? ' done' : ''}">
-      <span class="rw-round">Rewatch #${round}</span>
+      <span class="rw-round">${roundName(rounds)}</span>
       <div class="rw-nav">
         <button class="rw-arrow" id="prev" aria-label="Previous" ${cur <= 0 ? 'disabled' : ''}>‹</button>
         <div class="rw-now">
@@ -450,7 +452,7 @@ function drawRewatch(world, body) {
       </div>
       <div class="rw-bar"><span style="width:${Math.round((seenInCanon / (end + 1)) * 100)}%"></span></div>
       <span class="muted small">${seenInCanon} of ${end + 1} watched</span>
-      ${theEnd ? `<button class="btn primary" id="again">Start rewatch #${round + 1}</button>` : ''}
+      ${theEnd ? `<button class="btn primary" id="again">Start ${roundName(rounds + 1).replace('R', 'r')}</button>` : ''}
       ${watched.size ? '<button class="btn small ghost" id="reset">Reset tracker</button>' : ''}
     </div>`;
 
@@ -519,6 +521,6 @@ function drawRewatch(world, body) {
   const again = $('#again');
   if (again) {
     again.onclick = () => DB.updateWorld(world, { watched: [], rounds: (world.rounds || 0) + 1 })
-      .then(() => { state.filters[curKey] = null; toast(`Rewatch #${round + 1} begins`); refresh(); }, e => toast(friendlyError(e), true));
+      .then(() => { state.filters[curKey] = null; toast(`${roundName(rounds + 1)} begins`); refresh(); }, e => toast(friendlyError(e), true));
   }
 }
