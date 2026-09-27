@@ -202,7 +202,7 @@ function route() {
 // Re-draw from fresh data, but never while a form is being filled in.
 function refresh() {
   const [page, , sub] = parseHash();
-  if (modalOpen) { missedRefresh = true; return; }
+  if (modalOpen || tileSorting) { missedRefresh = true; return; }
   if (page === 'new' || sub === 'settings') return;
   const y = window.scrollY;
   route();
@@ -347,6 +347,82 @@ function renderLibrary() {
     cardInk(el, w.cardInk);
   });
   $('#out').onclick = () => confirmBox('Sign out?', 'Your worlds stay saved in your account.', 'Sign out', () => DB.signOut());
+  enableTileDrag($('.shelf'));
+}
+
+// Hold a door (about half a second) to pick it up, drag it, let go to drop.
+// A quick tap still opens the world, and a swipe still scrolls the page.
+let dragListeners = null; // the last library's listeners, removed when it redraws
+let tileSorting = false;  // no redraws while a door is being dragged
+function enableTileDrag(shelf) {
+  if (dragListeners) dragListeners.abort();
+  dragListeners = new AbortController();
+  const opts = { signal: dragListeners.signal };
+  const HOLD_MS = 450, SLOP = 10;
+  let timer = null, start = null, tile = null, ghost = null, offset = null, dragging = false, justDragged = false;
+
+  const tiles = () => $$('.tile[data-world]', shelf);
+  const cancelHold = () => { clearTimeout(timer); timer = null; };
+
+  function pickUp() {
+    dragging = tileSorting = true;
+    const r = tile.getBoundingClientRect();
+    offset = { x: start.x - r.left, y: start.y - r.top };
+    ghost = tile.cloneNode(true);
+    ghost.classList.add('tile-ghost');
+    Object.assign(ghost.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    document.body.appendChild(ghost);
+    tile.classList.add('tile-placeholder');
+    shelf.classList.add('sorting');
+  }
+
+  function moveTo(x, y) {
+    ghost.style.left = `${x - offset.x}px`;
+    ghost.style.top = `${y - offset.y}px`;
+    const over = document.elementFromPoint(x, y);
+    const target = over && over.closest('.tile[data-world]');
+    if (!target || target === tile || !shelf.contains(target)) return;
+    const list = tiles();
+    shelf.insertBefore(tile, list.indexOf(target) > list.indexOf(tile) ? target.nextSibling : target);
+  }
+
+  function drop() {
+    ghost.remove();
+    ghost = null;
+    tile.classList.remove('tile-placeholder');
+    shelf.classList.remove('sorting');
+    dragging = tileSorting = false;
+    justDragged = true;
+    setTimeout(() => { justDragged = false; }, 50);
+    const ids = tiles().map(t => t.dataset.world);
+    const changed = ids.map((id, k) => [worldById(id), k]).filter(([w, k]) => w && w.order !== k);
+    if (changed.length) {
+      Promise.all(changed.map(([w, k]) => DB.updateWorld(w, { order: k })))
+        .catch(e => { toast(friendlyError(e), true); refresh(); });
+    }
+    if (missedRefresh) { missedRefresh = false; setTimeout(refresh, 0); }
+  }
+
+  shelf.addEventListener('pointerdown', e => {
+    const t = e.target.closest('.tile[data-world]');
+    if (!t || e.button > 0) return;
+    tile = t;
+    start = { x: e.clientX, y: e.clientY };
+    timer = setTimeout(pickUp, HOLD_MS);
+  });
+  window.addEventListener('pointermove', e => {
+    if (dragging) { moveTo(e.clientX, e.clientY); return; }
+    if (timer && Math.hypot(e.clientX - start.x, e.clientY - start.y) > SLOP) cancelHold();
+  }, opts);
+  const end = () => { cancelHold(); if (dragging) drop(); };
+  window.addEventListener('pointerup', end, opts);
+  window.addEventListener('pointercancel', () => { if (!dragging) cancelHold(); }, opts);
+  // While dragging, the finger moves the door, not the page.
+  shelf.addEventListener('touchmove', e => { if (dragging) e.preventDefault(); }, { passive: false });
+  // iPhone hands a held finger to scrolling unless we keep it; finish on touchend.
+  shelf.addEventListener('touchend', end);
+  shelf.addEventListener('click', e => { if (dragging || justDragged) { e.preventDefault(); e.stopPropagation(); } }, true);
+  shelf.addEventListener('contextmenu', e => { if (e.target.closest('.tile')) e.preventDefault(); });
 }
 
 // The world name's color on its home card (null = the theme's own, or white on a photo).
