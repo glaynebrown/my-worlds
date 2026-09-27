@@ -172,7 +172,7 @@ function parseHash() {
   return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
 }
 
-const THEME_COLOR = { library: '#16110e', avatar: '#efe3c8', twd: '#1f1e1a', hp: '#1a120c' };
+const THEME_COLOR = { library: '#16110e', avatar: '#efe3c8', twd: '#1f1e1a', hp: '#1a120c', lotr: '#121812' };
 function setPageTheme(world) {
   const body = document.body;
   if (world) Themes.apply(body, world);
@@ -248,7 +248,7 @@ function startSession() {
       if (got.worlds && got.items) {
         setTimeout(savePhotosForOffline, 3000);
         state.loaded = true;
-        if (!state.settings.seeded && !state.worlds.length) seedStarters();
+        seedStarters();
         route();
       }
     };
@@ -260,19 +260,30 @@ function startSession() {
   });
 }
 
-// The first time you sign in: Avatar, The Walking Dead and Harry Potter.
+// The built-in worlds (themes.js STARTERS). The first sign-in gets all of
+// them; a built-in added later (like Lord of the Rings) shows up once in an
+// existing account. settings.seededThemes remembers which were given, so one
+// you delete doesn't come back.
 let seeding = false;
 async function seedStarters() {
   if (seeding) return;
+  const s = state.settings;
+  const given = s.seededThemes || (s.seeded || state.worlds.length ? ['avatar', 'twd', 'hp'] : []);
+  const todo = Themes.STARTERS.map((w, i) => [w, i]).filter(([w]) => !given.includes(w.theme) && !state.worlds.some(x => x.theme === w.theme));
+  if (!todo.length && s.seededThemes) return;
   seeding = true;
   try {
-    const ids = [];
-    for (const [i, w] of Themes.STARTERS.entries()) ids.push(await DB.addWorld({ ...w, order: i, watched: [], rounds: 0 }));
-    for (const { world, ...item } of Themes.STARTER_ITEMS) await DB.addItem({ ...item, world: ids[world] });
-    await DB.saveSettings({ seeded: true });
-    state.settings.seeded = true;
-    if (DB.demo) await DB.addSamples(ids);
+    const firstTime = !state.worlds.length;
+    let order = Math.max(-1, ...state.worlds.map(w => w.order ?? 0)) + 1;
+    const ids = {};
+    for (const [w, i] of todo) ids[i] = await DB.addWorld({ ...w, order: order++, watched: [], rounds: 0 });
+    for (const { world, ...item } of Themes.STARTER_ITEMS) if (ids[world]) await DB.addItem({ ...item, world: ids[world] });
+    const all = Themes.STARTERS.map(w => w.theme);
+    await DB.saveSettings({ seeded: true, seededThemes: all });
+    Object.assign(s, { seeded: true, seededThemes: all });
+    if (DB.demo && firstTime) await DB.addSamples(Object.values(ids));
   } catch (e) { console.error(e); toast(friendlyError(e), true); }
+  seeding = false;
 }
 
 // ---------- setup / sign in ----------

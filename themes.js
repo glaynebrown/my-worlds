@@ -38,6 +38,13 @@ const Themes = (() => {
       palette: [['Scarlet', '#740001'], ['Gold', '#b8891c'], ['Emerald', '#1a472a'], ['Midnight', '#222f5b']],
       theEnd: 'The end.',
     },
+    lotr: {
+      label: 'The Lord of the Rings',
+      fonts: ['Uncial Antiqua', 'Alegreya:ital,wght@0,400;0,600;1,400'],
+      empty: 'An empty page, waiting for a tale.',
+      palette: [['Gold', '#b8913a'], ['Elven', '#6f8fa8'], ['Shire', '#5f7d3c'], ['Ember', '#a8431f']],
+      theEnd: 'The end.',
+    },
   };
 
   // "Add a world": starting looks you can then tweak.
@@ -186,6 +193,12 @@ const Themes = (() => {
       },
     },
   ];
+  // (Built-ins added later go at the end; see seedStarters in app.js.)
+  STARTERS.push({
+    name: 'The Lord of the Rings', theme: 'lotr', canonOn: false, cutoff: null, ending: '',
+    track: { type: 'list', noun: 'Film', items: ['The Fellowship of the Ring', 'The Two Towers', 'The Return of the King'] },
+  });
+
   // Added the first time you sign in, alongside STARTERS (by index).
   const STARTER_ITEMS = [
     { world: 0, kind: 'ship', name: 'Zutara', note: 'Endgame.', colors: ['#b8352b', '#2f6f9f'] },
