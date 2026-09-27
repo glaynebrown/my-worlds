@@ -1,0 +1,185 @@
+/* Each world's look. The selectors are [data-theme=...] (not just body) so a
+   library tile or a preview can wear a world's look too. Textures are small
+   inline SVGs, so there are no image files to upload.
+   Worlds made with "Add a world" set their variables inline (themes.js). */
+
+/* defaults any theme can override */
+[data-theme] { --radius: 14px; --btn-radius: 999px; --font-body: 'Lora', Georgia, serif; --font-head: 'Cormorant Garamond', Georgia, serif; }
+
+/* ======================= Library (home) ======================= */
+[data-theme="library"] {
+  --bg: #16110e;
+  --bg-img:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .9 0 0 0 0 .7 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 80% 45% at 50% 0%, rgba(201,163,90,.22), transparent 70%),
+    radial-gradient(ellipse at 50% 120%, rgba(0,0,0,.6), transparent 60%);
+  --page-ink: #f1e7d4; --page-muted: #b3a58c;
+  --card: #f4ecdd; --ink: #2b221a; --muted: #7b6c58; --line: #dccfb8;
+  --accent: #c9a35a; --on-accent: #1a140f;
+  --font-head: 'Cormorant Garamond', Georgia, serif;
+}
+[data-theme="library"] .lib-title { color: #ecd9ae; }
+[data-theme="library"] .btn.primary { color: #1a140f; }
+
+/* ======================= Avatar: painted scroll ======================= */
+[data-theme="avatar"] {
+  --bg: #efe3c8;
+  --bg-img:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .45 0 0 0 0 .3 0 0 0 0 .12 0 0 0 .09 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' fill='none' stroke='%23a07a3c' stroke-width='1.3' stroke-linecap='round' opacity='.2'%3E%3Cpath d='M30 60c0-10 14-12 18-4s-4 16-14 14-14-16-4-24 30-6 32 10'/%3E%3Cpath d='M62 56c10-2 22 2 30 0'/%3E%3Cpath d='M130 150c0-10 14-12 18-4s-4 16-14 14-14-16-4-24 30-6 32 10'/%3E%3Cpath d='M162 146c10-2 22 2 30 0M104 150c-10 0-16-3-26-1'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 20% 10%, rgba(255,250,235,.7), transparent 55%),
+    radial-gradient(ellipse at 90% 100%, rgba(160,110,50,.18), transparent 60%);
+  --page-ink: #3b2a1a; --page-muted: #7a6448; --title: #3b2a1a;
+  --card: #f9f2df; --ink: #3b2a1a; --muted: #7d6a52; --line: #dfcfa9;
+  --accent: #b8352b; --on-accent: #fff8ec;
+  --font-head: 'Ma Shan Zheng', 'Brush Script MT', cursive;
+  --font-body: 'Spectral', Georgia, serif;
+  --radius: 6px;
+  --card-border: 1px solid #e3d3ad;
+  --card-shadow: 0 1px 0 #d6c399, 0 8px 18px rgba(90,60,20,.12);
+}
+[data-theme="avatar"] .w-title { font-size: clamp(2.3rem, 10vw, 3.4rem); letter-spacing: .01em; }
+/* Four nations under the title: water, earth, fire, air. */
+[data-theme="avatar"] .w-flourish {
+  height: 22px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='22'%3E%3Cpath d='M4 11h40M176 11h40' stroke='%23a07a3c' stroke-width='1.2'/%3E%3Ccircle cx='68' cy='11' r='7' fill='%232f6f9f'/%3E%3Ccircle cx='96' cy='11' r='7' fill='%235e7d3a'/%3E%3Ccircle cx='124' cy='11' r='7' fill='%23b8352b'/%3E%3Ccircle cx='152' cy='11' r='7' fill='%23d98b2b'/%3E%3C/svg%3E") center / auto 22px no-repeat;
+}
+[data-theme="avatar"] .w-tabs a { font-family: var(--font-head); font-size: min(1.05rem, 3.7vw); font-weight: 400; border-color: color-mix(in srgb, var(--tab) 45%, transparent); }
+[data-theme="avatar"] .w-tabs a { border-width: 1.5px; border-color: color-mix(in srgb, var(--tab) 60%, transparent); }
+[data-theme="avatar"] .sec-h { border-bottom: 1.5px solid color-mix(in srgb, var(--tab) 50%, transparent); padding-bottom: 4px; }
+/* Quotes and headcanons read like little scrolls: rolled ends top and bottom. */
+[data-theme="avatar"] .quote, [data-theme="avatar"] .head { border-left: 4px solid var(--tab); }
+[data-theme="avatar"] .quote-text { font-style: italic; }
+[data-theme="avatar"] .canon-end { border-top: 6px double var(--tab); border-bottom: 6px double var(--tab); }
+[data-theme="avatar"] .pin { border: 5px solid #fbf5e6; box-shadow: 0 1px 0 #d6c399, 0 6px 14px rgba(90,60,20,.14); }
+[data-theme="avatar"] .the-end-word { font-size: 3rem; }
+/* library tile */
+[data-theme="avatar"].tile .tile-art {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='30'%3E%3Ccircle cx='21' cy='15' r='9' fill='%232f6f9f'/%3E%3Ccircle cx='47' cy='15' r='9' fill='%235e7d3a'/%3E%3Ccircle cx='73' cy='15' r='9' fill='%23b8352b'/%3E%3Ccircle cx='99' cy='15' r='9' fill='%23d98b2b'/%3E%3C/svg%3E") 14px 16px / 96px auto no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100' fill='none' stroke='%23a07a3c' stroke-width='2' stroke-linecap='round' opacity='.35'%3E%3Cpath d='M20 60c0-16 22-20 28-6s-6 26-22 22-22-26-6-38 48-10 50 16'/%3E%3Cpath d='M70 54c10-2 16 2 24 0'/%3E%3C/svg%3E") 60% 45% / 80% auto no-repeat;
+}
+[data-theme="avatar"].tile { box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 6px #f6ecd4, inset 0 0 0 7px #c9ad74; }
+[data-theme="avatar"].tile .tile-name { font-size: 1.45rem; }
+
+/* ======================= The Walking Dead: survival journal ======================= */
+[data-theme="twd"] {
+  --bg: #1f1e1a;
+  --bg-img:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.55' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .8 0 0 0 0 .78 0 0 0 0 .7 0 0 0 .13 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 30% 20%, rgba(120,118,100,.28), transparent 55%),
+    radial-gradient(ellipse at 80% 70%, rgba(90,70,50,.25), transparent 50%),
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,.65) 100%);
+  --page-ink: #e8e0cc; --page-muted: #a39c89; --title: #e8e0cc;
+  --card: #d9ccb0; --ink: #2a2620; --muted: #6b604f; --line: #b9aa8a;
+  --accent: #8e2a1c; --on-accent: #f4ecd8;
+  --font-head: 'Stardos Stencil', 'Impact', sans-serif;
+  --font-body: 'Special Elite', 'Courier New', monospace;
+  --font-end: 'Permanent Marker', cursive;
+  --end-color: #c0281c;
+  --radius: 2px; --btn-radius: 3px;
+  --card-shadow: 0 4px 12px rgba(0,0,0,.55);
+}
+[data-theme="twd"] body, body[data-theme="twd"] { font-size: 16px; }
+[data-theme="twd"] .w-title { font-weight: 700; text-transform: uppercase; letter-spacing: .06em; font-size: clamp(2.1rem, 10vw, 3.3rem); text-shadow: 0 2px 0 rgba(0,0,0,.6); }
+/* A spray-painted slash under the title. */
+[data-theme="twd"] .w-flourish {
+  height: 20px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='20'%3E%3Cfilter id='r'%3E%3CfeTurbulence baseFrequency='.9' numOctaves='2'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='5'/%3E%3C/filter%3E%3Cpath d='M8 13 C80 6 170 15 252 7' stroke='%23b3261e' stroke-width='5' stroke-linecap='round' fill='none' filter='url(%23r)' opacity='.9'/%3E%3C/svg%3E") center / auto 20px no-repeat;
+}
+[data-theme="twd"] .w-tabs a { font-family: var(--font-head); letter-spacing: 0; font-weight: 700; border-radius: 2px; font-size: min(.95rem, 3.4vw); }
+[data-theme="twd"] .w-tabs a[aria-current] { background: var(--accent); color: #f4ecd8; box-shadow: 0 2px 0 rgba(0,0,0,.5); }
+[data-theme="twd"] .sec-h, [data-theme="twd"] .fav-name, [data-theme="twd"] .fic-title, [data-theme="twd"] .rw-next, [data-theme="twd"] .modal h2, [data-theme="twd"] .form-h { text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+[data-theme="twd"] .btn { font-family: var(--font-head); text-transform: uppercase; letter-spacing: .05em; }
+/* Torn bottom edge on paper cards. */
+[data-theme="twd"] .card, [data-theme="twd"] .rw-item {
+  -webkit-mask: linear-gradient(#000 0 0) top / 100% calc(100% - 7px) no-repeat, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 14px 7px repeat-x;
+          mask: linear-gradient(#000 0 0) top / 100% calc(100% - 7px) no-repeat, conic-gradient(from -45deg at bottom, #0000, #000 1deg 89deg, #0000 90deg) bottom / 14px 7px repeat-x;
+  padding-bottom: 20px;
+  background-image: repeating-linear-gradient(transparent 0 27px, rgba(80,70,50,.14) 27px 28px);
+}
+[data-theme="twd"] .fic { padding-bottom: 7px; }
+/* Mood board = taped-up polaroids. */
+[data-theme="twd"] .pin { background: #e8e0cc; padding: 7px 7px 0; border-radius: 1px; overflow: visible; transform: rotate(-1.2deg); }
+[data-theme="twd"] .pin:nth-child(2n) { transform: rotate(1.4deg); }
+[data-theme="twd"] .pin:nth-child(3n) { transform: rotate(-.4deg); }
+[data-theme="twd"] .pin::before { content: ''; position: absolute; top: -9px; left: 50%; width: 58px; height: 18px; transform: translateX(-50%) rotate(-3deg); background: rgba(220,210,180,.75); box-shadow: 0 1px 2px rgba(0,0,0,.2); }
+[data-theme="twd"] .pin img { margin-bottom: 7px; }
+[data-theme="twd"] .pin-cap { padding: 0 3px 8px; }
+[data-theme="twd"] .board { padding-top: 8px; }
+[data-theme="twd"] .fav-photo { border-radius: 2px; box-shadow: 0 0 0 5px #efe7d2, 0 3px 8px rgba(0,0,0,.4); transform: rotate(-2deg); }
+[data-theme="twd"] .fav:nth-child(2n) .fav-photo { transform: rotate(2deg); }
+[data-theme="twd"] .fav-rank { font-family: var(--font-end); color: #b3261e; font-size: 1.4rem; }
+/* The end, in spray paint. */
+[data-theme="twd"] .the-end-word { transform: rotate(-4deg); font-size: 3.1rem; text-shadow: 0 0 5px rgba(192,40,28,.55), 0 0 16px rgba(192,40,28,.25); }
+[data-theme="twd"] .cut-mark { width: 6px; height: 40px; background: #c0281c; box-shadow: 0 0 6px rgba(192,40,28,.7); transform: rotate(8deg); border-radius: 3px; }
+[data-theme="twd"] .rw-ep { border-radius: 2px; font-family: var(--font-body); }
+[data-theme="twd"] .not-canon summary { font-family: var(--font-end); color: #c0281c; font-size: 1.15rem; }
+[data-theme="twd"] .ship-name { text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+[data-theme="twd"] .quote-text { font-size: 1.05rem; }
+[data-theme="twd"] .chip { border-radius: 2px; font-family: var(--font-body); }
+[data-theme="twd"] .modal { background-image: repeating-linear-gradient(transparent 0 27px, rgba(80,70,50,.12) 27px 28px); }
+[data-theme="twd"] .empty { font-family: var(--font-body); }
+/* library tile */
+[data-theme="twd"].tile .tile-art {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 130'%3E%3Cfilter id='r'%3E%3CfeTurbulence baseFrequency='.8' numOctaves='2'/%3E%3CfeDisplacementMap in='SourceGraphic' scale='4'/%3E%3C/filter%3E%3Cpath d='M10 40 L88 26' stroke='%23b3261e' stroke-width='6' stroke-linecap='round' filter='url(%23r)' opacity='.85'/%3E%3Cpath d='M18 54 L80 44' stroke='%23b3261e' stroke-width='3' stroke-linecap='round' filter='url(%23r)' opacity='.6'/%3E%3C/svg%3E") center / 100% auto no-repeat;
+}
+[data-theme="twd"].tile .tile-name { text-transform: uppercase; font-weight: 700; letter-spacing: .04em; font-size: 1.3rem; }
+
+/* ======================= Harry Potter: candlelit parchment ======================= */
+[data-theme="hp"] {
+  --bg: #1a120c;
+  --bg-img:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1 0 0 0 0 .8 0 0 0 0 .5 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 70% 40% at 50% 0%, rgba(255,184,80,.3), transparent 70%),
+    radial-gradient(ellipse at 50% 60%, transparent 35%, rgba(0,0,0,.6) 100%),
+    linear-gradient(#2a1a10, #140d08);
+  --page-ink: #f0e2bf; --page-muted: #bfa87a; --title: #e0b74a;
+  --card: #efe2c2; --ink: #3a2412; --muted: #7a5c3a; --line: #d4bf92;
+  --accent: #740001; --on-accent: #f6e7c1;
+  --font-head: 'IM Fell English SC', Georgia, serif;
+  --font-body: 'EB Garamond', Georgia, serif;
+  --font-quote: 'IM Fell English', Georgia, serif;
+  --end-color: #740001;
+  --radius: 3px; --btn-radius: 4px;
+  --card-shadow: inset 0 0 28px rgba(130,85,30,.3), 0 8px 20px rgba(0,0,0,.5);
+}
+[data-theme="hp"] .w-title { letter-spacing: .03em; text-shadow: 0 0 18px rgba(224,183,74,.35); }
+/* Gold rule with a little lightning bolt. */
+[data-theme="hp"] .w-flourish {
+  height: 24px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='24'%3E%3Cpath d='M8 12h92M140 12h92' stroke='%23d3a625' stroke-width='1'/%3E%3Cpath d='M100 12l4-3 4 3-4 3z M132 12l4-3 4 3-4 3z' fill='%23d3a625'/%3E%3Cpath d='M123 2 113 13h7l-4 10 11-13h-7z' fill='%23e0b74a'/%3E%3C/svg%3E") center / auto 24px no-repeat;
+}
+[data-theme="hp"] .card, [data-theme="hp"] .rw-item, [data-theme="hp"] .modal {
+  background-color: var(--card);
+  background-image:
+    radial-gradient(ellipse at 15% 20%, rgba(160,110,40,.14), transparent 40%),
+    radial-gradient(ellipse at 85% 90%, rgba(120,70,20,.16), transparent 45%);
+}
+[data-theme="hp"] .w-tabs a { font-family: var(--font-head); font-weight: 400; font-size: min(1rem, 3.4vw); border-color: rgba(211,166,37,.45); color: #ecd9a8; border-radius: 4px; }
+[data-theme="hp"] .w-tabs a[aria-current] { background: #740001; color: #f3d57a; border-color: #d3a625; }
+[data-theme="hp"] .btn.primary { background: #740001; color: #f3d57a; border: 1px solid #b8891c; }
+/* Section headings like labels on the Marauder's Map. */
+[data-theme="hp"] .sec-h { color: var(--title); text-align: center; letter-spacing: .08em; }
+[data-theme="hp"] .sec-h::before, [data-theme="hp"] .sec-h::after { content: '~'; margin: 0 .5em; color: #b8891c; }
+[data-theme="hp"] .quote-text { font-family: var(--font-quote); font-style: italic; font-size: 1.2rem; }
+[data-theme="hp"] .fav-photo { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px #b8891c; }
+[data-theme="hp"] .fav-rank, [data-theme="hp"] .fav-initials { color: #740001; }
+[data-theme="hp"] .pin { border: 1px solid #b8891c; box-shadow: 0 0 0 4px #2a1a10, 0 0 0 5px #b8891c, 0 8px 18px rgba(0,0,0,.5); margin-bottom: 18px; }
+[data-theme="hp"] .board { column-gap: 18px; padding: 6px; }
+[data-theme="hp"] .rw-ep { border-color: rgba(211,166,37,.4); color: #ecd9a8; }
+[data-theme="hp"] .rw-item.seen .rw-check { background: #740001; }
+[data-theme="hp"] .empty { color: #cdb27a; font-style: italic; }
+[data-theme="hp"] .chip { border-color: rgba(211,166,37,.45); color: #ecd9a8; }
+[data-theme="hp"] .chip.on { background: #d3a625; color: #1a120c; }
+/* library tile */
+[data-theme="hp"].tile .tile-art {
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Cpath d='M26 6 12 30h9l-6 24 17-30h-9z' fill='%23d3a625' opacity='.85'/%3E%3C/svg%3E") 50% 32% / 34% auto no-repeat,
+    radial-gradient(ellipse at 50% 30%, rgba(255,184,80,.35), transparent 60%);
+}
+[data-theme="hp"].tile { box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px #b8891c; }
+[data-theme="hp"].tile .tile-name { color: #e0b74a; }
+
+/* ======================= Worlds you add ======================= */
+[data-theme="custom"] { --radius: 14px; --card-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 16px rgba(0,0,0,.1); }
+[data-theme="custom"] .w-flourish { background: linear-gradient(var(--accent), var(--accent)) center / 140px 1.5px no-repeat, radial-gradient(circle, var(--accent) 0 4px, transparent 4.5px) center / 10px 10px no-repeat; }

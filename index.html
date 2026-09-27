@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>My Worlds</title>
+<meta name="description" content="My fandom worlds: mood boards, quotes, favorites, my canon, fics and rewatches.">
+<meta name="theme-color" content="#16110e">
+<!-- Home-screen app: icon, name, and opening full-screen without browser bars -->
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Worlds">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Lora:ital,wght@0,400;0,600;1,400&display=swap">
+<link rel="stylesheet" href="styles.css">
+<link rel="stylesheet" href="themes.css">
+</head>
+<body data-theme="library">
+<div id="banner" class="banner" hidden>Sample mode · nothing is saved</div>
+<main id="view"><p class="loading">Loading…</p></main>
+<div id="toast" role="status" aria-live="polite"></div>
+
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-storage-compat.js"></script>
+<script src="firebase-config.js"></script>
+<script src="themes.js"></script>
+<script src="photos.js"></script>
+<script src="store.js"></script>
+<script src="demo.js"></script>
+<script src="world.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

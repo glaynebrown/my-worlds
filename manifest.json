@@ -1,0 +1,14 @@
+{
+  "name": "My Worlds",
+  "short_name": "Worlds",
+  "description": "My fandom worlds: mood boards, quotes, favorites, my canon, fics and rewatches.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#16110e",
+  "theme_color": "#16110e",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any maskable" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}

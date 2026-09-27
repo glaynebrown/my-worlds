@@ -1,0 +1,523 @@
+/* Inside a world: Mood board, Quotes, Favorites, My Canon (optional), Fics
+   and Rewatch. Every add/edit happens in a pop-up (formModal in app.js), so
+   the page itself never holds half-typed text when new data arrives. */
+
+const SECTIONS = [
+  ['board', 'Board'], ['quotes', 'Quotes'], ['favs', 'Favorites'],
+  ['canon', 'My Canon'], ['fics', 'Fics'], ['rewatch', 'Rewatch'],
+];
+
+const byNewest = (a, b) => (b.t || 0) - (a.t || 0);
+const byOldest = (a, b) => (a.t || 0) - (b.t || 0);
+const empty = (world, text) => `<p class="empty">${esc(text || Themes.info(world).empty)}</p>`;
+const addBtn = (id, label) => `<button class="btn primary add-btn" id="${id}"><span aria-hidden="true">+</span> ${esc(label)}</button>`;
+
+function renderWorld(world, section) {
+  const sections = SECTIONS.filter(([k]) => k !== 'canon' || world.canonOn);
+  if (!sections.some(([k]) => k === section)) section = 'board';
+  const colors = Themes.info(world).tabColors || {};
+
+  view.innerHTML = `<div class="page world">
+    <header class="w-head">
+      <a class="back" href="#/">‹ Worlds</a>
+      <a class="gear" href="#/w/${world.id}/settings" aria-label="World settings"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5"/></svg></a>
+    </header>
+    <div class="w-hero"><h1 class="w-title">${esc(world.name)}</h1><div class="w-flourish" aria-hidden="true"></div></div>
+    <nav class="w-tabs" aria-label="Sections">${sections.map(([k, label]) =>
+      `<a href="#/w/${world.id}/${k}" style="${colors[k] ? `--tab:${colors[k]}` : ''}" ${k === section ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
+    <section class="w-body" id="wb" style="${colors[section] ? `--tab:${colors[section]}` : ''}"></section>
+  </div>`;
+
+  const body = $('#wb');
+  ({ board: drawBoard, quotes: drawQuotes, favs: drawFavs, canon: drawCanon, fics: drawFics, rewatch: drawRewatch })[section](world, body);
+}
+
+// Little filter chips (by character, by ship). Remembered per world + section.
+function chips(world, key, values) {
+  const uniq = [...new Set(values.filter(Boolean))].sort((a, b) => a.localeCompare(b));
+  if (uniq.length < 2) return { html: '', pick: null };
+  const fk = `${world.id}:${key}`;
+  let pick = state.filters[fk];
+  if (pick && !uniq.includes(pick)) pick = state.filters[fk] = null;
+  const html = `<div class="chips" data-fk="${esc(fk)}"><button class="chip ${pick ? '' : 'on'}" data-v="">All</button>${uniq.map(v =>
+    `<button class="chip ${v === pick ? 'on' : ''}" data-v="${esc(v)}">${esc(v)}</button>`).join('')}</div>`;
+  return { html, pick };
+}
+function wireChips(body, redraw) {
+  const row = $('.chips', body);
+  if (!row) return;
+  row.onclick = e => {
+    const b = e.target.closest('.chip');
+    if (!b) return;
+    state.filters[row.dataset.fk] = b.dataset.v || null;
+    redraw();
+  };
+}
+
+// ---------- Mood board ----------
+// A photo board: used for the world's mood board and for each ship's page.
+// newItem = the fields every added photo gets ({ world, kind, ... }).
+// The page redraws as each photo arrives, so upload progress lives out here.
+const uploads = {};
+function photoBoard(world, body, pins, newItem, emptyText) {
+  const key = `${newItem.kind}:${newItem.ship || world.id}`;
+  body.insertAdjacentHTML('beforeend', `<label class="btn primary add-btn"><span aria-hidden="true">+</span> Add photos<input type="file" accept="image/*" multiple hidden class="pinfile"></label>
+    <p class="muted small progress" ${uploads[key] ? '' : 'hidden'}>${esc(uploads[key] || '')}</p>
+    ${pins.length ? `<div class="board">${pins.map(p => `<button class="pin" data-id="${p.id}"><img src="${esc(p.photo && p.photo.thumbUrl)}" alt="${esc(p.caption || 'Photo')}" loading="lazy" ${p.photo ? `width="${p.photo.w}" height="${p.photo.h}"` : ''}>${p.caption ? `<span class="pin-cap">${esc(p.caption)}</span>` : ''}</button>`).join('')}</div>` : empty(world, emptyText)}`);
+
+  $('.pinfile', body).onchange = async e => {
+    const files = [...e.target.files];
+    e.target.value = '';
+    if (!files.length) return;
+    const show = text => {
+      uploads[key] = text;
+      const prog = $('.progress');
+      if (prog) { prog.textContent = text || ''; prog.hidden = !text; }
+    };
+    let done = 0;
+    try {
+      for (const f of files) {
+        show(`Adding ${done + 1} of ${files.length}…`);
+        await DB.addItem({ ...newItem, caption: '' }, await Photos.prepare(f));
+        done++;
+      }
+      toast(done === 1 ? 'Photo added' : `${done} photos added`);
+    } catch (x) { console.error(x); toast(friendlyError(x), true); }
+    show(null);
+  };
+
+  $$('.pin', body).forEach(el => {
+    el.onclick = () => {
+      const pin = state.items.find(i => i.id === el.dataset.id);
+      openModal(`<img class="viewer-img" src="${esc(pin.photo.url)}" alt="">
+        <label class="field"><span class="field-label">Caption (optional)</span><input id="cap" value="${esc(pin.caption || '')}"></label>
+        <div class="actions"><button class="btn ghost danger-text" id="del">Delete</button><span class="spacer"></span><button class="btn" data-close>Close</button><button class="btn primary" id="save">Save</button></div>`,
+      (root, close) => {
+        $('#save', root).onclick = e => busy(e.target, async () => { await DB.updateItem(pin, { caption: $('#cap', root).value.trim() }); close(); });
+        $('#del', root).onclick = () => { close(); confirmBox('Delete this photo?', 'It’s removed for good.', 'Delete', () => DB.deleteItem(pin)); };
+      }, 'viewer');
+    };
+  });
+}
+
+function drawBoard(world, body) {
+  body.innerHTML = '';
+  photoBoard(world, body, itemsIn(world.id, 'pin').sort(byNewest), { world: world.id, kind: 'pin' });
+}
+
+// ---------- Quotes ----------
+function quoteForm(world, q) {
+  formModal({
+    title: q ? 'Edit quote' : 'Add a quote',
+    values: q || {},
+    fields: [
+      { key: 'text', label: 'Quote', type: 'textarea' },
+      { key: 'who', label: 'Who said it', placeholder: world.theme === 'twd' ? 'Daryl' : '' },
+      { key: 'where', label: 'Where (optional)', placeholder: world.track && world.track.type === 'list' ? 'Which film' : 'S2 E5' },
+    ],
+    onSave: async v => {
+      if (!v.text) throw new Error('Type the quote first.');
+      if (q) await DB.updateItem(q, v); else await DB.addItem({ world: world.id, kind: 'quote', ...v });
+    },
+    onDelete: q && (() => confirmBox('Delete this quote?', '', 'Delete', () => DB.deleteItem(q))),
+  });
+}
+
+function drawQuotes(world, body) {
+  const all = itemsIn(world.id, 'quote').sort(byNewest);
+  const { html, pick } = chips(world, 'who', all.map(q => q.who));
+  const list = pick ? all.filter(q => q.who === pick) : all;
+  body.innerHTML = `${addBtn('addq', 'Add a quote')}${html}
+    ${list.length ? `<div class="quotes">${list.map(q => `<button class="quote card" data-id="${q.id}">
+      <span class="quote-text">${esc(q.text)}</span>
+      ${q.who || q.where ? `<span class="quote-by">— ${esc([q.who, q.where].filter(Boolean).join(', '))}</span>` : ''}</button>`).join('')}</div>` : empty(world)}`;
+  $('#addq').onclick = () => quoteForm(world);
+  wireChips(body, () => drawQuotes(world, body));
+  $$('.quote', body).forEach(el => { el.onclick = () => quoteForm(world, state.items.find(i => i.id === el.dataset.id)); });
+}
+
+// ---------- Favorites ----------
+const favsOf = world => itemsIn(world.id, 'fav').sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || byOldest(a, b));
+const initials = name => name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('');
+
+function favForm(world, f) {
+  formModal({
+    title: f ? `Edit ${f.name}` : 'Add a favorite',
+    values: f || {},
+    fields: [
+      { key: 'name', label: 'Name' },
+      { key: 'photo', label: 'Photo', type: 'photo' },
+      { key: 'quote', label: 'Favorite line (optional)', type: 'textarea' },
+      { key: 'note', label: 'Why I love them (optional)', type: 'textarea' },
+    ],
+    extra: f ? `<div class="row-btns"><button type="button" class="btn small" data-move="-1">Move up</button><button type="button" class="btn small" data-move="1">Move down</button></div>` : '',
+    onSave: async (v, { photo, dropPhoto }) => {
+      if (!v.name) throw new Error('Add a name.');
+      if (f) await DB.updateItem(f, v, photo, dropPhoto);
+      else await DB.addItem({ world: world.id, kind: 'fav', order: favsOf(world).length, ...v }, photo);
+    },
+    onDelete: f && (() => confirmBox(`Remove ${f.name}?`, '', 'Remove', () => DB.deleteItem(f))),
+  });
+  if (!f) return;
+  $$('[data-move]').forEach(b => {
+    b.onclick = () => {
+      const list = favsOf(world);
+      const i = list.findIndex(x => x.id === f.id), j = i + Number(b.dataset.move);
+      if (j < 0 || j >= list.length) return toast(j < 0 ? 'Already first.' : 'Already last.');
+      [list[i], list[j]] = [list[j], list[i]];
+      Promise.all(list.map((x, k) => (x.order === k ? null : DB.updateItem(x, { order: k }))))
+        .then(() => toast(j < i ? 'Moved up' : 'Moved down'), e => toast(friendlyError(e), true));
+    };
+  });
+}
+
+function drawFavs(world, body) {
+  const list = favsOf(world);
+  body.innerHTML = `${addBtn('addf', 'Add a favorite')}
+    ${list.length ? `<div class="favs">${list.map((f, i) => `<button class="fav card" data-id="${f.id}">
+      <span class="fav-rank">${i + 1}</span>
+      <span class="fav-photo">${f.photo ? `<img src="${esc(f.photo.thumbUrl)}" alt="" loading="lazy">` : `<span class="fav-initials">${esc(initials(f.name))}</span>`}</span>
+      <span class="fav-name">${esc(f.name)}</span>
+      ${f.quote ? `<span class="fav-quote">“${esc(f.quote)}”</span>` : ''}
+      ${f.note ? `<span class="fav-note">${esc(f.note)}</span>` : ''}</button>`).join('')}</div>` : empty(world)}`;
+  $('#addf').onclick = () => favForm(world);
+  $$('.fav', body).forEach(el => { el.onclick = () => favForm(world, state.items.find(i => i.id === el.dataset.id)); });
+}
+
+// ---------- My Canon ----------
+// Which parts My Canon shows (picked in world settings). Older worlds show all three.
+const canonParts = world => ({ ending: true, ships: true, headcanons: true, ...(world.canonParts || {}) });
+const shipPhotos = ship => state.items.filter(i => i.kind === 'shippic' && i.ship === ship.id).sort(byNewest);
+
+function endingForm(world) {
+  formModal({
+    title: 'My ending',
+    values: { ending: world.ending },
+    fields: [{ key: 'ending', label: 'How it really ends', type: 'textarea', big: true, placeholder: 'In my version…' }],
+    onSave: v => DB.updateWorld(world, { ending: v.ending }),
+  });
+}
+
+function shipForm(world, s) {
+  formModal({
+    title: s ? `Edit ${s.name}` : 'Add a ship',
+    values: s || {},
+    fields: [
+      { key: 'name', label: 'Ship name', placeholder: 'Zutara' },
+      { key: 'colors', label: 'Colors', type: 'colors', palette: Themes.palette(world) },
+      { key: 'note', label: 'Notes (optional)', type: 'textarea', placeholder: 'Endgame.' },
+    ],
+    onSave: async v => {
+      if (!v.name) throw new Error('Name the ship.');
+      if (s) await DB.updateItem(s, v); else await DB.addItem({ world: world.id, kind: 'ship', ...v });
+    },
+    onDelete: s && (() => {
+      const pics = shipPhotos(s);
+      confirmBox(`Remove ${s.name}?`, pics.length ? `Its ${pics.length} photo${pics.length === 1 ? '' : 's'} will be deleted too.` : '', 'Remove', async () => {
+        for (const p of pics) await DB.deleteItem(p);
+        await DB.deleteItem(s);
+        if (parseHash()[2] === 'ship') location.hash = `#/w/${world.id}/canon`;
+      });
+    }),
+  });
+}
+
+// A ship's own page: its colors across the top, then a photo board.
+function renderShip(world, shipId) {
+  const ship = state.items.find(i => i.id === shipId && i.kind === 'ship');
+  if (!ship) { location.replace(`#/w/${world.id}/canon`); return; }
+  const [a, b] = ship.colors || Themes.palette(world).map(p => p[1]);
+  view.innerHTML = `<div class="page world">
+    <header class="w-head"><a class="back" href="#/w/${world.id}/canon">‹ My Canon</a><button class="linkish edit-ship" id="edit">Edit</button></header>
+    <div class="ship ship-hero" style="--a:${a};--b:${b}"><span class="ship-name">${esc(ship.name)}</span>${ship.note ? `<span class="ship-note">${esc(ship.note)}</span>` : ''}</div>
+    <section class="w-body" id="wb"></section></div>`;
+  $('#edit').onclick = () => shipForm(world, ship);
+  photoBoard(world, $('#wb'), shipPhotos(ship), { world: world.id, kind: 'shippic', ship: ship.id }, `No photos of ${ship.name} yet.`);
+}
+
+function headcanonForm(world, h) {
+  formModal({
+    title: h ? 'Edit headcanon' : 'Add a headcanon',
+    values: h || {},
+    fields: [{ key: 'text', label: 'In my world…', type: 'textarea' }],
+    onSave: async v => {
+      if (!v.text) throw new Error('Write the headcanon first.');
+      if (h) await DB.updateItem(h, v); else await DB.addItem({ world: world.id, kind: 'headcanon', ...v });
+    },
+    onDelete: h && (() => confirmBox('Delete this headcanon?', '', 'Delete', () => DB.deleteItem(h))),
+  });
+}
+
+function cutoffSelect(world, steps) {
+  if (!steps.length) return '';
+  const groups = new Map();
+  steps.forEach((s, i) => {
+    const g = world.track.type === 'list' ? 0 : s.group;
+    if (!groups.has(g)) groups.set(g, []);
+    groups.get(g).push(`<option value="${i}" ${world.cutoff === i ? 'selected' : ''}>${esc(world.track.type === 'list' ? s.label : s.title ? `${s.short} · ${s.title}` : s.short)}</option>`);
+  });
+  return `<label class="field cutoff-field"><span class="field-label">My story ends after</span>
+    <select id="cutoff"><option value="">The real ending (no cutoff)</option>
+    ${[...groups].map(([g, opts]) => `<optgroup label="${esc(Themes.groupName(world.track, g))}">${opts.join('')}</optgroup>`).join('')}</select></label>`;
+}
+
+function drawCanon(world, body) {
+  const steps = Themes.steps(world.track, world.theme);
+  const cut = world.cutoff != null && steps[world.cutoff];
+  const ships = itemsIn(world.id, 'ship').sort(byOldest);
+  const heads = itemsIn(world.id, 'headcanon').sort(byNewest);
+  const info = Themes.info(world);
+  const parts = canonParts(world);
+
+  // Only ships, and just one: that ship's page fills My Canon.
+  if (!parts.ending && !parts.headcanons && ships.length === 1) {
+    const ship = ships[0];
+    const [a, b] = ship.colors || Themes.palette(world).map(p => p[1]);
+    body.innerHTML = `<button class="ship ship-hero" id="edit-ship" style="--a:${a};--b:${b}" aria-label="Edit ${esc(ship.name)}"><span class="ship-name">${esc(ship.name)}</span>${ship.note ? `<span class="ship-note">${esc(ship.note)}</span>` : ''}</button>`;
+    photoBoard(world, body, shipPhotos(ship), { world: world.id, kind: 'shippic', ship: ship.id }, `No photos of ${ship.name} yet.`);
+    body.insertAdjacentHTML('beforeend', '<p class="center" style="margin-top:22px"><button class="btn small" id="adds">+ Add another ship</button></p>');
+    $('#edit-ship').onclick = () => shipForm(world, ship);
+    $('#adds').onclick = () => shipForm(world);
+    return;
+  }
+
+  body.innerHTML = `
+    ${parts.ending ? `<div class="card canon-end">
+      ${cut ? `<div class="the-end"><span class="the-end-word">${esc(info.theEnd)}</span><span class="the-end-at">${esc(cut.title && world.track.type !== 'list' ? `${cut.short} · ${cut.title}` : cut.label)}</span></div>` : ''}
+      ${cutoffSelect(world, steps)}
+      <div class="ending-text">${world.ending ? esc(world.ending).replace(/\n/g, '<br>') : '<span class="muted">Write how it really ends, in your version.</span>'}</div>
+      <button class="btn small" id="edit-end">${world.ending ? 'Edit my ending' : 'Write my ending'}</button>
+    </div>` : ''}
+
+    ${parts.ships ? `<h2 class="sec-h">Ships</h2>
+    ${ships.length ? `<div class="ships">${ships.map(s => {
+      const [a, b] = s.colors || Themes.palette(world).map(p => p[1]);
+      const pics = shipPhotos(s);
+      return `<a class="ship" href="#/w/${world.id}/ship/${s.id}" style="--a:${a};--b:${b}"><span class="ship-name">${esc(s.name)}</span>${s.note ? `<span class="ship-note">${esc(s.note)}</span>` : ''}
+        ${pics.length ? `<span class="ship-strip">${pics.slice(0, 4).map(p => `<img src="${esc(p.photo.thumbUrl)}" alt="" loading="lazy">`).join('')}${pics.length > 4 ? `<span class="ship-more">+${pics.length - 4}</span>` : ''}</span>` : '<span class="ship-hint">Tap to add photos</span>'}</a>`;
+    }).join('')}</div>` : ''}
+    <button class="btn small" id="adds">+ Add a ship</button>` : ''}
+
+    ${parts.headcanons ? `<h2 class="sec-h">Headcanons</h2>
+    ${heads.length ? `<div class="heads">${heads.map(h => `<button class="head card" data-id="${h.id}">${esc(h.text).replace(/\n/g, '<br>')}</button>`).join('')}</div>` : ''}
+    <button class="btn small" id="addh">+ Add a headcanon</button>` : ''}`;
+
+  const on = (sel, fn) => { const el = $(sel, body); if (el) el.onclick = fn; };
+  on('#edit-end', () => endingForm(world));
+  on('#adds', () => shipForm(world));
+  on('#addh', () => headcanonForm(world));
+  const sel = $('#cutoff');
+  if (sel) {
+    sel.onchange = () => {
+      const v = sel.value === '' ? null : Number(sel.value);
+      DB.updateWorld(world, { cutoff: v }).then(() => toast(v == null ? 'Back to the real ending' : `Your story ends at ${steps[v].short || steps[v].label}`), e => toast(friendlyError(e), true));
+    };
+  }
+  $$('.head', body).forEach(el => { el.onclick = () => headcanonForm(world, state.items.find(i => i.id === el.dataset.id)); });
+}
+
+// ---------- Fics ----------
+// AO3 links get tidied to the work itself (not a chapter or comments page).
+function tidyLink(url) {
+  if (!url) return '';
+  if (!/^https?:\/\//i.test(url)) url = 'https://' + url;
+  const ao3 = /archiveofourown\.org\/(?:collections\/[^/]+\/)?works\/(\d+)/i.exec(url);
+  return ao3 ? `https://archiveofourown.org/works/${ao3[1]}` : url;
+}
+
+function ficForm(world, f) {
+  const ships = [...new Set(itemsIn(world.id, 'ship').map(s => s.name).concat(itemsIn(world.id, 'fic').map(x => x.ship)).filter(Boolean))];
+  formModal({
+    title: f ? 'Edit fic' : 'Save a fic',
+    values: f || {},
+    fields: [
+      { key: 'url', label: 'AO3 link', type: 'url', placeholder: 'archiveofourown.org/works/…' },
+      { key: 'title', label: 'Title' },
+      { key: 'author', label: 'Author (optional)' },
+      { key: 'ship', label: 'Ship (optional)', placeholder: ships[0] || '' },
+      { key: 'note', label: 'Note to self (optional)', type: 'textarea', placeholder: 'The one where…' },
+    ],
+    onSave: async v => {
+      v.url = tidyLink(v.url);
+      if (!v.url && !v.title) throw new Error('Paste the link or type the title.');
+      if (!v.title) {
+        const id = /works\/(\d+)/.exec(v.url);
+        v.title = id ? `AO3 work ${id[1]}` : 'Untitled fic';
+      }
+      if (f) await DB.updateItem(f, v); else await DB.addItem({ world: world.id, kind: 'fic', ...v });
+    },
+    onDelete: f && (() => confirmBox('Remove this fic?', 'Only the saved link is removed, not the fic.', 'Remove', () => DB.deleteItem(f))),
+  });
+  // Ship suggestions from this world's ships and earlier fics.
+  if (ships.length) {
+    const input = $('[name="ship"]');
+    const dl = document.createElement('datalist');
+    dl.id = 'shiplist';
+    dl.innerHTML = ships.map(s => `<option value="${esc(s)}">`).join('');
+    input.after(dl);
+    input.setAttribute('list', 'shiplist');
+  }
+}
+
+function drawFics(world, body) {
+  const all = itemsIn(world.id, 'fic').sort(byNewest);
+  const { html, pick } = chips(world, 'ship', all.map(f => f.ship));
+  const list = pick ? all.filter(f => f.ship === pick) : all;
+  body.innerHTML = `${addBtn('addfic', 'Save a fic')}${html}
+    ${list.length ? `<div class="fics">${list.map(f => `<div class="fic card">
+      <a class="fic-main" href="${esc(f.url || '#')}" target="_blank" rel="noopener">
+        <span class="fic-title">${esc(f.title)}</span>
+        ${f.author ? `<span class="fic-by">by ${esc(f.author)}</span>` : ''}
+        ${f.ship ? `<span class="tag">${esc(f.ship)}</span>` : ''}
+        ${f.note ? `<span class="fic-note">${esc(f.note)}</span>` : ''}
+      </a>
+      <button class="fic-edit" data-id="${f.id}" aria-label="Edit ${esc(f.title)}">Edit</button></div>`).join('')}</div>` : empty(world)}`;
+  $('#addfic').onclick = () => ficForm(world);
+  wireChips(body, () => drawFics(world, body));
+  $$('.fic-edit', body).forEach(el => { el.onclick = () => ficForm(world, state.items.find(i => i.id === el.dataset.id)); });
+}
+
+// ---------- Rewatch ----------
+// Episode/movie notes are items of kind 'epnote', matched to a step by its
+// full label ("Season 5, Episode 1" or a film title), so they survive a rewatch restart.
+function epNoteForm(world, step, note) {
+  formModal({
+    title: `Notes · ${step.title || step.short}`,
+    values: note || {},
+    fields: [{ key: 'text', label: step.title && world.track.type !== 'list' ? `${step.short} · ${step.label}` : step.label, type: 'textarea', big: true, placeholder: 'What stood out this time…' }],
+    onSave: async v => {
+      if (note && !v.text) return DB.deleteItem(note);
+      if (!v.text) return;
+      if (note) await DB.updateItem(note, v); else await DB.addItem({ world: world.id, kind: 'epnote', step: step.label, ...v });
+    },
+    onDelete: note && (() => confirmBox('Delete this note?', '', 'Delete', () => DB.deleteItem(note))),
+  });
+}
+
+// Which episodes/films are watched: a list of step indexes, so skipping is fine.
+// (Older saves kept only "watched through" in world.at.)
+const watchedOf = world => new Set(Array.isArray(world.watched)
+  ? world.watched
+  : [...Array(Math.max(0, (world.at ?? -1) + 1)).keys()]);
+
+const NOTE_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6z"/><path d="M6 3v18M4 7h4M4 12h4M4 17h4M11 8h5M11 12h5"/></svg>';
+
+function drawRewatch(world, body) {
+  const steps = Themes.steps(world.track, world.theme);
+  if (!steps.length) {
+    body.innerHTML = `<p class="empty">No rewatch tracker for this world.</p>
+      <p class="center"><a class="btn small" href="#/w/${world.id}/settings">Set one up</a></p>`;
+    return;
+  }
+  const watched = watchedOf(world);
+  const cutoff = world.canonOn && canonParts(world).ending && world.cutoff != null ? world.cutoff : null;
+  const end = cutoff ?? steps.length - 1;
+  const round = (world.rounds || 0) + 1;
+  const info = Themes.info(world);
+  const isList = world.track.type === 'list';
+  const notes = new Map(itemsIn(world.id, 'epnote').map(n => [n.step, n]));
+  const noteAt = i => notes.get(steps[i].label);
+  const name = i => (isList ? steps[i].label : steps[i].short);
+
+  // The episode shown in the big card. Arrows move it without changing
+  // anything saved; it starts just after the furthest one watched.
+  const curKey = `${world.id}:cur`;
+  if (state.filters[curKey] == null || state.filters[curKey] >= steps.length) {
+    const furthest = Math.max(-1, ...[...watched].filter(i => i <= end));
+    state.filters[curKey] = Math.min(furthest + 1, end);
+  }
+  const cur = state.filters[curKey];
+  const curSeen = watched.has(cur);
+  const seenInCanon = [...watched].filter(i => i <= end).length;
+  const theEnd = cur === end && curSeen;
+
+  const hero = `<div class="card rw-hero${theEnd ? ' done' : ''}">
+      <span class="rw-round">Rewatch #${round}</span>
+      <div class="rw-nav">
+        <button class="rw-arrow" id="prev" aria-label="Previous" ${cur <= 0 ? 'disabled' : ''}>‹</button>
+        <div class="rw-now">
+          <span class="rw-next${(steps[cur].title || '').length > 22 ? ' long' : ''}">${esc(steps[cur].title || name(cur))}</span>
+          <span class="muted small">${esc(isList ? steps[cur].short : steps[cur].label)}</span>
+        </div>
+        <button class="rw-arrow" id="next" aria-label="Next" ${cur >= steps.length - 1 ? 'disabled' : ''}>›</button>
+      </div>
+      ${theEnd ? `<div class="the-end"><span class="the-end-word">${esc(info.theEnd)}</span>${cutoff != null ? '<span class="the-end-at">Your story ends here.</span>' : ''}</div>` : ''}
+      ${cutoff != null && cur > cutoff ? `<span class="muted small">${esc(info.notCanon || 'Not canon')}</span>` : ''}
+      <div class="rw-actions">
+        <button class="btn watch-btn${curSeen ? ' on' : ''}" id="watched" aria-pressed="${curSeen}">${curSeen ? 'Watched ✓' : 'Watched it'}</button>
+        <button class="note-btn${noteAt(cur) ? ' has-note' : ''}" id="note-cur" aria-label="Notes on ${esc(name(cur))}" title="Notes on ${esc(name(cur))}">${NOTE_ICON}</button>
+      </div>
+      <div class="rw-bar"><span style="width:${Math.round((seenInCanon / (end + 1)) * 100)}%"></span></div>
+      <span class="muted small">${seenInCanon} of ${end + 1} watched</span>
+      ${theEnd ? `<button class="btn primary" id="again">Start rewatch #${round + 1}</button>` : ''}
+      ${watched.size ? '<button class="btn small ghost" id="reset">Reset tracker</button>' : ''}
+    </div>`;
+
+  // The grid: one row of numbered squares per season (or a checklist of titles).
+  const cell = i => {
+    const cls = [watched.has(i) ? 'seen' : '', i === cur ? 'current' : '', cutoff != null && i > cutoff ? 'beyond' : '', noteAt(i) ? 'has-note' : ''].join(' ');
+    const mark = cutoff === i ? '<span class="cut-mark" aria-hidden="true"></span>' : '';
+    return isList
+      ? `<button class="rw-item ${cls}" data-i="${i}" aria-pressed="${watched.has(i)}"><span class="rw-check" aria-hidden="true"></span><span>${esc(steps[i].label)}</span>${cutoff === i ? `<span class="cut-note">${esc(info.theEnd)}</span>` : ''}</button>`
+      : `<button class="rw-ep ${cls}" data-i="${i}" aria-label="${esc(steps[i].label)}${steps[i].title ? `: ${esc(steps[i].title)}` : ''}" title="${esc(steps[i].title || '')}" aria-pressed="${watched.has(i)}">${steps[i].e}</button>${mark}`;
+  };
+  let grid;
+  if (isList) {
+    grid = `<div class="rw-list">${steps.map((_, i) => cell(i)).join('')}</div>`;
+  } else {
+    const groups = [];
+    steps.forEach((s, i) => { (groups[s.group] = groups[s.group] || []).push(i); });
+    const row = (idx, g) => `<div class="rw-season"><span class="rw-season-name">${esc(Themes.groupName(world.track, g))}</span><div class="rw-eps">${idx.map(cell).join('')}</div></div>`;
+    const inCanon = groups.map((idx, g) => [idx, g]).filter(([idx]) => cutoff == null || idx[0] <= cutoff);
+    const outside = groups.map((idx, g) => [idx, g]).filter(([idx]) => cutoff != null && idx[0] > cutoff);
+    const openOutside = cutoff != null && steps[cur].group > steps[cutoff].group;
+    grid = inCanon.map(([idx, g]) => row(idx, g)).join('')
+      + (outside.length ? `<details class="not-canon" ${openOutside ? 'open' : ''}><summary>${esc(info.notCanon || 'Not canon')} <span class="muted small">(${esc(Themes.groupName(world.track, outside[0][1]))}–${outside[outside.length - 1][1] + 1})</span></summary>${outside.map(([idx, g]) => row(idx, g)).join('')}</details>` : '');
+  }
+
+  // All notes, in watch order.
+  const noted = steps.map((s, i) => [i, noteAt(i)]).filter(([, n]) => n);
+  const notesHtml = `<h2 class="sec-h">My notes</h2>${noted.length
+    ? `<div class="ep-notes">${noted.map(([i, n]) => `<button class="ep-note card" data-note="${i}"><span class="ep-note-at">${esc(name(i))}${!isList && steps[i].title ? ` · ${esc(steps[i].title)}` : ''}</span><span class="ep-note-text">${esc(n.text)}</span></button>`).join('')}</div>`
+    : '<p class="muted small">No notes yet. Tap the notebook next to “Watched it” to write about an episode.</p>'}`;
+
+  body.innerHTML = `${hero}<h2 class="sec-h">${isList ? 'The list' : 'Episodes'}</h2>
+    <p class="muted small">Tap one to mark it watched (or not). Skipping is fine.</p>${grid}${notesHtml}`;
+
+  const go = i => { state.filters[curKey] = i; drawRewatch(world, body); };
+  const save = (set, msg) => DB.updateWorld(world, { watched: [...set].sort((a, b) => a - b) })
+    .then(() => msg && toast(msg), e => toast(friendlyError(e), true));
+  const toggle = i => {
+    const set = new Set(watched);
+    if (set.has(i)) set.delete(i); else set.add(i);
+    return set;
+  };
+
+  $('#prev').onclick = () => go(cur - 1);
+  $('#next').onclick = () => go(cur + 1);
+  $('#watched').onclick = () => save(toggle(cur));
+  $('#note-cur').onclick = () => epNoteForm(world, steps[cur], noteAt(cur));
+  $$('[data-note]', body).forEach(el => {
+    el.onclick = () => { const i = Number(el.dataset.note); epNoteForm(world, steps[i], noteAt(i)); };
+  });
+  $$('[data-i]', body).forEach(el => {
+    el.onclick = () => {
+      const i = Number(el.dataset.i);
+      state.filters[curKey] = i;
+      save(toggle(i));
+    };
+  });
+  const reset = $('#reset');
+  if (reset) {
+    reset.onclick = () => confirmBox('Reset the tracker?', 'This clears every watched mark. Your notes stay.', 'Reset', async () => {
+      await DB.updateWorld(world, { watched: [] });
+      state.filters[curKey] = null;
+      toast('Tracker reset. Notes kept.');
+    });
+  }
+  const again = $('#again');
+  if (again) {
+    again.onclick = () => DB.updateWorld(world, { watched: [], rounds: (world.rounds || 0) + 1 })
+      .then(() => { state.filters[curKey] = null; toast(`Rewatch #${round + 1} begins`); refresh(); }, e => toast(friendlyError(e), true));
+  }
+}
