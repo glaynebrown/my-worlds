@@ -334,7 +334,7 @@ function renderLogin() {
     if (!email || !pw) { err.textContent = 'Enter your email and password.'; err.hidden = false; return; }
     err.hidden = true;
     busy($('button', e.target), async () => {
-      try { await DB.signIn(email, pw); location.hash = '#/'; } catch (x) { err.textContent = friendlyError(x); err.hidden = false; }
+      try { await DB.signIn(email, pw); if (/^#\/(login|reset)?$/.test(location.hash) || !location.hash) location.hash = '#/'; } catch (x) { err.textContent = friendlyError(x); err.hidden = false; }
     }, 'Opening…');
   };
 }
