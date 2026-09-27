@@ -219,6 +219,8 @@ window.addEventListener('hashchange', () => {
   lastHash = location.hash;
   $$('.modal-bg').forEach(m => m.remove());
   modalOpen = 0;
+  $$('.tile-ghost').forEach(g => g.remove());
+  tileSorting = false;
   route();
   const tabs = $('.w-tabs');
   window.scrollTo(0, sameWorld && tabs ? Math.min(y, tabs.offsetTop) : 0);
@@ -327,9 +329,9 @@ function renderReset() {
 // ---------- library ----------
 function tileHtml(w) {
   const photo = w.cardPhoto && w.cardPhoto.thumbUrl;
-  return `<a class="tile${photo ? ' has-photo' : ''}" href="#/w/${w.id}" data-world="${w.id}">
+  return `<div class="tile${photo ? ' has-photo' : ''}" role="link" tabindex="0" data-world="${w.id}">
     <span class="tile-art" aria-hidden="true"></span>
-    <span class="tile-name">${esc(w.name)}</span></a>`;
+    <span class="tile-name">${esc(w.name)}</span></div>`;
 }
 
 function renderLibrary() {
@@ -355,17 +357,28 @@ function renderLibrary() {
 // A quick tap still opens the world, and a swipe still scrolls the page.
 let dragListeners = null; // the last library's listeners, removed when it redraws
 let tileSorting = false;  // no redraws while a door is being dragged
+
+// Doors aren't real links (an iPhone press-and-hold on a link opens its own
+// preview and interrupts the drag), so a tap opens the world from here.
+// Hold a door (about half a second) to pick it up, drag it, let go to drop.
+// Touch drives it on the phone; the mouse (pointer events) on a computer.
 function enableTileDrag(shelf) {
   if (dragListeners) dragListeners.abort();
   dragListeners = new AbortController();
   const opts = { signal: dragListeners.signal };
+  $$('.tile-ghost').forEach(g => g.remove()); // leftovers from an interrupted drag
+  tileSorting = false;
+
   const HOLD_MS = 450, SLOP = 10;
   let timer = null, start = null, tile = null, ghost = null, offset = null, dragging = false, justDragged = false;
 
   const tiles = () => $$('.tile[data-world]', shelf);
   const cancelHold = () => { clearTimeout(timer); timer = null; };
+  const begin = (t, x, y) => { tile = t; start = { x, y }; cancelHold(); timer = setTimeout(pickUp, HOLD_MS); };
 
   function pickUp() {
+    timer = null;
+    if (!tile || !tile.isConnected) return;
     dragging = tileSorting = true;
     const r = tile.getBoundingClientRect();
     offset = { x: start.x - r.left, y: start.y - r.top };
@@ -378,6 +391,7 @@ function enableTileDrag(shelf) {
   }
 
   function moveTo(x, y) {
+    if (!ghost) return;
     ghost.style.left = `${x - offset.x}px`;
     ghost.style.top = `${y - offset.y}px`;
     const over = document.elementFromPoint(x, y);
@@ -387,14 +401,15 @@ function enableTileDrag(shelf) {
     shelf.insertBefore(tile, list.indexOf(target) > list.indexOf(tile) ? target.nextSibling : target);
   }
 
+  // Always cleans up, even if the touch was interrupted.
   function drop() {
-    ghost.remove();
+    if (ghost) ghost.remove();
     ghost = null;
-    tile.classList.remove('tile-placeholder');
+    if (tile) tile.classList.remove('tile-placeholder');
     shelf.classList.remove('sorting');
     dragging = tileSorting = false;
     justDragged = true;
-    setTimeout(() => { justDragged = false; }, 50);
+    setTimeout(() => { justDragged = false; }, 350);
     const ids = tiles().map(t => t.dataset.world);
     const changed = ids.map((id, k) => [worldById(id), k]).filter(([w, k]) => w && w.order !== k);
     if (changed.length) {
@@ -403,27 +418,48 @@ function enableTileDrag(shelf) {
     }
     if (missedRefresh) { missedRefresh = false; setTimeout(refresh, 0); }
   }
+  const end = () => { cancelHold(); if (dragging) drop(); };
 
-  shelf.addEventListener('pointerdown', e => {
+  // ----- phone: touch -----
+  shelf.addEventListener('touchstart', e => {
     const t = e.target.closest('.tile[data-world]');
-    if (!t || e.button > 0) return;
-    tile = t;
-    start = { x: e.clientX, y: e.clientY };
-    timer = setTimeout(pickUp, HOLD_MS);
-  });
+    if (!t || e.touches.length > 1) return;
+    begin(t, e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true, ...opts });
+  shelf.addEventListener('touchmove', e => {
+    const p = e.touches[0];
+    if (dragging) { e.preventDefault(); moveTo(p.clientX, p.clientY); return; } // the finger moves the door, not the page
+    if (timer && Math.hypot(p.clientX - start.x, p.clientY - start.y) > SLOP) cancelHold(); // it's a scroll
+  }, { passive: false, ...opts });
+  shelf.addEventListener('touchend', end, opts);
+  shelf.addEventListener('touchcancel', end, opts);
+
+  // ----- computer: mouse -----
+  shelf.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse' || e.button > 0) return;
+    const t = e.target.closest('.tile[data-world]');
+    if (t) begin(t, e.clientX, e.clientY);
+  }, opts);
   window.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse') return;
     if (dragging) { moveTo(e.clientX, e.clientY); return; }
     if (timer && Math.hypot(e.clientX - start.x, e.clientY - start.y) > SLOP) cancelHold();
   }, opts);
-  const end = () => { cancelHold(); if (dragging) drop(); };
-  window.addEventListener('pointerup', end, opts);
-  window.addEventListener('pointercancel', () => { if (!dragging) cancelHold(); }, opts);
-  // While dragging, the finger moves the door, not the page.
-  shelf.addEventListener('touchmove', e => { if (dragging) e.preventDefault(); }, { passive: false });
-  // iPhone hands a held finger to scrolling unless we keep it; finish on touchend.
-  shelf.addEventListener('touchend', end);
-  shelf.addEventListener('click', e => { if (dragging || justDragged) { e.preventDefault(); e.stopPropagation(); } }, true);
-  shelf.addEventListener('contextmenu', e => { if (e.target.closest('.tile')) e.preventDefault(); });
+  window.addEventListener('pointerup', e => { if (e.pointerType === 'mouse') end(); }, opts);
+
+  // ----- opening a world -----
+  const open = t => { location.hash = `#/w/${t.dataset.world}`; };
+  shelf.addEventListener('click', e => {
+    const t = e.target.closest('.tile[data-world]');
+    if (!t) return;
+    if (dragging || justDragged) return;
+    open(t);
+  }, opts);
+  shelf.addEventListener('keydown', e => {
+    const t = e.target.closest('.tile[data-world]');
+    if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(t); }
+  }, opts);
+  shelf.addEventListener('contextmenu', e => { if (e.target.closest('.tile')) e.preventDefault(); }, opts);
 }
 
 // The world name's color on its home card (null = the theme's own, or white on a photo).
