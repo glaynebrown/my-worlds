@@ -538,7 +538,7 @@ function trackToFields(track) {
     if (track.sections) {
       lines = [];
       let at = 0;
-      track.sections.forEach(([name, n]) => { lines.push(`# ${name}`, ...track.items.slice(at, at + n)); at += n; });
+      track.sections.forEach(({ name, count }) => { lines.push(`# ${name}`, ...track.items.slice(at, at + count)); at += count; });
     }
     return { type: 'list', seasons: '', noun: track.noun || 'Film', items: lines.join('\n') };
   }
@@ -552,15 +552,15 @@ function readTrack(root, old) {
     const lines = $('#t-items', root).value.split('\n').map(s => s.trim()).filter(Boolean);
     const items = [], sections = [];
     lines.forEach(l => {
-      if (l.startsWith('#')) sections.push([l.replace(/^#+\s*/, '') || 'More', 0]);
-      else { items.push(l); if (sections.length) sections[sections.length - 1][1]++; }
+      if (l.startsWith('#')) sections.push({ name: l.replace(/^#+\s*/, '') || 'More', count: 0 });
+      else { items.push(l); if (sections.length) sections[sections.length - 1].count++; }
     });
     if (!items.length) throw new Error('Add at least one title to the rewatch list, or pick “No tracker”.');
     const out = { type: 'list', noun: $('#t-noun', root).value.trim() || 'Part', items };
     if (sections.length) {
-      const before = items.length - sections.reduce((n, [, c]) => n + c, 0);
-      if (before) sections.unshift(['More', before]); // titles above the first heading
-      out.sections = sections.filter(([, c]) => c);
+      const before = items.length - sections.reduce((n, s) => n + s.count, 0);
+      if (before) sections.unshift({ name: 'More', count: before }); // titles above the first heading
+      out.sections = sections.filter(s => s.count);
     }
     if (old && old.shuffle) out.shuffle = true;
     if (old && old.labels && old.items.join('\n') === items.join('\n')) out.labels = old.labels;

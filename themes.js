@@ -213,13 +213,13 @@ const Themes = (() => {
       // Optional sections (Disney: Princesses / Classics / Pixar & friends) and a
       // year at the end of a title, like "Peter Pan (1953)".
       const bounds = [];
-      (track.sections || []).reduce((at, [, n]) => { bounds.push(at + n); return at + n; }, 0);
+      (track.sections || []).reduce((at, { count }) => { bounds.push(at + count); return at + count; }, 0);
       return track.items.map((item, i) => {
         const m = /^(.*\S)\s*\((\d{4})\)$/.exec(item);
         const title = m ? m[1] : item;
         const group = track.sections ? Math.max(0, bounds.findIndex(b => i < b)) : 0;
         const short = (track.labels && track.labels[i])
-          || (track.sections ? [track.sections[group][0], m && m[2]].filter(Boolean).join(' · ') : null)
+          || (track.sections ? [track.sections[group].name, m && m[2]].filter(Boolean).join(' · ') : null)
           || (m ? m[2] : `${track.noun || 'Part'} ${i + 1}`);
         return { label: title, short, group, title, key: track.labels ? `${title} (${short})` : item };
       });
@@ -240,7 +240,7 @@ const Themes = (() => {
     return out;
   }
   const groupName = (track, g) => (track.type === 'list'
-    ? (track.sections && track.sections[g] ? track.sections[g][0] : `${track.noun || 'Part'}s`)
+    ? (track.sections && track.sections[g] ? track.sections[g].name : `${track.noun || 'Part'}s`)
     : `${track.noun || 'Season'} ${g + 1}`);
 
   // The three worlds you start with.
@@ -298,7 +298,8 @@ const Themes = (() => {
     name: 'Disney', theme: 'disney', canonOn: false, cutoff: null, ending: '',
     track: {
       type: 'list', noun: 'Movie', shuffle: true,
-      sections: [['Classics', 24], ['Princesses', 12], ['Pixar & friends', 11]],
+      // (Stored as objects: the database can't save a list inside a list.)
+      sections: [{ name: 'Classics', count: 24 }, { name: 'Princesses', count: 12 }, { name: 'Pixar & friends', count: 11 }],
       items: [
         'Pinocchio (1940)', 'Dumbo (1941)', 'Bambi (1942)', 'Alice in Wonderland (1951)', 'Peter Pan (1953)', 'Lady and the Tramp (1955)',
         '101 Dalmatians (1961)', 'The Sword in the Stone (1963)', 'The Jungle Book (1967)', 'The Aristocats (1970)', 'Robin Hood (1973)',
