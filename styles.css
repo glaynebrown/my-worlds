@@ -14,7 +14,7 @@ body {
   min-height: 100vh;
   background-color: var(--bg);
   background-image: var(--bg-img, none);
-  background-size: cover;
+  background-size: var(--bg-size, cover);
   background-attachment: fixed;
   color: var(--page-ink);
   font: 17px/1.5 var(--font-body);
@@ -25,7 +25,7 @@ body {
 /* iPhone ignores background-attachment: fixed, so the texture sits on a layer instead. */
 @supports (-webkit-touch-callout: none) {
   body { background-image: none; }
-  body::before { content: ''; position: fixed; inset: 0; z-index: -1; background-color: var(--bg); background-image: var(--bg-img, none); background-size: cover; background-position: center; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; background-color: var(--bg); background-image: var(--bg-img, none); background-size: var(--bg-size, cover); background-position: center; }
 }
 button, input, select, textarea { font: inherit; color: inherit; }
 button { cursor: pointer; }
@@ -103,7 +103,7 @@ img { display: block; max-width: 100%; }
 .tile {
   position: relative; display: flex; flex-direction: column; justify-content: flex-end;
   aspect-ratio: 3 / 4; padding: 14px; border-radius: 16px 16px 10px 10px; overflow: hidden; text-decoration: none;
-  background-color: var(--bg); background-image: var(--bg-img, none); background-size: cover; background-position: center;
+  background-color: var(--bg); background-image: var(--bg-img, none); background-size: var(--bg-size, cover); background-position: center;
   color: var(--page-ink); box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(255,255,255,.08);
   transition: transform .15s;
 }
@@ -261,6 +261,15 @@ a.ship { text-decoration: none; }
 .note-btn { position: relative; width: 46px; height: 46px; flex: none; display: grid; place-items: center; border-radius: var(--btn-radius, 999px); border: 1.5px solid var(--line); background: transparent; color: var(--ink); padding: 0; }
 .note-btn.has-note::after { content: ''; position: absolute; top: -2px; right: -2px; width: 11px; height: 11px; border-radius: 50%; background: var(--note-dot, #f2c14e); box-shadow: 0 0 0 2px var(--card); }
 .rw-season { margin-bottom: 12px; }
+.list-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; margin: 30px 0 10px; }
+.list-head .sec-h { margin: 0; }
+.pick-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; line-height: 1; text-align: center; }
+.pick-btn svg { flex: none; }
+.rw-section { margin-bottom: 10px; }
+.rw-section > summary { list-style: none; cursor: pointer; display: flex; align-items: center; gap: 8px; }
+.rw-section > summary::-webkit-details-marker { display: none; }
+.fold-caret { width: 8px; height: 8px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); margin-top: -4px; opacity: .75; transition: transform .15s; }
+.rw-section:not([open]) .fold-caret { transform: rotate(-45deg); margin-top: 0; }
 .rw-season-name { display: block; font-size: .8rem; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--page-muted); margin-bottom: 6px; }
 .rw-eps { display: flex; flex-wrap: wrap; gap: 5px; align-items: center; }
 .rw-ep { width: 36px; height: 36px; border-radius: 8px; border: 1.5px solid color-mix(in srgb, var(--page-ink) 25%, transparent); background: transparent; color: var(--page-ink); font-size: .85rem; padding: 0; }
@@ -298,7 +307,7 @@ a.ship { text-decoration: none; }
 .color-field input::-webkit-color-swatch-wrapper { padding: 0; }
 .color-field input::-webkit-color-swatch { border: 0; border-radius: 50%; }
 .preview-wrap { margin-top: 16px; }
-.w-preview { border-radius: 14px; padding: 22px 16px; background-color: var(--bg); background-image: var(--bg-img, none); background-size: cover; background-position: center; color: var(--page-ink); text-align: center; }
+.w-preview { border-radius: 14px; padding: 22px 16px; background-color: var(--bg); background-image: var(--bg-img, none); background-size: var(--bg-size, cover); background-position: center; color: var(--page-ink); text-align: center; }
 .w-preview-title { font-family: var(--font-head); font-size: 1.9rem; line-height: 1.1; margin-bottom: 14px; }
 .w-preview-card { background: var(--card); color: var(--ink); border-radius: 12px; padding: 14px; font-family: var(--font-body); display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; }
 .w-preview-pill { background: var(--accent); color: var(--on-accent); border-radius: 99px; padding: 4px 12px; font-size: .8rem; font-weight: 600; }
