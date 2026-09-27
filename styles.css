@@ -40,6 +40,7 @@ img { display: block; max-width: 100%; }
 .small { font-size: .88rem; }
 .spacer { flex: 1; }
 
+#offline-bar { position: sticky; top: 0; z-index: 31; text-align: center; font: 600 .78rem/1 system-ui, sans-serif; padding: 7px; background: #3a3530; color: #f4efe6; }
 .banner { position: sticky; top: 0; z-index: 30; text-align: center; font: 600 .78rem/1 system-ui, sans-serif; letter-spacing: .04em; padding: 7px; background: #f2c14e; color: #2b2410; }
 
 /* ---------- buttons & fields ---------- */

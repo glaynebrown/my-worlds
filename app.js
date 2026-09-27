@@ -236,8 +236,9 @@ function startSession() {
     const arrived = (key, list) => {
       state[key] = list;
       got[key] = true;
-      if (state.loaded) return refresh();
+      if (state.loaded) { setTimeout(savePhotosForOffline, 3000); return refresh(); }
       if (got.worlds && got.items) {
+        setTimeout(savePhotosForOffline, 3000);
         state.loaded = true;
         if (!state.settings.seeded && !state.worlds.length) seedStarters();
         route();
@@ -643,6 +644,31 @@ function renderWorldForm(world) {
       });
     };
   }
+}
+
+// ---------- offline ----------
+// A small bar while there's no signal. Everything still opens from the phone;
+// text changes save there and sync when the signal comes back.
+function drawOffline() { $('#offline-bar').hidden = navigator.onLine; }
+window.addEventListener('online', () => { drawOffline(); savePhotosForOffline(); });
+window.addEventListener('offline', drawOffline);
+drawOffline();
+
+// While online, quietly save a copy of every photo's small version on the
+// phone (the service worker keeps them), so boards and cards show in airplane
+// mode even for photos you haven't opened lately.
+const savedPhotos = new Set();
+let savingPhotos = false;
+async function savePhotosForOffline() {
+  if (savingPhotos || !navigator.onLine || !DB || DB.demo || !navigator.serviceWorker || !navigator.serviceWorker.controller) return;
+  savingPhotos = true;
+  try {
+    const urls = [...state.items.map(i => i.photo && i.photo.thumbUrl), ...state.worlds.map(w => w.cardPhoto && w.cardPhoto.thumbUrl),
+      ...state.worlds.map(w => w.look && w.look.photo && w.look.photo.url)].filter(u => u && !savedPhotos.has(u));
+    for (let k = 0; k < urls.length; k += 4) {
+      await Promise.all(urls.slice(k, k + 4).map(u => fetch(u).then(() => savedPhotos.add(u), () => {})));
+    }
+  } finally { savingPhotos = false; }
 }
 
 // ---------- start ----------

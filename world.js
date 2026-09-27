@@ -89,7 +89,8 @@ function photoBoard(world, body, pins, newItem, emptyText) {
   $$('.pin', body).forEach(el => {
     el.onclick = () => {
       const pin = state.items.find(i => i.id === el.dataset.id);
-      openModal(`<img class="viewer-img" src="${esc(pin.photo.url)}" alt="">
+      // Offline, the full-size photo may not be saved on the phone yet; the small one always is.
+      openModal(`<img class="viewer-img" src="${esc(pin.photo.url)}" onerror="this.onerror=null;this.src='${esc(pin.photo.thumbUrl)}'" alt="">
         <label class="field"><span class="field-label">Caption (optional)</span><input id="cap" value="${esc(pin.caption || '')}"></label>
         <div class="actions"><button class="btn ghost danger-text" id="del">Delete</button><span class="spacer"></span><button class="btn" data-close>Close</button><button class="btn primary" id="save">Save</button></div>`,
       (root, close) => {
