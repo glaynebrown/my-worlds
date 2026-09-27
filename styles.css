@@ -131,6 +131,16 @@ img { display: block; max-width: 100%; }
 /* A world card with your own photo: the photo fills it, with a dark fade for the name. */
 .tile.has-photo { background-image: linear-gradient(transparent 35%, rgba(0,0,0,.7)), var(--card-photo); background-size: cover; background-position: center; }
 .tile.has-photo .tile-art { display: none; }
+/* Name position you picked beats the theme's own spot. */
+.tile.positioned { justify-content: var(--pos-v) !important; align-items: var(--pos-h) !important; text-align: var(--pos-t) !important; }
+.tile.positioned .tile-name { margin-top: 0 !important; margin-bottom: 0 !important; }
+.pos-pick { display: flex; align-items: center; gap: 14px; }
+.pos-grid { display: grid; grid-template-columns: repeat(3, 30px); grid-template-rows: repeat(3, 38px); gap: 4px; padding: 6px; border-radius: 10px; background: var(--line); }
+.pos-cell { border: 0; border-radius: 6px; background: var(--card); display: grid; place-items: center; padding: 0; }
+.pos-cell span { width: 14px; height: 4px; border-radius: 2px; background: var(--muted); opacity: .45; }
+.pos-cell.on { background: var(--accent); }
+.pos-cell.on span { background: var(--on-accent); opacity: 1; }
+.btn.on-auto { background: var(--accent); color: var(--on-accent); border-color: transparent; }
 .tile.has-photo .tile-name { color: #fff; text-shadow: 0 1px 8px rgba(0,0,0,.6); }
 /* A name color you picked beats the theme's own. */
 .tile.inked .tile-name { color: var(--card-ink) !important; }

@@ -35,7 +35,7 @@ function publishWallpapers() {
   const data = {};
   state.worlds.filter(w => w.theme !== 'custom').forEach(w => {
     const p = w.cardPhoto;
-    data[w.theme] = { photo: p ? { url: p.url, thumbUrl: p.thumbUrl, w: p.w || null, h: p.h || null } : null, ink: w.cardInk || null };
+    data[w.theme] = { photo: p ? { url: p.url, thumbUrl: p.thumbUrl, w: p.w || null, h: p.h || null } : null, ink: w.cardInk || null, pos: w.cardPos || null };
   });
   const json = JSON.stringify(data);
   if (json === lastWallpapers) return;
@@ -76,7 +76,7 @@ function renderLibraryPick() {
     Themes.apply(el, { theme });
     const wall = walls[theme];
     if (wall && wall.photo) { el.classList.add('has-photo'); el.style.setProperty('--card-photo', `url('${wall.photo.thumbUrl || wall.photo.url}')`); }
-    if (wall) cardInk(el, wall.ink);
+    if (wall) { cardInk(el, wall.ink); cardPos(el, wall.pos); }
     const toggle = () => {
       if (picked.has(theme)) picked.delete(theme); else picked.add(theme);
       el.classList.toggle('picked', picked.has(theme));
@@ -97,6 +97,7 @@ function renderLibraryPick() {
         const data = neutralWorld(s, order++);
         const wall = walls[s.theme];
         if (wall && wall.ink) data.cardInk = wall.ink;
+        if (wall && wall.pos) data.cardPos = wall.pos;
         const id = await DB.addWorld(data);
         // Their own copy of your card photo, so it never depends on your account.
         if (wall && wall.photo && DB.copyPhoto) {

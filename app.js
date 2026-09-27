@@ -463,6 +463,7 @@ function renderLibrary() {
     Themes.apply(el, w); // (resets inline style for worlds you added, so the photo goes on after)
     if (w.cardPhoto) el.style.setProperty('--card-photo', `url('${w.cardPhoto.thumbUrl}')`);
     cardInk(el, w.cardInk);
+    cardPos(el, w.cardPos);
   });
   // The doorway icon hides everything that isn't a door.
   $('#crest').onclick = () => openModal(`<div class="crest-menu">
@@ -588,6 +589,19 @@ function enableTileDrag(shelf) {
 // The world name's color on its home card (null = the theme's own, or white on a photo).
 // Dark text gets a light fade behind it instead of a dark one.
 const CARD_INKS = [['#ffffff', 'White'], ['#f3e9d2', 'Cream'], ['#e0b74a', 'Gold'], ['#b3261e', 'Red'], ['#1c1814', 'Black']];
+// Where the name sits on the card: 'top|middle|bottom' + '-' + 'left|center|right' (null = the theme's spot).
+const POS_V = { top: 'flex-start', middle: 'center', bottom: 'flex-end' };
+const POS_H = { left: 'flex-start', center: 'center', right: 'flex-end' };
+function cardPos(el, pos) {
+  const [v, h] = (pos || '').split('-');
+  el.classList.toggle('positioned', !!(POS_V[v] && POS_H[h]));
+  if (POS_V[v] && POS_H[h]) {
+    el.style.setProperty('--pos-v', POS_V[v]);
+    el.style.setProperty('--pos-h', POS_H[h]);
+    el.style.setProperty('--pos-t', h);
+  }
+}
+
 function cardInk(el, ink) {
   el.classList.toggle('light-fade', !!ink && Themes.isDark(ink));
   el.classList.toggle('inked', !!ink);
@@ -716,7 +730,7 @@ function renderWorldForm(world) {
 
   const lookHtml = !custom ? '' : `
     <h2 class="form-h">The look</h2>
-    <div class="presets">${Themes.PRESETS.map((p, i) => `<button type="button" class="preset" data-i="${i}" style="--pbg:${p.bg};--pcard:${p.card};--pacc:${p.accent};--ptext:${Themes.isDark(p.bg) ? p.card : p.ink}"><span class="preset-dot"></span><span style="font-family:'${p.font}'">${esc(p.name)}</span></button>`).join('')}</div>
+    <div class="presets">${Themes.PRESETS.map((p, i) => `<button type="button" class="preset" data-i="${i}" style="--pbg:${p.bg};--pcard:${p.card};--pacc:${p.accent};--ptext:${Themes.isDark(p.bg) ? (Themes.isDark(p.card) ? p.ink : p.card) : (Themes.isDark(p.ink) ? p.ink : p.card)}"><span class="preset-dot"></span><span style="font-family:'${p.font}'">${esc(p.name)}</span></button>`).join('')}</div>
     <div class="color-grid">
       ${[['bg', 'Background'], ['card', 'Cards'], ['ink', 'Text'], ['accent', 'Accent']].map(([k, label]) =>
         `<label class="color-field"><input type="color" id="c-${k}" value="${esc(look[k])}"><span>${label}</span></label>`).join('')}
@@ -745,6 +759,12 @@ function renderWorldForm(world) {
           <button type="button" class="swatch auto${world.cardInk ? '' : ' on'}" data-ink="" aria-label="Automatic" title="Automatic">A</button>
           ${CARD_INKS.map(([c, n]) => `<button type="button" class="swatch${world.cardInk === c ? ' on' : ''}" style="--c:${c}" data-ink="${c}" aria-label="${n}" title="${n}"></button>`).join('')}
           <label class="swatch custom-ink${world.cardInk && !CARD_INKS.some(([c]) => c === world.cardInk) ? ' on' : ''}" title="Any color" style="--c:${esc(world.cardInk || '#8a6d3b')}"><input type="color" id="inkpick" value="${esc(world.cardInk || '#8a6d3b')}" aria-label="Any color"></label>
+        </div></div>
+      <div class="field"><span class="field-label">Name position</span>
+        <div class="pos-pick">
+          <div class="pos-grid" id="poses">${['top', 'middle', 'bottom'].map(v => ['left', 'center', 'right'].map(h =>
+            `<button type="button" class="pos-cell${world.cardPos === `${v}-${h}` ? ' on' : ''}" data-pos="${v}-${h}" aria-label="${v} ${h}" title="${v} ${h}"><span></span></button>`).join('')).join('')}</div>
+          <button type="button" class="btn small${world.cardPos ? '' : ' on-auto'}" id="posauto">Auto</button>
         </div></div>`}
       <h2 class="form-h">Rewatch tracker</h2>
       <div class="seg" role="radiogroup">
@@ -822,12 +842,13 @@ function renderWorldForm(world) {
   }
 
   // Home page card photo: previewed here, saved with the rest of the form.
-  let cardPrepared = null, cardDrop = false, ink = world ? world.cardInk || null : null;
+  let cardPrepared = null, cardDrop = false, ink = world ? world.cardInk || null : null, pos = world ? world.cardPos || null : null;
   const drawCard = () => {
     const el = $('#card-prev');
     if (!el) return;
     Themes.apply(el, world);
     cardInk(el, ink);
+    cardPos(el, pos);
     const url = cardPrepared ? URL.createObjectURL(cardPrepared.thumb.blob) : (!cardDrop && world.cardPhoto ? world.cardPhoto.thumbUrl : null);
     el.classList.toggle('has-photo', !!url);
     if (url) el.style.setProperty('--card-photo', `url('${url}')`);
@@ -840,6 +861,14 @@ function renderWorldForm(world) {
       try { cardPrepared = await Photos.prepare(file); cardDrop = false; $('#carddrop').hidden = false; drawCard(); } catch (x) { toast(friendlyError(x), true); }
     };
     $('#carddrop').onclick = e => { cardPrepared = null; cardDrop = true; e.target.hidden = true; drawCard(); };
+    const pickPos = value => {
+      pos = value;
+      $$('#poses .pos-cell').forEach(c => c.classList.toggle('on', c.dataset.pos === value));
+      $('#posauto').classList.toggle('on-auto', !value);
+      drawCard();
+    };
+    $$('#poses .pos-cell').forEach(c => { c.onclick = () => pickPos(c.dataset.pos); });
+    $('#posauto').onclick = () => pickPos(null);
     const pickInk = (value, btn) => {
       ink = value || null;
       $$('#inks .swatch').forEach(s => s.classList.toggle('on', s === btn));
@@ -862,7 +891,7 @@ function renderWorldForm(world) {
       checkPhotoRoom((prepared && !(look.photo) ? 1 : 0) + (cardPrepared && !(world && world.cardPhoto) ? 1 : 0));
       const canonPicked = Object.fromEntries($$('[data-part]', root).map(c => [c.dataset.part, c.checked]));
       const data = { name, track, canonOn: $('#canon').checked, canonParts: canonPicked, ficsOn: $('#fics').checked };
-      if (!isNew) data.cardInk = ink;
+      if (!isNew) { data.cardInk = ink; data.cardPos = pos; }
       if ($('#first')) data.firstWatch = $('#first').checked;
       if (data.canonOn && !Object.values(canonPicked).some(Boolean)) throw new Error('Pick at least one thing to show on My Canon, or turn it off.');
       if (custom) data.look = { ...root._readLook(), photo: dropPhoto ? null : (look.photo || null) };
