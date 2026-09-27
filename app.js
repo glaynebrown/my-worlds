@@ -270,7 +270,12 @@ async function firstRun() {
     const share = await DB.loadShare().catch(e => { console.error(e); return null; });
     if (share) return importShare(share);
   }
-  seedStarters();
+  await seedStarters();
+  // Already has worlds? A copy that arrived later is offered, not forced.
+  if (state.worlds.length && DB.loadShare) {
+    const share = await DB.loadShare().catch(e => { console.error(e); return null; });
+    if (share) offerShare(share);
+  }
 }
 
 // The built-in worlds (themes.js STARTERS). The first sign-in gets all of

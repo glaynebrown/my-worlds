@@ -118,3 +118,88 @@ async function importShare(share) {
     route();
   }
 }
+
+// ---------- her side: a copy that arrives after she already has worlds ----------
+function offerShare(share) {
+  openModal(`<h2>A copy of your sister’s worlds</h2>
+    <p>Your sister shared her worlds with you: their looks, photos, boards, quotes, favorites and ships.</p>
+    <p class="muted small" style="margin-top:8px">They’re added into your matching worlds. Everything you’ve added yourself stays.</p>
+    <div class="actions"><button class="btn" data-close>Not now</button><span class="spacer"></span><button class="btn primary" id="take">Add them</button></div>`,
+  (root, close) => {
+    $('#take', root).onclick = () => { close(); mergeShare(share); };
+  });
+}
+
+// What makes two saved things "the same" (so nothing shows up twice).
+const sameKey = i => [i.kind, (i.name || i.text || i.caption || i.title || '').trim().toLowerCase(), i.photo ? i.photo.url : ''].join('|');
+
+async function mergeShare(share) {
+  seeding = true;
+  state.importing = true;
+  const total = share.worlds.length + share.items.length;
+  let done = 0;
+  const step = () => { done++; view.innerHTML = `<p class="loading">Adding your sister’s worlds… ${Math.round((done / total) * 100)}%</p>`; };
+  const copyPhoto = async (folder, id, photo) => {
+    if (!photo) return photo;
+    try { return await DB.copyPhoto(folder, id, photo); } catch (e) { console.warn('Kept the original photo link', e); return photo; }
+  };
+  try {
+    view.innerHTML = '<p class="loading">Adding your sister’s worlds…</p>';
+    const worldIds = {}, shipIds = {};
+    let order = Math.max(-1, ...state.worlds.map(w => w.order ?? 0)) + 1;
+    for (const { id, ...w } of share.worlds) {
+      // Her own world of the same kind (built-in look, or same name).
+      const mine = state.worlds.find(x => (w.theme !== 'custom' && x.theme === w.theme) || (x.name || '').trim().toLowerCase() === (w.name || '').trim().toLowerCase());
+      if (mine) {
+        worldIds[id] = mine.id;
+        const patch = {};
+        ['name', 'look', 'cardInk', 'track', 'cutoff', 'ending', 'canonOn', 'canonParts', 'ficsOn'].forEach(k => { if (w[k] !== undefined) patch[k] = w[k]; });
+        if (w.cardPhoto && !mine.cardPhoto) patch.cardPhoto = await copyPhoto('worlds', mine.id, w.cardPhoto);
+        if (w.look && w.look.photo) patch.look = { ...w.look, photo: await copyPhoto('worlds', mine.id, w.look.photo) };
+        // Keep her watched marks when the tracker is the same shape.
+        if (JSON.stringify(w.track) !== JSON.stringify(mine.track)) patch.watched = [];
+        await DB.updateWorld(mine, patch);
+      } else {
+        const nid = DB.newId('worlds');
+        worldIds[id] = nid;
+        const data = { ...w, order: order++, t: w.t || Date.now() };
+        if (w.cardPhoto) data.cardPhoto = await copyPhoto('worlds', nid, w.cardPhoto);
+        if (w.look && w.look.photo) data.look = { ...w.look, photo: await copyPhoto('worlds', nid, w.look.photo) };
+        await DB.setWorld(nid, data);
+      }
+      step();
+    }
+    // Her starter Zutara goes (the copy brings Zukka), unless she's added photos to it.
+    for (const z of state.items.filter(i => i.kind === 'ship' && KEEP_SHIPS.test((i.name || '').trim()))) {
+      if (!state.items.some(p => p.kind === 'shippic' && p.ship === z.id)) await DB.deleteItem(z);
+    }
+    const have = new Set(state.items.map(i => `${i.world}|${sameKey(i)}`));
+    const ordered = [...share.items.filter(i => i.kind === 'ship'), ...share.items.filter(i => i.kind !== 'ship')];
+    for (const { id, ...it } of ordered) {
+      const world = worldIds[it.world];
+      if (!world) { step(); continue; }
+      if (it.kind === 'ship') {
+        const existing = state.items.find(x => x.world === world && x.kind === 'ship' && sameKey(x) === sameKey(it));
+        if (existing) { shipIds[id] = existing.id; step(); continue; }
+      }
+      if (it.kind !== 'ship' && it.kind !== 'shippic' && have.has(`${world}|${sameKey(it)}`)) { step(); continue; }
+      const nid = DB.newId('items');
+      if (it.kind === 'ship') shipIds[id] = nid;
+      const data = { ...it, world };
+      if (it.kind === 'shippic') data.ship = shipIds[it.ship] || null;
+      if (it.photo) data.photo = await copyPhoto('items', nid, it.photo);
+      await DB.setItem(nid, data);
+      step();
+    }
+    await DB.saveSettings({ sharedFrom: share.email });
+    await DB.deleteShare(share).catch(e => console.warn('Could not remove the shared copy', e));
+    toast('Your sister’s worlds are in');
+  } catch (e) {
+    console.error(e);
+    toast(friendlyError(e), true);
+  } finally {
+    state.importing = false;
+    seeding = false;
+    route();
+  }
+}
