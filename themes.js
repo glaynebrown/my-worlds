@@ -45,6 +45,49 @@ const Themes = (() => {
       palette: [['Gold', '#b8913a'], ['Elven', '#6f8fa8'], ['Shire', '#5f7d3c'], ['Ember', '#a8431f']],
       theEnd: 'The end.',
     },
+    got: {
+      label: 'Game of Thrones',
+      fonts: ['Cinzel:wght@500;700', 'Cardo:ital,wght@0,400;0,700;1,400'],
+      empty: 'Nothing here yet. Winter is coming.',
+      palette: [['Ice', '#7fa9c9'], ['Fire', '#c0461f'], ['Crimson', '#8b1a1a'], ['Gold', '#c6932f']],
+      theEnd: 'The end.',
+      notCanon: 'The seasons that didn’t happen',
+    },
+    firefly: {
+      label: 'Firefly',
+      fonts: ['Rye', 'Zilla Slab:ital,wght@0,400;0,600;1,400'],
+      empty: 'Nothing here yet. Keep flying.',
+      palette: [['Rust', '#b5562a'], ['Brass', '#b89140'], ['Sky', '#5b86a8'], ['Sage', '#6b7d5a']],
+      theEnd: 'The end.',
+    },
+    tlou: {
+      label: 'The Last of Us',
+      fonts: ['Oswald:wght@400;500;600', 'Source Serif 4:ital,wght@0,400;0,600;1,400'],
+      empty: 'Nothing here yet. Endure and survive.',
+      palette: [['Amber', '#c98a2b'], ['Moss', '#5d7045'], ['Sky', '#7d96a3'], ['Rust', '#8f4a2e']],
+      theEnd: 'The end.',
+    },
+    potc: {
+      label: 'Pirates of the Caribbean',
+      fonts: ['Pirata One', 'Libre Caslon Text:ital,wght@0,400;0,700;1,400'],
+      empty: 'Nothing here yet. Savvy?',
+      palette: [['Doubloon', '#c9a23a'], ['Sea', '#2d6a73'], ['Blood', '#8e2323'], ['Pearl', '#3a3a44']],
+      theEnd: 'The end.',
+    },
+    disney: {
+      label: 'Disney',
+      fonts: ['Great Vibes', 'Cormorant Garamond:ital,wght@0,500;0,600;0,700;1,500'],
+      empty: 'Nothing here yet. Wish upon a star.',
+      palette: [['Gold', '#d4a53c'], ['Rose', '#d98aa6'], ['Sky', '#7fa7e0'], ['Lilac', '#a58ad9']],
+      theEnd: 'Happily ever after.',
+    },
+    narnia: {
+      label: 'Narnia',
+      fonts: ['Cinzel:wght@500;700', 'Crimson Pro:ital,wght@0,400;0,600;1,400'],
+      empty: 'Nothing here yet. Step through the wardrobe.',
+      palette: [['Lion gold', '#c8963e'], ['Narnian red', '#9e2b2b'], ['Winter', '#6f93b8'], ['Forest', '#4f6f4a']],
+      theEnd: 'The end.',
+    },
   };
 
   // "Add a world": starting looks you can then tweak.
@@ -80,6 +123,19 @@ const Themes = (() => {
       ["A New Beginning", "The Bridge", "Warning Signs", "The Obliged", "What Comes After", "Who Are You Now?", "Stradivarius", "Evolution", "Adaptation", "Omega", "Bounty", "Guardians", "Chokepoint", "Scars", "The Calm Before", "The Storm"],
       ["Lines We Cross", "We Are the End of the World", "Ghosts", "Silence the Whisperers", "What It Always Is", "Bonds", "Open Your Eyes", "The World Before", "Squeeze", "Stalker", "Morning Star", "Walk with Us", "What We Become", "Look at the Flowers", "The Tower", "A Certain Doom", "Home Sweet Home", "Find Me", "One More", "Splinter", "Diverged", "Here’s Negan"],
       ["Acheron: Part I", "Acheron: Part II", "Hunted", "Rendition", "Out of the Ashes", "On the Inside", "Promises Broken", "For Blood", "No Other Way", "New Haunts", "Rogue Element", "The Lucky Ones", "Warlords", "The Rotten Core", "Trust", "Acts of God", "Lockdown", "A New Deal", "Variant", "What’s Been Lost", "Outpost 22", "Faith", "Family", "Rest in Peace"],
+    ],
+    got: [
+      ["Winter Is Coming", "The Kingsroad", "Lord Snow", "Cripples, Bastards, and Broken Things", "The Wolf and the Lion", "A Golden Crown", "You Win or You Die", "The Pointy End", "Baelor", "Fire and Blood"],
+      ["The North Remembers", "The Night Lands", "What Is Dead May Never Die", "Garden of Bones", "The Ghost of Harrenhal", "The Old Gods and the New", "A Man Without Honor", "The Prince of Winterfell", "Blackwater", "Valar Morghulis"],
+      ["Valar Dohaeris", "Dark Wings, Dark Words", "Walk of Punishment", "And Now His Watch Is Ended", "Kissed by Fire", "The Climb", "The Bear and the Maiden Fair", "Second Sons", "The Rains of Castamere", "Mhysa"],
+      ["Two Swords", "The Lion and the Rose", "Breaker of Chains", "Oathkeeper", "First of His Name", "The Laws of Gods and Men", "Mockingbird", "The Mountain and the Viper", "The Watchers on the Wall", "The Children"],
+      ["The Wars to Come", "The House of Black and White", "High Sparrow", "Sons of the Harpy", "Kill the Boy", "Unbowed, Unbent, Unbroken", "The Gift", "Hardhome", "The Dance of Dragons", "Mother’s Mercy"],
+      ["The Red Woman", "Home", "Oathbreaker", "Book of the Stranger", "The Door", "Blood of My Blood", "The Broken Man", "No One", "Battle of the Bastards", "The Winds of Winter"],
+      ["Dragonstone", "Stormborn", "The Queen’s Justice", "The Spoils of War", "Eastwatch", "Beyond the Wall", "The Dragon and the Wolf"],
+      ["Winterfell", "A Knight of the Seven Kingdoms", "The Long Night", "The Last of the Starks", "The Bells", "The Iron Throne"],
+    ],
+    tlou: [
+      ["When You’re Lost in the Darkness", "Infected", "Long, Long Time", "Please Hold to My Hand", "Endure and Survive", "Kin", "Left Behind", "When We Are in Need", "Look for the Light"],
     ],
   };
 
@@ -152,7 +208,22 @@ const Themes = (() => {
   // theme (optional) adds episode titles for Avatar and TWD.
   function steps(track, theme) {
     if (!track) return [];
-    if (track.type === 'list') return track.items.map((title, i) => ({ label: title, short: `${track.noun || 'Part'} ${i + 1}`, group: 0, title }));
+    // key: what rewatch notes are filed under (a label, plus its short name when two titles could match).
+    if (track.type === 'list') {
+      // Optional sections (Disney: Princesses / Classics / Pixar & friends) and a
+      // year at the end of a title, like "Peter Pan (1953)".
+      const bounds = [];
+      (track.sections || []).reduce((at, [, n]) => { bounds.push(at + n); return at + n; }, 0);
+      return track.items.map((item, i) => {
+        const m = /^(.*\S)\s*\((\d{4})\)$/.exec(item);
+        const title = m ? m[1] : item;
+        const group = track.sections ? Math.max(0, bounds.findIndex(b => i < b)) : 0;
+        const short = (track.labels && track.labels[i])
+          || (track.sections ? [track.sections[group][0], m && m[2]].filter(Boolean).join(' · ') : null)
+          || (m ? m[2] : `${track.noun || 'Part'} ${i + 1}`);
+        return { label: title, short, group, title, key: track.labels ? `${title} (${short})` : item };
+      });
+    }
     const names = EPISODE_TITLES[theme];
     const named = names && names.length === track.seasons.length && names.every((s, k) => s.length === track.seasons[k]);
     // Avatar counts in Books and Chapters instead of Seasons and Episodes.
@@ -162,13 +233,15 @@ const Themes = (() => {
       for (let e = 1; e <= count; e++) {
         const title = named ? names[s][e - 1] : null;
         out.push(book
-          ? { label: `Book ${s + 1}, Chapter ${e}`, short: `B${s + 1} Ch${e}`, group: s, e, title }
-          : { label: `Season ${s + 1}, Episode ${e}`, short: `S${s + 1} E${e}`, group: s, e, title });
+          ? { label: `Book ${s + 1}, Chapter ${e}`, short: `B${s + 1} Ch${e}`, group: s, e, title, key: `Book ${s + 1}, Chapter ${e}` }
+          : { label: `Season ${s + 1}, Episode ${e}`, short: `S${s + 1} E${e}`, group: s, e, title, key: `Season ${s + 1}, Episode ${e}` });
       }
     });
     return out;
   }
-  const groupName = (track, g) => (track.type === 'list' ? `${track.noun || 'Part'}s` : `${track.noun || 'Season'} ${g + 1}`);
+  const groupName = (track, g) => (track.type === 'list'
+    ? (track.sections && track.sections[g] ? track.sections[g][0] : `${track.noun || 'Part'}s`)
+    : `${track.noun || 'Season'} ${g + 1}`);
 
   // The three worlds you start with.
   const STARTERS = [
@@ -197,6 +270,52 @@ const Themes = (() => {
   STARTERS.push({
     name: 'The Lord of the Rings', theme: 'lotr', canonOn: false, cutoff: null, ending: '',
     track: { type: 'list', noun: 'Film', items: ['The Fellowship of the Ring', 'The Two Towers', 'The Return of the King'] },
+  });
+  STARTERS.push({
+    name: 'Game of Thrones', theme: 'got', canonOn: true, cutoff: null, ending: '',
+    track: { type: 'episodes', seasons: [10, 10, 10, 10, 10, 10, 7, 6] },
+  });
+  STARTERS.push({
+    name: 'Firefly', theme: 'firefly', canonOn: true, cutoff: null, ending: '',
+    // The episodes in the order they were meant to be seen, then the movie.
+    track: {
+      type: 'list', noun: 'Episode',
+      items: ['Serenity', 'The Train Job', 'Bushwhacked', 'Shindig', 'Safe', 'Our Mrs. Reynolds', 'Jaynestown', 'Out of Gas',
+        'Ariel', 'War Stories', 'Trash', 'The Message', 'Heart of Gold', 'Objects in Space', 'Serenity'],
+      labels: ['Episode 1 (the pilot)', 'Episode 2', 'Episode 3', 'Episode 4', 'Episode 5', 'Episode 6', 'Episode 7', 'Episode 8',
+        'Episode 9', 'Episode 10', 'Episode 11', 'Episode 12', 'Episode 13', 'Episode 14', 'The movie'],
+    },
+  });
+  STARTERS.push({
+    name: 'The Last of Us', theme: 'tlou', canonOn: true, cutoff: null, ending: '',
+    track: { type: 'episodes', seasons: [9] }, // Season 1 only
+  });
+  STARTERS.push({
+    name: 'Pirates of the Caribbean', theme: 'potc', canonOn: true, cutoff: null, ending: '',
+    track: { type: 'list', noun: 'Film', items: ['The Curse of the Black Pearl', 'Dead Man’s Chest', 'At World’s End', 'On Stranger Tides'] },
+  });
+  STARTERS.push({
+    name: 'Disney', theme: 'disney', canonOn: false, cutoff: null, ending: '',
+    track: {
+      type: 'list', noun: 'Movie', shuffle: true,
+      sections: [['Classics', 24], ['Princesses', 12], ['Pixar & friends', 11]],
+      items: [
+        'Pinocchio (1940)', 'Dumbo (1941)', 'Bambi (1942)', 'Alice in Wonderland (1951)', 'Peter Pan (1953)', 'Lady and the Tramp (1955)',
+        '101 Dalmatians (1961)', 'The Sword in the Stone (1963)', 'The Jungle Book (1967)', 'The Aristocats (1970)', 'Robin Hood (1973)',
+        'The Rescuers (1977)', 'The Fox and the Hound (1981)', 'The Great Mouse Detective (1986)', 'Oliver & Company (1988)',
+        'The Lion King (1994)', 'The Hunchback of Notre Dame (1996)', 'Hercules (1997)', 'Tarzan (1999)', 'The Emperor’s New Groove (2000)',
+        'Atlantis: The Lost Empire (2001)', 'Lilo & Stitch (2002)', 'Treasure Planet (2002)', 'Brother Bear (2003)',
+        'Snow White and the Seven Dwarfs (1937)', 'Cinderella (1950)', 'Sleeping Beauty (1959)', 'The Little Mermaid (1989)',
+        'Beauty and the Beast (1991)', 'Aladdin (1992)', 'Pocahontas (1995)', 'Mulan (1998)', 'The Princess and the Frog (2009)',
+        'Tangled (2010)', 'Brave (2012)', 'Moana (2016)',
+        'Toy Story (1995)', 'Anastasia (1997)', 'A Bug’s Life (1998)', 'Monsters, Inc. (2001)', 'Shrek (2001)',
+        'Spirit: Stallion of the Cimarron (2002)', 'Finding Nemo (2003)', 'The Incredibles (2004)', 'Cars (2006)', 'Up (2009)', 'Onward (2020)',
+      ],
+    },
+  });
+  STARTERS.push({
+    name: 'Narnia', theme: 'narnia', canonOn: false, cutoff: null, ending: '',
+    track: { type: 'list', noun: 'Film', items: ['The Lion, the Witch and the Wardrobe', 'Prince Caspian', 'The Voyage of the Dawn Treader'] },
   });
 
   // Added the first time you sign in, alongside STARTERS (by index).

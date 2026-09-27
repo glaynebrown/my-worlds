@@ -172,7 +172,7 @@ function parseHash() {
   return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
 }
 
-const THEME_COLOR = { library: '#16110e', avatar: '#efe3c8', twd: '#1f1e1a', hp: '#1a120c', lotr: '#121812' };
+const THEME_COLOR = { library: '#16110e', avatar: '#efe3c8', twd: '#1f1e1a', hp: '#1a120c', disney: '#171a3d', lotr: '#121812', narnia: '#16222f', got: '#14161a', firefly: '#141a26', tlou: '#1b211c', potc: '#0f1f26' };
 function setPageTheme(world) {
   const body = document.body;
   if (world) Themes.apply(body, world);
@@ -532,7 +532,16 @@ function renderWishlist() {
 // ---------- add / edit a world ----------
 function trackToFields(track) {
   if (!track) return { type: 'none', seasons: '', noun: 'Film', items: '' };
-  if (track.type === 'list') return { type: 'list', seasons: '', noun: track.noun || 'Film', items: track.items.join('\n') };
+  if (track.type === 'list') {
+    // Sections show as "# Heading" lines in the text box.
+    let lines = track.items;
+    if (track.sections) {
+      lines = [];
+      let at = 0;
+      track.sections.forEach(([name, n]) => { lines.push(`# ${name}`, ...track.items.slice(at, at + n)); at += n; });
+    }
+    return { type: 'list', seasons: '', noun: track.noun || 'Film', items: lines.join('\n') };
+  }
   return { type: 'episodes', seasons: track.seasons.join(', '), noun: track.noun || '', items: '' };
 }
 
@@ -540,9 +549,22 @@ function readTrack(root, old) {
   const type = $('input[name=ttype]:checked', root).value;
   if (type === 'none') return null;
   if (type === 'list') {
-    const items = $('#t-items', root).value.split('\n').map(s => s.trim()).filter(Boolean);
+    const lines = $('#t-items', root).value.split('\n').map(s => s.trim()).filter(Boolean);
+    const items = [], sections = [];
+    lines.forEach(l => {
+      if (l.startsWith('#')) sections.push([l.replace(/^#+\s*/, '') || 'More', 0]);
+      else { items.push(l); if (sections.length) sections[sections.length - 1][1]++; }
+    });
     if (!items.length) throw new Error('Add at least one title to the rewatch list, or pick “No tracker”.');
-    return { type: 'list', noun: $('#t-noun', root).value.trim() || 'Part', items };
+    const out = { type: 'list', noun: $('#t-noun', root).value.trim() || 'Part', items };
+    if (sections.length) {
+      const before = items.length - sections.reduce((n, [, c]) => n + c, 0);
+      if (before) sections.unshift(['More', before]); // titles above the first heading
+      out.sections = sections.filter(([, c]) => c);
+    }
+    if (old && old.shuffle) out.shuffle = true;
+    if (old && old.labels && old.items.join('\n') === items.join('\n')) out.labels = old.labels;
+    return out;
   }
   const seasons = $('#t-seasons', root).value.split(/[^0-9]+/).map(Number).filter(n => n > 0);
   if (!seasons.length) throw new Error('Type how many episodes are in each season, like 10, 10, 8.');
@@ -601,9 +623,11 @@ function renderWorldForm(world) {
       <div data-t="episodes"><label class="field"><span class="field-label">Episodes in each season</span><input id="t-seasons" value="${esc(tf.seasons)}" placeholder="10, 10, 8" inputmode="numeric"></label></div>
       <div data-t="list">
         <label class="field"><span class="field-label">Each one is a…</span><input id="t-noun" value="${esc(tf.noun)}" placeholder="Film"></label>
-        <label class="field"><span class="field-label">Titles in order, one per line</span><textarea id="t-items" rows="6">${esc(tf.items)}</textarea></label>
+        <label class="field"><span class="field-label">Titles in order, one per line (a line starting with # makes a section)</span><textarea id="t-items" rows="6">${esc(tf.items)}</textarea></label>
       </div>
       ${isNew || !(world.rounds > 0) ? `<label class="switch" data-t-any><input type="checkbox" id="first" ${(world && world.firstWatch) || (fromWish && fromWish.toWatch) ? 'checked' : ''}><span class="track"></span><span>I’m watching this for the first time</span></label>` : ''}
+      <h2 class="form-h">Fics</h2>
+      <label class="switch"><input type="checkbox" id="fics" ${!world || world.ficsOn !== false ? 'checked' : ''}><span class="track"></span><span>Include a Fics section</span></label>
       <h2 class="form-h">My Canon</h2>
       <label class="switch"><input type="checkbox" id="canon" ${!world || world.canonOn ? 'checked' : ''}><span class="track"></span><span>Include a My Canon section</span></label>
       <div class="canon-parts" id="parts">
@@ -702,7 +726,7 @@ function renderWorldForm(world) {
       if (!name) throw new Error('Give your world a name.');
       const track = readTrack(root, world && world.track);
       const canonPicked = Object.fromEntries($$('[data-part]', root).map(c => [c.dataset.part, c.checked]));
-      const data = { name, track, canonOn: $('#canon').checked, canonParts: canonPicked };
+      const data = { name, track, canonOn: $('#canon').checked, canonParts: canonPicked, ficsOn: $('#fics').checked };
       if (!isNew) data.cardInk = ink;
       if ($('#first')) data.firstWatch = $('#first').checked;
       if (data.canonOn && !Object.values(canonPicked).some(Boolean)) throw new Error('Pick at least one thing to show on My Canon, or turn it off.');

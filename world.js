@@ -13,7 +13,7 @@ const empty = (world, text) => `<p class="empty">${esc(text || Themes.info(world
 const addBtn = (id, label) => `<button class="btn primary add-btn" id="${id}"><span aria-hidden="true">+</span> ${esc(label)}</button>`;
 
 function renderWorld(world, section) {
-  const sections = SECTIONS.filter(([k]) => k !== 'canon' || world.canonOn);
+  const sections = SECTIONS.filter(([k]) => (k !== 'canon' || world.canonOn) && (k !== 'fics' || world.ficsOn !== false));
   if (!sections.some(([k]) => k === section)) section = 'board';
   const colors = Themes.info(world).tabColors || {};
 
@@ -389,10 +389,24 @@ function epNoteForm(world, step, note) {
     onSave: async v => {
       if (note && !v.text) return DB.deleteItem(note);
       if (!v.text) return;
-      if (note) await DB.updateItem(note, v); else await DB.addItem({ world: world.id, kind: 'epnote', step: step.label, ...v });
+      if (note) await DB.updateItem(note, v); else await DB.addItem({ world: world.id, kind: 'epnote', step: step.key, ...v });
     },
     onDelete: note && (() => confirmBox('Delete this note?', '', 'Delete', () => DB.deleteItem(note))),
   });
+}
+
+// Folded Disney-style sections, remembered on this phone only.
+function foldedSections(worldId) {
+  try { return (JSON.parse(localStorage.getItem('fw-folded') || '{}')[worldId]) || []; } catch { return []; }
+}
+function foldSection(worldId, g, folded) {
+  try {
+    const all = JSON.parse(localStorage.getItem('fw-folded') || '{}');
+    const set = new Set(all[worldId] || []);
+    if (folded) set.add(g); else set.delete(g);
+    all[worldId] = [...set];
+    localStorage.setItem('fw-folded', JSON.stringify(all));
+  } catch {}
 }
 
 // Which episodes/films are watched: a list of step indexes, so skipping is fine.
@@ -419,7 +433,7 @@ function drawRewatch(world, body) {
   const info = Themes.info(world);
   const isList = world.track.type === 'list';
   const notes = new Map(itemsIn(world.id, 'epnote').map(n => [n.step, n]));
-  const noteAt = i => notes.get(steps[i].label);
+  const noteAt = i => notes.get(steps[i].key);
   const name = i => (isList ? steps[i].label : steps[i].short);
 
   // The episode shown in the big card. Arrows move it without changing
@@ -461,11 +475,17 @@ function drawRewatch(world, body) {
     const cls = [watched.has(i) ? 'seen' : '', i === cur ? 'current' : '', cutoff != null && i > cutoff ? 'beyond' : '', noteAt(i) ? 'has-note' : ''].join(' ');
     const mark = cutoff === i ? '<span class="cut-mark" aria-hidden="true"></span>' : '';
     return isList
-      ? `<button class="rw-item ${cls}" data-i="${i}" aria-pressed="${watched.has(i)}"><span class="rw-check" aria-hidden="true"></span><span>${esc(steps[i].label)}</span>${cutoff === i ? `<span class="cut-note">${esc(info.theEnd)}</span>` : ''}</button>`
+      ? `<button class="rw-item ${cls}" data-i="${i}" aria-pressed="${watched.has(i)}"><span class="rw-check" aria-hidden="true"></span><span>${esc(steps[i].label)}${world.track.labels ? ` <span class="muted small">· ${esc(steps[i].short)}</span>` : /\((\d{4})\)$/.test(world.track.items[i]) ? ` <span class="muted small">· ${world.track.items[i].slice(-5, -1)}</span>` : ''}</span>${cutoff === i ? `<span class="cut-note">${esc(info.theEnd)}</span>` : ''}</button>`
       : `<button class="rw-ep ${cls}" data-i="${i}" aria-label="${esc(steps[i].label)}${steps[i].title ? `: ${esc(steps[i].title)}` : ''}" title="${esc(steps[i].title || '')}" aria-pressed="${watched.has(i)}">${steps[i].e}</button>${mark}`;
   };
   let grid;
-  if (isList) {
+  if (isList && world.track.sections) {
+    // Each section folds closed with its arrow; remembered on this phone.
+    const shut = foldedSections(world.id);
+    const groups = [];
+    steps.forEach((s, i) => { (groups[s.group] = groups[s.group] || []).push(i); });
+    grid = groups.map((idx, g) => `<details class="rw-section" data-g="${g}" ${shut.includes(g) ? '' : 'open'}><summary class="rw-season-name">${esc(Themes.groupName(world.track, g))}<span class="fold-caret" aria-hidden="true"></span></summary><div class="rw-list">${idx.map(cell).join('')}</div></details>`).join('');
+  } else if (isList) {
     grid = `<div class="rw-list">${steps.map((_, i) => cell(i)).join('')}</div>`;
   } else {
     const groups = [];
@@ -484,7 +504,8 @@ function drawRewatch(world, body) {
     ? `<div class="ep-notes">${noted.map(([i, n]) => `<button class="ep-note card" data-note="${i}"><span class="ep-note-at">${esc(name(i))}${!isList && steps[i].title ? ` · ${esc(steps[i].title)}` : ''}</span><span class="ep-note-text">${esc(n.text)}</span></button>`).join('')}</div>`
     : '<p class="muted small">No notes yet. Tap the notebook next to “Watched it” to write about an episode.</p>'}`;
 
-  body.innerHTML = `${hero}<h2 class="sec-h">${isList ? 'The list' : 'Episodes'}</h2>
+  const canPick = world.track.shuffle && steps.some((_, i) => !watched.has(i));
+  body.innerHTML = `${hero}<div class="list-head"><h2 class="sec-h">${isList ? 'The list' : 'Episodes'}</h2>${canPick ? `<button class="btn small pick-btn" id="pick"><svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" aria-hidden=\"true\"><path d=\"M12 2l2.2 6.3L20.5 10.5l-6.3 2.2L12 19l-2.2-6.3L3.5 10.5l6.3-2.2z\" fill=\"currentColor\"/></svg><span>Pick one for me</span></button>` : ''}</div>
     <p class="muted small">Tap one to mark it watched (or not). Skipping is fine.</p>${grid}${notesHtml}`;
 
   const go = i => { state.filters[curKey] = i; drawRewatch(world, body); };
@@ -510,6 +531,20 @@ function drawRewatch(world, body) {
       save(toggle(i));
     };
   });
+  // Movie night: a random one not watched yet this time around.
+  $$('.rw-section', body).forEach(d => {
+    d.addEventListener('toggle', () => foldSection(world.id, Number(d.dataset.g), !d.open));
+  });
+  const pick = $('#pick');
+  if (pick) {
+    pick.onclick = () => {
+      const left = steps.map((_, i) => i).filter(i => !watched.has(i) && i !== cur);
+      const pool = left.length ? left : steps.map((_, i) => i).filter(i => !watched.has(i));
+      const i = pool[Math.floor(Math.random() * pool.length)];
+      toast(`Tonight: ${steps[i].title || steps[i].label}`);
+      go(i);
+    };
+  }
   const reset = $('#reset');
   if (reset) {
     reset.onclick = () => confirmBox('Reset the tracker?', 'This clears every watched mark. Your notes stay.', 'Reset', async () => {

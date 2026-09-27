@@ -230,6 +230,287 @@
 [data-theme="lotr"].tile { box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(201,164,92,.7); }
 [data-theme="lotr"].tile .tile-name { color: #d8b86a; font-size: 1.2rem; }
 
+/* ======================= Narnia: snowy night by the lamppost ======================= */
+[data-theme="narnia"] {
+  --bg: #16222f;
+  --bg-img:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220' fill='%23fff'%3E%3Ccircle cx='20' cy='30' r='1.6' opacity='.55'/%3E%3Ccircle cx='70' cy='12' r='1' opacity='.4'/%3E%3Ccircle cx='120' cy='60' r='2' opacity='.5'/%3E%3Ccircle cx='180' cy='25' r='1.2' opacity='.45'/%3E%3Ccircle cx='45' cy='110' r='1.1' opacity='.4'/%3E%3Ccircle cx='160' cy='120' r='1.7' opacity='.5'/%3E%3Ccircle cx='95' cy='160' r='1.3' opacity='.45'/%3E%3Ccircle cx='200' cy='190' r='1' opacity='.4'/%3E%3Ccircle cx='30' cy='200' r='1.8' opacity='.5'/%3E%3Ccircle cx='140' cy='205' r='1.1' opacity='.35'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 60% 40% at 12% 8%, rgba(255,196,110,.28), transparent 70%),
+    radial-gradient(ellipse at 50% 110%, rgba(230,240,250,.12), transparent 55%),
+    linear-gradient(#1d2d3e, #111a24);
+  --bg-size: 180px 180px, cover, cover, cover; /* snow stays snowflake-sized */
+  --page-ink: #eef2f6; --page-muted: #aebdcb; --title: #f3dcae;
+  --card: #f5f7f9; --ink: #22303d; --muted: #66788a; --line: #d6dee6;
+  --accent: #c8963e; --on-accent: #1b1a14;
+  --font-head: 'Cinzel', Georgia, serif;
+  --font-body: 'Crimson Pro', Georgia, serif;
+  --radius: 10px; --btn-radius: 999px;
+  --card-shadow: 0 1px 0 rgba(255,255,255,.6) inset, 0 10px 24px rgba(0,0,0,.35);
+}
+[data-theme="narnia"] body, body[data-theme="narnia"] { font-size: 18px; }
+[data-theme="narnia"] .w-title { font-weight: 700; letter-spacing: .06em; text-shadow: 0 0 18px rgba(255,196,110,.35); }
+/* A little lamppost glowing between two lines. */
+[data-theme="narnia"] .w-flourish {
+  height: 34px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='34'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffc46e' stop-opacity='.7'/%3E%3Cstop offset='1' stop-color='%23ffc46e' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M10 24h92M138 24h92' stroke='%23f3dcae' stroke-width='1' opacity='.7'/%3E%3Ccircle cx='120' cy='9' r='12' fill='url(%23g)'/%3E%3Cpath d='M115 4h10l-2 9h-6z' fill='%23ffd48a'/%3E%3Cpath d='M113 4h14M120 13v19M116 32h8' stroke='%23e8d9b8' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") center / auto 34px no-repeat;
+}
+[data-theme="narnia"] .w-tabs a { font-family: var(--font-head); font-weight: 500; font-size: min(.8rem, 2.8vw); letter-spacing: .02em; border-color: rgba(238,242,246,.3); color: #e6ecf2; }
+[data-theme="narnia"] .w-tabs a[aria-current] { background: #c8963e; color: #1b1a14; border-color: transparent; }
+[data-theme="narnia"] .sec-h { color: var(--title); letter-spacing: .04em; }
+[data-theme="narnia"] .quote-text { font-style: italic; font-size: 1.2rem; }
+[data-theme="narnia"] .pin { border: 6px solid #fff; border-radius: 4px; box-shadow: 0 10px 22px rgba(0,0,0,.4); }
+[data-theme="narnia"] .fav-photo { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px #c8963e; }
+[data-theme="narnia"] .fav-rank, [data-theme="narnia"] .fav-initials { color: #9e2b2b; }
+[data-theme="narnia"] .rw-ep { border-color: rgba(238,242,246,.3); color: #e6ecf2; }
+[data-theme="narnia"] .chip { border-color: rgba(238,242,246,.35); }
+[data-theme="narnia"] .empty { color: #c9d5e0; font-style: italic; }
+/* library tile */
+[data-theme="narnia"].tile .tile-art {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 130'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffc46e' stop-opacity='.6'/%3E%3Cstop offset='1' stop-color='%23ffc46e' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='34' r='30' fill='url(%23g)'/%3E%3Cpath d='M44 26h12l-2.5 12h-7z' fill='%23ffd48a'/%3E%3Cpath d='M41 26h18M50 38v52M44 90h12' stroke='%23d9cfb8' stroke-width='2.4' stroke-linecap='round'/%3E%3Cpath d='M0 104 Q30 94 60 102 T100 98 V130 H0Z' fill='%23eef3f8' opacity='.85'/%3E%3C/svg%3E") center top / 100% auto no-repeat;
+}
+[data-theme="narnia"].tile { box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(243,220,174,.5); }
+[data-theme="narnia"].tile .tile-name { color: #22303d; font-weight: 700; font-size: 1.15rem; letter-spacing: .04em; }
+
+/* ======================= Game of Thrones: ice and fire on stone ======================= */
+[data-theme="got"] {
+  --bg: #14161a;
+  --bg-img:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='260' height='260'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.5' numOctaves='4' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .75 0 0 0 0 .78 0 0 0 0 .82 0 0 0 .1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 70% 45% at 0% 0%, rgba(140,190,230,.22), transparent 70%),
+    radial-gradient(ellipse 70% 45% at 100% 100%, rgba(220,90,30,.2), transparent 70%),
+    radial-gradient(ellipse at 50% 50%, transparent 40%, rgba(0,0,0,.55) 100%),
+    linear-gradient(#1b1e23, #0f1013);
+  --bg-size: 260px 260px, cover, cover, cover, cover;
+  --page-ink: #e6e8eb; --page-muted: #a3a9b1; --title: #dfe3e8;
+  --card: #ebe3d1; --ink: #25221d; --muted: #6f675a; --line: #d3c8b0;
+  --accent: #8b1a1a; --on-accent: #f3ece0;
+  --font-head: 'Cinzel', Georgia, serif;
+  --font-body: 'Cardo', Georgia, serif;
+  --end-color: #8b1a1a;
+  --radius: 4px; --btn-radius: 4px;
+  --card-shadow: 0 0 0 1px rgba(0,0,0,.25), 0 10px 24px rgba(0,0,0,.5);
+}
+/* Steel lettering. */
+[data-theme="got"] .w-title {
+  font-weight: 700; letter-spacing: .12em; font-size: clamp(1.8rem, 8vw, 2.7rem);
+  background: linear-gradient(180deg, #f4f6f8 0%, #aeb6bf 45%, #eef1f4 55%, #7f8893 100%);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+  filter: drop-shadow(0 2px 2px rgba(0,0,0,.6));
+}
+/* Crossed swords: an icy line on one side, an ember line on the other. */
+[data-theme="got"] .w-flourish {
+  height: 34px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='34'%3E%3Cpath d='M10 17h90' stroke='%238fbbe0' stroke-width='1.2'/%3E%3Cpath d='M140 17h90' stroke='%238fbbe0' stroke-width='1.2'/%3E%3Csvg x='103' y='0' width='34' height='34' viewBox='0 0 100 100'%3E%3Cg fill='%23d9dde2' stroke='%23d9dde2' stroke-linecap='round'%3E%3Cpath d='M18 14 L71.8 64.2 L68.2 67.8Z' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M82 14 L28.2 64.2 L31.8 67.8Z' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M62 74 L78 58 M38 74 L22 58' stroke-width='5' fill='none'/%3E%3Cpath d='M70 66 L80 76 M30 66 L20 76' stroke-width='5.5' fill='none' stroke='%23a88a5a'/%3E%3Ccircle cx='83' cy='79' r='4.5' stroke='none'/%3E%3Ccircle cx='17' cy='79' r='4.5' stroke='none'/%3E%3C/g%3E%3C/svg%3E%3C/svg%3E") center / auto 34px no-repeat;
+}
+[data-theme="got"] .w-tabs a { font-family: var(--font-head); font-weight: 500; font-size: min(.8rem, 2.8vw); letter-spacing: .02em; border-radius: 3px; border-color: rgba(230,232,235,.28); color: #dfe3e8; }
+[data-theme="got"] .w-tabs a[aria-current] { background: #8b1a1a; color: #f3ece0; border-color: #b8893a; }
+[data-theme="got"] .btn.primary { border: 1px solid #b8893a; }
+[data-theme="got"] .sec-h { color: var(--title); letter-spacing: .08em; font-weight: 700; }
+[data-theme="got"] .card, [data-theme="got"] .rw-item, [data-theme="got"] .modal {
+  background-color: var(--card);
+  background-image: radial-gradient(ellipse at 15% 10%, rgba(140,110,60,.12), transparent 45%), radial-gradient(ellipse at 90% 95%, rgba(110,80,40,.14), transparent 50%);
+}
+[data-theme="got"] .quote-text { font-style: italic; font-size: 1.15rem; }
+[data-theme="got"] .pin { border: 1px solid #5a5f66; box-shadow: 0 0 0 3px #1b1e23, 0 0 0 4px #5a5f66, 0 10px 20px rgba(0,0,0,.5); margin-bottom: 14px; }
+[data-theme="got"] .board { column-gap: 14px; padding: 4px; }
+[data-theme="got"] .fav-photo { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px #8b1a1a; }
+[data-theme="got"] .fav-rank, [data-theme="got"] .fav-initials { color: #8b1a1a; }
+[data-theme="got"] .rw-ep { border-color: rgba(230,232,235,.28); color: #dfe3e8; border-radius: 3px; }
+[data-theme="got"] .chip { border-color: rgba(230,232,235,.3); }
+[data-theme="got"] .empty { color: #b9c0c8; font-style: italic; }
+[data-theme="got"] .not-canon summary { color: #d9a07a; }
+/* library tile */
+[data-theme="got"].tile .tile-art {
+  background:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cg fill='%23d9dde2' stroke='%23d9dde2' stroke-linecap='round'%3E%3Cpath d='M18 14 L71.8 64.2 L68.2 67.8Z' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M82 14 L28.2 64.2 L31.8 67.8Z' stroke-width='1.5' stroke-linejoin='round'/%3E%3Cpath d='M62 74 L78 58 M38 74 L22 58' stroke-width='5' fill='none'/%3E%3Cpath d='M70 66 L80 76 M30 66 L20 76' stroke-width='5.5' fill='none' stroke='%23a88a5a'/%3E%3Ccircle cx='83' cy='79' r='4.5' stroke='none'/%3E%3Ccircle cx='17' cy='79' r='4.5' stroke='none'/%3E%3C/g%3E%3C/svg%3E") 50% 26% / 55% auto no-repeat,
+    radial-gradient(ellipse at 0% 0%, rgba(140,190,230,.35), transparent 60%),
+    radial-gradient(ellipse at 100% 100%, rgba(220,90,30,.35), transparent 60%);
+}
+[data-theme="got"].tile { box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(200,205,212,.35); }
+[data-theme="got"].tile .tile-name { color: #e6e8eb; font-weight: 700; letter-spacing: .06em; font-size: 1.15rem; }
+
+/* ======================= Firefly: space western ======================= */
+[data-theme="firefly"] {
+  --bg: #141a26;
+  --bg-img:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' fill='%23fff'%3E%3Ccircle cx='14' cy='20' r='.9' opacity='.7'/%3E%3Ccircle cx='90' cy='8' r='.7' opacity='.5'/%3E%3Ccircle cx='150' cy='40' r='1.1' opacity='.8'/%3E%3Ccircle cx='40' cy='90' r='.6' opacity='.5'/%3E%3Ccircle cx='120' cy='120' r='.8' opacity='.6'/%3E%3Ccircle cx='180' cy='150' r='.7' opacity='.6'/%3E%3Ccircle cx='70' cy='170' r='1' opacity='.7'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 120% 50% at 50% 110%, rgba(214,120,56,.55), rgba(150,70,35,.25) 45%, transparent 75%),
+    linear-gradient(#10151f 0%, #1a2233 55%, #3a2a26 100%);
+  --bg-size: 200px 200px, cover, cover;
+  --page-ink: #efe6d6; --page-muted: #b8ac98; --title: #f0d49a;
+  --card: #e9dfca; --ink: #2d261e; --muted: #75695a; --line: #d2c4a8;
+  --accent: #b5562a; --on-accent: #fbf3e6;
+  --font-head: 'Rye', Georgia, serif;
+  --font-body: 'Zilla Slab', Georgia, serif;
+  --end-color: #b5562a;
+  --radius: 6px; --btn-radius: 6px;
+  --card-shadow: 0 0 0 1px rgba(90,70,45,.35), 0 10px 24px rgba(0,0,0,.45);
+}
+[data-theme="firefly"] .w-title { color: var(--title); letter-spacing: .04em; text-shadow: 0 2px 0 rgba(0,0,0,.55), 0 0 18px rgba(240,190,110,.25); }
+[data-theme="firefly"] .w-flourish { height: 30px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='36'%3E%3Cpath d='M10 18h94M136 18h94' stroke='%23c9a46a' stroke-width='1' stroke-dasharray='1 5' stroke-linecap='round'/%3E%3Csvg x='110' y='8' width='20' height='20' viewBox='0 0 800 800'%3E%3Cdefs%3E%3ClinearGradient id='lf' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23e8ac4e'/%3E%3Cstop offset='1' stop-color='%23b5562a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M2 528 L120 432 L205 440 L262 430 L250 400 L170 330 L110 258 L185 238 L188 205 L205 160 L210 78 L300 130 L372 165 L385 130 L405 145 L440 250 L462 322 L485 305 L520 160 L560 150 L665 62 L680 140 L715 178 L690 270 L700 320 L800 352 L720 450 L625 520 L650 555 L715 585 L610 610 L520 605 L505 635 L470 650 L390 665 L400 730 L300 700 L210 740 L215 690 L130 660 L75 660 L55 580Z' fill='url%28%23lf%29' stroke='url%28%23lf%29' stroke-width='6' stroke-linejoin='round'/%3E%3Cpath d='M506 622 Q528 668 546 736' stroke='%23b5562a' stroke-width='16' fill='none' stroke-linecap='round'/%3E%3C/svg%3E%3C/svg%3E") center / auto 36px no-repeat; }
+/* Canvas cards with a rivet in each corner. */
+[data-theme="firefly"] .card, [data-theme="firefly"] .rw-item, [data-theme="firefly"] .modal {
+  background-color: var(--card);
+  background-image:
+    radial-gradient(circle at 9px 9px, #9b8a6c 1.8px, transparent 2.4px),
+    radial-gradient(circle at calc(100% - 9px) 9px, #9b8a6c 1.8px, transparent 2.4px),
+    radial-gradient(circle at 9px calc(100% - 9px), #9b8a6c 1.8px, transparent 2.4px),
+    radial-gradient(circle at calc(100% - 9px) calc(100% - 9px), #9b8a6c 1.8px, transparent 2.4px),
+    radial-gradient(ellipse at 20% 10%, rgba(140,110,70,.12), transparent 50%);
+}
+[data-theme="firefly"] .w-tabs a { font-family: var(--font-body); font-weight: 600; text-transform: uppercase; letter-spacing: .04em; font-size: min(.78rem, 2.8vw); border-radius: 4px; border-color: rgba(239,230,214,.3); color: #efe6d6; }
+[data-theme="firefly"] .w-tabs a[aria-current] { background: #b5562a; color: #fbf3e6; border-color: transparent; }
+[data-theme="firefly"] .btn { font-family: var(--font-body); text-transform: uppercase; letter-spacing: .05em; font-size: .85rem; }
+[data-theme="firefly"] .sec-h { color: var(--title); }
+[data-theme="firefly"] .quote-text { font-style: italic; }
+[data-theme="firefly"] .pin { border: 5px solid #e9dfca; border-radius: 4px; box-shadow: 0 10px 22px rgba(0,0,0,.45); }
+[data-theme="firefly"] .fav-photo { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px #b5562a; }
+[data-theme="firefly"] .fav-rank, [data-theme="firefly"] .fav-initials { color: #b5562a; }
+[data-theme="firefly"] .rw-ep { border-color: rgba(239,230,214,.3); color: #efe6d6; }
+[data-theme="firefly"] .chip { border-color: rgba(239,230,214,.35); }
+[data-theme="firefly"] .empty { color: #d8c9ae; }
+/* library tile */
+[data-theme="firefly"].tile .tile-art { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 130'%3E%3Cg fill='%23fff'%3E%3Ccircle cx='12' cy='14' r='.8' opacity='.7'/%3E%3Ccircle cx='80' cy='10' r='1' opacity='.8'/%3E%3Ccircle cx='60' cy='80' r='.7' opacity='.6'/%3E%3Ccircle cx='30' cy='86' r='.9' opacity='.7'/%3E%3Ccircle cx='90' cy='70' r='.7' opacity='.6'/%3E%3Ccircle cx='14' cy='60' r='.6' opacity='.5'/%3E%3C/g%3E%3Csvg x='22' y='12' width='56' height='56' viewBox='0 0 800 800'%3E%3Cdefs%3E%3ClinearGradient id='lf' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23e8ac4e'/%3E%3Cstop offset='1' stop-color='%23b5562a'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M2 528 L120 432 L205 440 L262 430 L250 400 L170 330 L110 258 L185 238 L188 205 L205 160 L210 78 L300 130 L372 165 L385 130 L405 145 L440 250 L462 322 L485 305 L520 160 L560 150 L665 62 L680 140 L715 178 L690 270 L700 320 L800 352 L720 450 L625 520 L650 555 L715 585 L610 610 L520 605 L505 635 L470 650 L390 665 L400 730 L300 700 L210 740 L215 690 L130 660 L75 660 L55 580Z' fill='url%28%23lf%29' stroke='url%28%23lf%29' stroke-width='6' stroke-linejoin='round'/%3E%3Cpath d='M506 622 Q528 668 546 736' stroke='%23b5562a' stroke-width='16' fill='none' stroke-linecap='round'/%3E%3C/svg%3E%3Cpath d='M0 110 Q50 96 100 106 V130 H0Z' fill='%236b3a1f' opacity='.9'/%3E%3C/svg%3E") center top / 100% auto no-repeat; }
+[data-theme="firefly"].tile { box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(240,212,154,.4); }
+[data-theme="firefly"].tile .tile-name { color: #f0d49a; font-size: 1.35rem; text-shadow: 0 2px 0 rgba(0,0,0,.5); }
+
+/* ======================= The Last of Us: nature took the city back ======================= */
+[data-theme="tlou"] {
+  --bg: #1b211c;
+  --bg-img:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.6' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .7 0 0 0 0 .8 0 0 0 0 .6 0 0 0 .08 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    linear-gradient(115deg, transparent 20%, rgba(230,210,150,.07) 30%, transparent 40%, transparent 55%, rgba(230,210,150,.05) 62%, transparent 70%),
+    radial-gradient(ellipse 80% 45% at 70% 0%, rgba(214,196,140,.18), transparent 70%),
+    radial-gradient(ellipse at 50% 55%, transparent 40%, rgba(0,0,0,.5) 100%),
+    linear-gradient(#232b24, #141914);
+  --bg-size: 240px 240px, cover, cover, cover, cover;
+  --page-ink: #e8e8dc; --page-muted: #a9ad9a; --title: #eef0e4;
+  --card: #e6e2d4; --ink: #262a22; --muted: #6c6f5f; --line: #cfcab7;
+  --accent: #c98a2b; --on-accent: #1d1a12;
+  --font-head: 'Oswald', 'Helvetica Neue', sans-serif;
+  --font-body: 'Source Serif 4', Georgia, serif;
+  --end-color: #b0741f;
+  --radius: 8px; --btn-radius: 6px;
+  --card-shadow: 0 0 0 1px rgba(70,80,55,.25), 0 10px 22px rgba(0,0,0,.4);
+}
+[data-theme="tlou"] .w-title { font-weight: 500; text-transform: uppercase; letter-spacing: .14em; font-size: clamp(1.8rem, 8vw, 2.6rem); }
+[data-theme="tlou"] .w-flourish { height: 30px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='30' fill='none'%3E%3Cpath d='M12 17 C50 8 80 24 120 15 S190 8 228 17' stroke='%236f8452' stroke-width='1.6' stroke-linecap='round'/%3E%3Cg fill='%237f9660'%3E%3Cpath d='M40 13c4-6 11-6 12-4-3 4-8 6-12 4z'/%3E%3Cpath d='M66 19c3 6 10 7 12 5-2-4-7-7-12-5z'/%3E%3Cpath d='M104 14c4-6 11-6 12-4-3 4-8 6-12 4z'/%3E%3Cpath d='M140 16c3 6 10 7 12 5-2-4-7-7-12-5z'/%3E%3Cpath d='M176 11c4-6 11-6 12-4-3 4-8 6-12 4z'/%3E%3Cpath d='M200 14c3 6 10 7 12 5-2-4-7-7-12-5z'/%3E%3C/g%3E%3Ccircle cx='120' cy='15' r='2.6' fill='%23e0a646'/%3E%3C/svg%3E") center / auto 30px no-repeat; }
+[data-theme="tlou"] .w-tabs a { font-family: var(--font-head); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; font-size: min(.8rem, 2.9vw); border-radius: 5px; border-color: rgba(232,232,220,.25); color: #e8e8dc; }
+[data-theme="tlou"] .w-tabs a[aria-current] { background: #c98a2b; color: #1d1a12; border-color: transparent; }
+[data-theme="tlou"] .btn { font-family: var(--font-head); font-weight: 500; text-transform: uppercase; letter-spacing: .06em; }
+[data-theme="tlou"] .sec-h, [data-theme="tlou"] .rw-next, [data-theme="tlou"] .fav-name, [data-theme="tlou"] .fic-title, [data-theme="tlou"] .modal h2 { text-transform: uppercase; letter-spacing: .06em; }
+/* Worn paper with a faint leaf in the corner. */
+[data-theme="tlou"] .card, [data-theme="tlou"] .rw-item, [data-theme="tlou"] .modal {
+  background-color: var(--card);
+  background-image:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cpath d='M8 52 C14 30 30 16 54 8 C48 30 34 46 8 52Z M8 52 L40 22' fill='none' stroke='%235d7045' stroke-width='1.4' opacity='.18'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse at 20% 10%, rgba(120,110,80,.1), transparent 50%);
+  background-repeat: no-repeat;
+  background-position: right 8px bottom 8px, 0 0;
+}
+[data-theme="tlou"] .quote-text { font-style: italic; }
+[data-theme="tlou"] .pin { border: 5px solid #e6e2d4; border-radius: 6px; }
+[data-theme="tlou"] .fav-photo { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px #5d7045; }
+[data-theme="tlou"] .fav-rank, [data-theme="tlou"] .fav-initials { color: #5d7045; }
+[data-theme="tlou"] .rw-ep { border-color: rgba(232,232,220,.28); color: #e8e8dc; }
+[data-theme="tlou"] .chip { border-color: rgba(232,232,220,.3); }
+[data-theme="tlou"] .empty { color: #c4c8b4; font-style: italic; }
+/* library tile */
+[data-theme="tlou"].tile .tile-art { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 130'%3E%3Cg fill='%230d110d' opacity='.85'%3E%3Cpath d='M0 130 V78 h10 v-14 h8 v22 h7 V58 h12 v28 h6 V70 h9 v-8 h8 v24 h8 V52 h11 v34 h6 V74 h15 V130Z'/%3E%3C/g%3E%3Cg stroke='%235d7045' stroke-width='1.6' fill='none' opacity='.9'%3E%3Cpath d='M27 58 c-4 10 4 16 0 28'/%3E%3Cpath d='M79 52 c5 12 -4 18 1 34'/%3E%3Cpath d='M12 64 c3 8 -2 12 1 20'/%3E%3C/g%3E%3Cg fill='%236f8452'%3E%3Ccircle cx='25' cy='66' r='2'/%3E%3Ccircle cx='29' cy='76' r='1.8'/%3E%3Ccircle cx='81' cy='62' r='2'/%3E%3Ccircle cx='77' cy='74' r='1.8'/%3E%3C/g%3E%3Cg fill='%23c9a36a'%3E%3Cellipse cx='52' cy='99' rx='10' ry='5.5'/%3E%3Cpath d='M58 96 L66 70 L69.5 71 L63 98Z'/%3E%3Cellipse cx='69' cy='69' rx='4.2' ry='2.4' transform='rotate%28-20 69 69%29'/%3E%3Cpath d='M66.5 66.5 l-.5 -3 M68.5 66 l.2 -3' stroke='%23c9a36a' stroke-width='1'/%3E%3Crect x='44' y='101' width='2' height='14' rx='1'/%3E%3Crect x='48' y='102' width='2' height='13' rx='1'/%3E%3Crect x='56' y='102' width='2' height='13' rx='1'/%3E%3Crect x='60' y='101' width='2' height='14' rx='1'/%3E%3C/g%3E%3Cg fill='%238a6a3c'%3E%3Ccircle cx='50' cy='98' r='1.3'/%3E%3Ccircle cx='55' cy='100' r='1.2'/%3E%3Ccircle cx='61' cy='86' r='1'/%3E%3Ccircle cx='64' cy='78' r='.9'/%3E%3C/g%3E%3C/svg%3E") center bottom / 100% auto no-repeat, radial-gradient(ellipse at 70% 10%, rgba(214,196,140,.25), transparent 60%); }
+[data-theme="tlou"].tile .tile-name { color: #eef0e4; font-family: 'Oswald', sans-serif; font-weight: 500; text-transform: uppercase; letter-spacing: .1em; font-size: 1.1rem; text-shadow: 0 2px 6px rgba(0,0,0,.7); }
+[data-theme="tlou"].tile { justify-content: flex-start; box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(232,232,220,.2); }
+
+/* ======================= Pirates of the Caribbean: moonlit sea ======================= */
+[data-theme="potc"] {
+  --bg: #0f1f26;
+  --bg-img:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.7' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .8 0 0 0 0 .9 0 0 0 0 .9 0 0 0 .05 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 55% 35% at 85% 4%, rgba(243,239,217,.22), transparent 70%),
+    repeating-linear-gradient(175deg, transparent 0 38px, rgba(90,150,160,.05) 38px 40px),
+    radial-gradient(ellipse at 50% 55%, transparent 40%, rgba(0,0,0,.55) 100%),
+    linear-gradient(#132a33 0%, #0e1c23 60%, #0a1418 100%);
+  --bg-size: 240px 240px, cover, cover, cover, cover;
+  --page-ink: #eae4d0; --page-muted: #a3aea9; --title: #e3c15f;
+  --card: #ecdfbf; --ink: #2e2415; --muted: #75654a; --line: #d4c296;
+  --accent: #c9a23a; --on-accent: #1a1409;
+  --font-head: 'Pirata One', Georgia, serif;
+  --font-body: 'Libre Caslon Text', Georgia, serif;
+  --end-color: #8e2323;
+  --radius: 4px; --btn-radius: 4px;
+  --card-shadow: 0 10px 22px rgba(0,0,0,.45);
+}
+[data-theme="potc"] body, body[data-theme="potc"] { font-size: 16px; }
+[data-theme="potc"] .w-title { color: var(--title); font-size: clamp(2.1rem, 9vw, 3rem); letter-spacing: .02em; text-shadow: 0 2px 0 rgba(0,0,0,.6), 0 0 16px rgba(227,193,95,.25); }
+[data-theme="potc"] .w-flourish { height: 34px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='34'%3E%3Cpath d='M10 17h90M140 17h90' stroke='%23c9a23a' stroke-width='2.2' stroke-dasharray='5 2' stroke-linecap='round' opacity='.8'/%3E%3Ccircle cx='120' cy='17' r='10' fill='none' stroke='%23c9a23a' stroke-width='1'/%3E%3Cpath d='M120.0 3.0 L121.2 14.0 L125.4 11.6 L123.0 15.8 L134.0 17.0 L123.0 18.2 L125.4 22.4 L121.2 20.0 L120.0 31.0 L118.8 20.0 L114.6 22.4 L117.0 18.2 L106.0 17.0 L117.0 15.8 L114.6 11.6 L118.8 14.0Z' fill='%23e3c15f'/%3E%3Ccircle cx='120' cy='17' r='1.8' fill='%230f1f26'/%3E%3C/svg%3E") center / auto 34px no-repeat; }
+/* Treasure-map parchment, burnt at the edges. */
+[data-theme="potc"] .card, [data-theme="potc"] .rw-item, [data-theme="potc"] .modal {
+  background-color: var(--card);
+  background-image: radial-gradient(ellipse at 50% 50%, transparent 55%, rgba(110,70,25,.28) 100%), radial-gradient(ellipse at 20% 15%, rgba(150,110,50,.12), transparent 45%);
+  box-shadow: inset 0 0 0 1px rgba(90,60,20,.35), inset 0 0 18px rgba(90,55,15,.35), 0 10px 22px rgba(0,0,0,.45);
+}
+[data-theme="potc"] .w-tabs a { font-family: var(--font-body); font-weight: 700; font-size: min(.72rem, 2.7vw); border-color: rgba(227,193,95,.4); color: #eae4d0; border-radius: 3px; }
+[data-theme="potc"] .w-tabs a[aria-current] { background: #c9a23a; color: #1a1409; border-color: transparent; }
+[data-theme="potc"] .sec-h { color: var(--title); font-size: 1.8rem; }
+[data-theme="potc"] .rw-next { font-size: 2.4rem; }
+[data-theme="potc"] .rw-next.long { font-size: 1.9rem; }
+[data-theme="potc"] .fav-name { font-size: 1.4rem; }
+[data-theme="potc"] .ship-name { font-size: 2rem; }
+[data-theme="potc"] .watch-btn { color: #6e5210; border-color: #a8831f; }
+[data-theme="potc"] .watch-btn.on { background: #c9a23a; color: #1a1409; border-color: transparent; }
+[data-theme="potc"] .quote-text { font-style: italic; }
+[data-theme="potc"] .pin { border: 5px solid #ecdfbf; border-radius: 3px; box-shadow: inset 0 0 12px rgba(90,55,15,.35), 0 10px 22px rgba(0,0,0,.45); }
+[data-theme="potc"] .fav-photo { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px #c9a23a; }
+[data-theme="potc"] .fav-rank, [data-theme="potc"] .fav-initials { color: #8e2323; }
+[data-theme="potc"] .rw-ep { border-color: rgba(227,193,95,.35); color: #eae4d0; }
+[data-theme="potc"] .chip { border-color: rgba(227,193,95,.4); }
+[data-theme="potc"] .empty { color: #cfc6a8; font-size: 1.5rem; }
+/* library tile */
+[data-theme="potc"].tile .tile-art { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 130'%3E%3Cdefs%3E%3CradialGradient id='m'%3E%3Cstop offset='0' stop-color='%23f3efd9' stop-opacity='.9'/%3E%3Cstop offset='.35' stop-color='%23f3efd9' stop-opacity='.25'/%3E%3Cstop offset='1' stop-color='%23f3efd9' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='72' cy='24' r='26' fill='url%28%23m%29'/%3E%3Ccircle cx='72' cy='24' r='8' fill='%23f3efd9' opacity='.9'/%3E%3Cg fill='%230a0d10'%3E%3Cpath d='M22 86 L78 86 L72 96 L30 96 Z'/%3E%3Cpath d='M70 86 L84 80 L80 88Z'/%3E%3Crect x='37' y='40' width='1.6' height='46'/%3E%3Crect x='50' y='32' width='1.8' height='54'/%3E%3Crect x='63' y='44' width='1.6' height='42'/%3E%3Cpath d='M30 48 Q38 52 45 48 L45 60 Q38 64 30 60Z'/%3E%3Cpath d='M31 64 Q38 68 45 64 L45 78 Q38 82 31 78Z'/%3E%3Cpath d='M42 38 Q51 43 60 38 L60 52 Q51 57 42 52Z'/%3E%3Cpath d='M42 58 Q51 63 60 58 L60 74 Q51 79 42 74Z'/%3E%3Cpath d='M57 52 Q64 56 71 52 L71 62 Q64 66 57 62Z'/%3E%3Cpath d='M57 66 Q64 70 71 66 L71 78 Q64 82 57 78Z'/%3E%3Cpath d='M50 32 l8 3 -8 3z'/%3E%3C/g%3E%3Cpath d='M0 94 Q12 90 25 94 T50 94 T75 94 T100 94 V130 H0Z' fill='%2312303a'/%3E%3Cpath d='M0 100 Q12 96 25 100 T50 100 T75 100 T100 100' stroke='%233f7d86' stroke-width='1' fill='none' opacity='.6'/%3E%3Cpath d='M58 96 h24 M62 104 h14' stroke='%23f3efd9' stroke-width='1' opacity='.35'/%3E%3C/svg%3E") center bottom / 100% auto no-repeat; }
+[data-theme="potc"].tile { justify-content: flex-start; box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(227,193,95,.35); }
+[data-theme="potc"].tile .tile-name { color: #e3c15f; font-size: 1.3rem; text-shadow: 0 2px 4px rgba(0,0,0,.7); }
+
+/* ======================= Disney: once upon a time ======================= */
+[data-theme="disney"] {
+  --bg: #171a3d;
+  --bg-img:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200' fill='%23fff'%3E%3Ccircle cx='20' cy='30' r='1' opacity='.8'/%3E%3Ccircle cx='150' cy='20' r='.8' opacity='.6'/%3E%3Ccircle cx='90' cy='80' r='1.2' opacity='.7'/%3E%3Ccircle cx='170' cy='110' r='.9' opacity='.6'/%3E%3Ccircle cx='40' cy='150' r='1' opacity='.7'/%3E%3Ccircle cx='120' cy='170' r='.8' opacity='.5'/%3E%3Cpath d='M60 50 l1.2 3.3 3.3 1.2 -3.3 1.2 -1.2 3.3 -1.2 -3.3 -3.3 -1.2 3.3 -1.2z' fill='%23f3d98a' opacity='.8'/%3E%3Cpath d='M175 170 l1 2.8 2.8 1 -2.8 1 -1 2.8 -1 -2.8 -2.8 -1 2.8 -1z' fill='%23f3d98a' opacity='.7'/%3E%3C/svg%3E"),
+    radial-gradient(ellipse 80% 40% at 50% 0%, rgba(170,140,230,.25), transparent 70%),
+    radial-gradient(ellipse 90% 40% at 50% 105%, rgba(243,217,138,.14), transparent 70%),
+    linear-gradient(#1c2150 0%, #221a47 60%, #140f2e 100%);
+  --bg-size: 200px 200px, cover, cover, cover;
+  --page-ink: #f1edf9; --page-muted: #b4b0cf; --title: #f3d98a;
+  --card: #fbf6ea; --ink: #232a4d; --muted: #6d6f8f; --line: #e3dccb;
+  --accent: #d4a53c; --on-accent: #1d1a10;
+  --font-head: 'Cormorant Garamond', Georgia, serif;
+  --font-body: 'Lora', Georgia, serif;
+  --end-color: #b0802a;
+  --radius: 14px;
+  --card-shadow: 0 0 0 1px rgba(212,165,60,.35), 0 10px 26px rgba(0,0,0,.35);
+}
+[data-theme="disney"] .w-title { font-family: 'Great Vibes', cursive; font-size: clamp(3rem, 14vw, 4.2rem); color: var(--title); text-shadow: 0 0 20px rgba(243,217,138,.35); }
+[data-theme="disney"] .w-flourish { height: 34px; background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='34' fill='none'%3E%3Cpath d='M40 30 C80 4 160 4 200 26' stroke='%23e9c97a' stroke-width='1.4' stroke-linecap='round'/%3E%3Cpath d='M40 30 C80 8 150 6 190 22' stroke='%23e9c97a' stroke-width='.6' opacity='.6'/%3E%3Cpath d='M202 26 l1.8 4.6 4.6 1.8 -4.6 1.8 -1.8 4.6 -1.8 -4.6 -4.6 -1.8 4.6 -1.8z' fill='%23fff3c4' transform='translate%280 -9%29'/%3E%3Ccircle cx='120' cy='10' r='1.2' fill='%23fff3c4'/%3E%3Ccircle cx='70' cy='18' r='1' fill='%23fff3c4' opacity='.8'/%3E%3Ccircle cx='168' cy='14' r='1' fill='%23fff3c4' opacity='.8'/%3E%3C/svg%3E") center / auto 34px no-repeat; }
+[data-theme="disney"] .sec-h { font-family: 'Great Vibes', cursive; font-size: 2.3rem; color: var(--title); }
+[data-theme="disney"] .rw-next, [data-theme="disney"] .fav-name, [data-theme="disney"] .fic-title, [data-theme="disney"] .modal h2 { font-weight: 700; }
+[data-theme="disney"] .the-end-word { font-family: 'Great Vibes', cursive; font-size: 2.6rem; }
+[data-theme="disney"] .w-tabs a { font-family: var(--font-head); font-weight: 700; font-size: min(.95rem, 3.4vw); border-color: rgba(243,217,138,.4); color: #f1edf9; }
+[data-theme="disney"] .w-tabs a[aria-current] { background: #d4a53c; color: #1d1a10; border-color: transparent; }
+[data-theme="disney"] .rw-season-name { font-family: 'Great Vibes', cursive; font-size: 1.7rem; letter-spacing: 0; text-transform: none; color: var(--title); margin: 10px 0 4px; }
+[data-theme="disney"] .rw-season .rw-list { gap: 6px; }
+[data-theme="disney"] .watch-btn { color: #8a6516; border-color: #c4952f; }
+[data-theme="disney"] .watch-btn.on { background: #d4a53c; color: #1d1a10; border-color: transparent; }
+[data-theme="disney"] .pick-btn { background: linear-gradient(135deg, #f3d98a, #d4a53c); border: 0; color: #1d1a10; }
+[data-theme="disney"] .quote-text { font-style: italic; }
+[data-theme="disney"] .pin { border: 5px solid #fbf6ea; border-radius: 10px; }
+[data-theme="disney"] .fav-photo { box-shadow: 0 0 0 3px var(--card), 0 0 0 5px #d4a53c; }
+[data-theme="disney"] .fav-rank, [data-theme="disney"] .fav-initials { color: #b0802a; }
+[data-theme="disney"] .chip { border-color: rgba(243,217,138,.4); }
+[data-theme="disney"] .empty { color: #d7d1ec; font-style: italic; }
+/* library tile */
+[data-theme="disney"].tile .tile-art { background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 130'%3E%3Cpath d='M14 70 C30 30 70 26 90 52' stroke='%23e9c97a' stroke-width='1.2' fill='none' stroke-linecap='round'/%3E%3Cpath d='M90 48 l1.6 4 4 1.6 -4 1.6 -1.6 4 -1.6 -4 -4 -1.6 4 -1.6z' fill='%23fff3c4'/%3E%3Cg fill='%23fff'%3E%3Ccircle cx='20' cy='20' r='.8' opacity='.8'/%3E%3Ccircle cx='78' cy='14' r='1' opacity='.7'/%3E%3Ccircle cx='50' cy='36' r='.7' opacity='.6'/%3E%3Ccircle cx='30' cy='50' r='.6' opacity='.6'/%3E%3C/g%3E%3Cg fill='%230d1030' opacity='.92'%3E%3Cpath d='M22 130 V96 h6 V86 l3 -8 3 8 v10 h6 V80 l3 -10 3 10 v6 h4 V64 l4 -16 4 16 v22 h4 v-6 l3 -10 3 10 v16 h6 V86 l3 -8 3 8 v10 h6 V130Z'/%3E%3C/g%3E%3Cg fill='%23f3d98a' opacity='.85'%3E%3Crect x='49' y='76' width='2' height='3' rx='1'/%3E%3Crect x='43' y='90' width='2' height='3' rx='1'/%3E%3Crect x='55' y='90' width='2' height='3' rx='1'/%3E%3Crect x='33' y='100' width='1.6' height='2.6' rx='.8'/%3E%3Crect x='66' y='100' width='1.6' height='2.6' rx='.8'/%3E%3C/g%3E%3C/svg%3E") center bottom / 100% auto no-repeat, radial-gradient(ellipse at 50% 20%, rgba(170,140,230,.35), transparent 60%); }
+[data-theme="disney"].tile { justify-content: flex-start; box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(243,217,138,.4); }
+[data-theme="disney"].tile .tile-name { font-family: 'Great Vibes', cursive; color: #f3d98a; font-size: 2.2rem; line-height: 1; text-shadow: 0 0 12px rgba(243,217,138,.35); }
+
 /* ======================= Worlds you add ======================= */
 [data-theme="custom"] { --radius: 14px; --card-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 16px rgba(0,0,0,.1); }
 [data-theme="custom"] .w-flourish { background: linear-gradient(var(--accent), var(--accent)) center / 140px 1.5px no-repeat, radial-gradient(circle, var(--accent) 0 4px, transparent 4.5px) center / 10px 10px no-repeat; }

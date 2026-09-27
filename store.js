@@ -3,7 +3,7 @@
    Firestore layout (one account -- yours):
      users/{uid}                  { seeded: true } once the starter worlds exist
      users/{uid}/worlds/{id}      one world:
-        { name, theme: 'avatar'|'twd'|'hp'|'custom', canonParts: { ending, ships, headcanons }, look (custom only:
+        { name, theme: 'avatar'|'twd'|'hp'|'custom', canonParts: { ending, ships, headcanons }, ficsOn (false hides Fics), look (custom only:
           { bg, card, ink, accent, font, photo }), order, canonOn,
           cutoff (step index or null), ending, track (see themes.js),
           cardPhoto (the world's card on the home page),
