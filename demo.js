@@ -37,6 +37,11 @@ const DemoStore = (() => {
     resetPassword: async () => {},
 
     loadSettings: async () => clone(settings),
+    join: async invite => ({ invite, libraryMode: true }),
+    createAccount: async () => {},
+    loadWallpapers: async () => null,
+    saveWallpapers: async () => {},
+    deleteAccount: async () => { throw new Error('Sample mode has no account to delete.'); },
     saveSettings: async patch => { settings = { ...settings, ...patch }; },
 
     watchWorlds(cb) { listeners.worlds.push(cb); emit(); return () => {}; },

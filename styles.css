@@ -82,12 +82,24 @@ img { display: block; max-width: 100%; }
 .auth-card { width: 100%; max-width: 380px; text-align: center; }
 .auth-card form, .auth-card .muted { text-align: left; }
 .auth-card .field-label { color: var(--page-muted); }
+.auth-card .muted { color: var(--page-muted); }
 
 /* ---------- library ---------- */
 .lib-head { text-align: center; padding: 34px 0 18px; }
 .lib-crest { color: var(--accent); display: inline-block; }
 .crest-link { text-decoration: none; -webkit-tap-highlight-color: transparent; background: none; border: 0; padding: 0; cursor: pointer; }
 .crest-menu { display: grid; gap: 10px; }
+.crest-menu .linkish { justify-self: center; margin-top: 4px; }
+.linkish.danger-text { color: #c0564c; }
+/* Library picker */
+.tile.pickable { cursor: pointer; }
+.pick-check { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 700 15px/1 system-ui, sans-serif; color: transparent; border: 2px solid rgba(255,255,255,.7); background: rgba(0,0,0,.25); z-index: 1; }
+.tile.picked { outline: 3px solid #e9c97a; outline-offset: 2px; }
+.tile.picked .pick-check { background: #e9c97a; border-color: #e9c97a; color: #1a140f; }
+.pick-bar { position: sticky; bottom: 0; padding: 16px 0 calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(transparent, var(--bg) 35%); margin-top: 10px; }
+.pick-bar .btn:disabled { opacity: .55; }
+.library .empty { margin-top: 20px; }
+.library .add-tile { background: transparent; border: 2px dashed color-mix(in srgb, var(--page-ink) 30%, transparent); box-shadow: none; align-items: center; justify-content: center; text-align: center; gap: 8px; }
 .small-modal { max-width: 360px; }
 .wishlist .lib-head { padding-top: 4px; }
 .wishes { display: grid; gap: 12px; }

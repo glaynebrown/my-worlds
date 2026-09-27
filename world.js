@@ -69,6 +69,7 @@ function photoBoard(world, body, pins, newItem, emptyText) {
     const files = [...e.target.files];
     e.target.value = '';
     if (!files.length) return;
+    try { checkPhotoRoom(files.length); } catch (x) { toast(x.message, true); return; }
     const show = text => {
       uploads[key] = text;
       const prog = $('.progress');
@@ -154,6 +155,7 @@ function favForm(world, f) {
     extra: f ? `<div class="row-btns"><button type="button" class="btn small" data-move="-1">Move up</button><button type="button" class="btn small" data-move="1">Move down</button></div>` : '',
     onSave: async (v, { photo, dropPhoto }) => {
       if (!v.name) throw new Error('Add a name.');
+      if (photo && !(f && f.photo)) checkPhotoRoom(1);
       if (f) await DB.updateItem(f, v, photo, dropPhoto);
       else await DB.addItem({ world: world.id, kind: 'fav', order: favsOf(world).length, ...v }, photo);
     },

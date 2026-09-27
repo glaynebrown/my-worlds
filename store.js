@@ -88,10 +88,48 @@ const Store = (() => {
       if (self.caches) await caches.delete('fw-photos-v1').catch(() => {});
     },
     resetPassword: email => auth.sendPasswordResetEmail(email),
+    createAccount: (email, password) => auth.createUserWithEmailAndPassword(email, password),
 
+    // null = this login hasn't joined yet (no users/{uid} doc; see join()).
     async loadSettings() {
       const snap = await userDoc().get();
-      return snap.exists ? snap.data() : {};
+      return snap.exists ? snap.data() : null;
+    },
+    // Joining needs the invite code (checked by firestore.rules, not just here).
+    async join(invite) {
+      const data = { invite, libraryMode: true, joinedAt: firebase.firestore.FieldValue.serverTimestamp() };
+      await userDoc().set(data);
+      return { invite, libraryMode: true };
+    },
+
+    // ----- the Library's home-card photos (library/wallpapers) -----
+    async loadWallpapers() {
+      const snap = await db.collection('library').doc('wallpapers').get().catch(() => null);
+      return snap && snap.exists ? snap.data() : null;
+    },
+    saveWallpapers: data => db.collection('library').doc('wallpapers').set({ ...data, owner: uid() }),
+
+    // Deletes every photo, world and saved thing, then the login itself.
+    async deleteAccount(password, onStep) {
+      needOnline('Deleting your account');
+      const user = auth.currentUser;
+      await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, password));
+      const [ws, is] = await Promise.all([worlds().get(), items().get()]);
+      const all = [...is.docs.map(withId), ...ws.docs.map(withId)];
+      let n = 0;
+      for (const d of all) {
+        await Promise.all([removePhoto(d.photo), removePhoto(d.cardPhoto), removePhoto(d.look && d.look.photo)]);
+        if (onStep) onStep(++n, all.length);
+      }
+      const refs = [...is.docs, ...ws.docs].map(d => d.ref);
+      for (let k = 0; k < refs.length; k += 400) {
+        const batch = db.batch();
+        refs.slice(k, k + 400).forEach(r => batch.delete(r));
+        await batch.commit();
+      }
+      await userDoc().delete();
+      if (self.caches) await caches.delete('fw-photos-v1').catch(() => {});
+      await user.delete();
     },
     saveSettings: patch => write(userDoc().set(patch, { merge: true })),
 

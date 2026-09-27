@@ -187,8 +187,9 @@ function route() {
   if (!DB) { setPageTheme(null); return renderSetupNeeded(); }
   if (!state.user) {
     setPageTheme(null);
-    return page === 'reset' ? renderReset() : renderLogin();
+    return page === 'reset' ? renderReset() : page === 'signup' ? renderSignup() : renderLogin();
   }
+  if (state.needsInvite) { setPageTheme(null); return renderInvite(); }
   if (!state.loaded) { setPageTheme(null); view.innerHTML = '<p class="loading">Opening the library…</p>'; return; }
   if (state.importing) return; // share.js shows its own progress
 
@@ -204,6 +205,7 @@ function route() {
   if (page === 'new') return renderWorldForm(null);
   if (page === 'wishlist') return renderWishlist();
   if (page === 'share') return renderShare();
+  if (page === 'library') return renderLibraryPick();
   renderLibrary();
 }
 
@@ -236,12 +238,34 @@ window.addEventListener('hashchange', () => {
 
 // ---------- session ----------
 function startSession() {
-  DB.onAuth(async user => {
+  DB.onAuth(openAccount);
+}
+
+// The invite code comes in on the link (…/?invite=CODE) and is kept on this
+// phone so "Create account" can use it.
+function savedInvite() {
+  try {
+    const fromLink = new URLSearchParams(location.search).get('invite');
+    if (fromLink) localStorage.setItem('fw-invite', fromLink.trim());
+    return localStorage.getItem('fw-invite') || '';
+  } catch { return ''; }
+}
+
+async function openAccount(user) {
     state.unwatch.forEach(stop => stop());
-    Object.assign(state, { user, settings: null, worlds: [], items: [], loaded: false, unwatch: [] });
+    Object.assign(state, { user, settings: null, worlds: [], items: [], loaded: false, unwatch: [], needsInvite: false });
     if (!user) return route();
     route();
     try { state.settings = await DB.loadSettings(); } catch (e) { console.error(e); toast(friendlyError(e), true); state.settings = {}; }
+    // A login that hasn't joined yet needs the invite code once.
+    if (state.settings === null) {
+      const code = savedInvite();
+      state.settings = code ? await DB.join(code).catch(() => null) : null;
+      if (!state.settings) { state.needsInvite = true; return route(); }
+    }
+    if (state.settings.libraryMode || state.settings.sharedFrom) {
+      DB.loadWallpapers().then(w => { state.wallpapers = w; if (parseHash()[0] === 'library') refresh(); }).catch(() => {});
+    }
     const got = { worlds: false, items: false };
     const arrived = (key, list) => {
       state[key] = list;
@@ -253,13 +277,13 @@ function startSession() {
         firstRun();
         route();
       }
+      publishWallpapers();
     };
     const onError = e => { console.error(e); toast(friendlyError(e), true); };
     state.unwatch = [
       DB.watchWorlds(list => arrived('worlds', list), onError),
       DB.watchItems(list => arrived('items', list), onError),
     ];
-  });
 }
 
 // First time on a brand-new account: a copy someone shared (share.js) wins
@@ -270,6 +294,8 @@ async function firstRun() {
     const share = await DB.loadShare().catch(e => { console.error(e); return null; });
     if (share) return importShare(share);
   }
+  // Joined with the invite: they choose their own doors from the Library.
+  if (s.libraryMode && !s.seeded && !state.worlds.length) { location.hash = '#/library'; return; }
   await seedStarters();
   // Already has worlds? A copy that arrived later is offered, not forced.
   if (state.worlds.length && DB.loadShare) {
@@ -286,6 +312,7 @@ let seeding = false;
 async function seedStarters() {
   if (seeding) return;
   const s = state.settings;
+  if (s.libraryMode) return; // they add built-in worlds from the Library instead
   const given = s.seededThemes || (s.seeded || state.worlds.length ? ['avatar', 'twd', 'hp'] : []);
   const todo = Themes.STARTERS.map((w, i) => [w, i]).filter(([w]) => !given.includes(w.theme) && !state.worlds.some(x => x.theme === w.theme));
   if (!todo.length && s.seededThemes) return;
@@ -332,7 +359,8 @@ function renderLogin() {
     <label class="field"><span class="field-label">Password</span><input type="password" id="pw" autocomplete="current-password" required></label>
     <p class="error" id="err" hidden></p>
     <button class="btn primary block" style="margin-top:18px">Enter</button>
-    <p class="center" style="margin-top:14px"><a class="small muted" href="#/reset">Forgot password?</a></p></form>`);
+    <p class="center" style="margin-top:14px"><a class="small muted" href="#/reset">Forgot password?</a></p>
+    ${savedInvite() ? '<p class="center" style="margin-top:22px"><a class="btn block" href="#/signup">New here? Create an account</a></p>' : ''}</form>`);
   $('#f').onsubmit = e => {
     e.preventDefault();
     const email = $('#email').value.trim(), pw = $('#pw').value, err = $('#err');
@@ -341,6 +369,59 @@ function renderLogin() {
     busy($('button', e.target), async () => {
       try { await DB.signIn(email, pw); if (/^#\/(login|reset)?$/.test(location.hash) || !location.hash) location.hash = '#/'; } catch (x) { err.textContent = friendlyError(x); err.hidden = false; }
     }, 'Opening…');
+  };
+}
+
+function renderSignup() {
+  view.innerHTML = authShell(`<form id="f" novalidate>
+    <p class="muted small">Make your own account. Everything you add stays private to you.</p>
+    <label class="field"><span class="field-label">Email</span><input type="email" id="email" autocomplete="username"></label>
+    <label class="field"><span class="field-label">Password (at least 6 characters)</span><input type="password" id="pw" autocomplete="new-password"></label>
+    <label class="field"><span class="field-label">Invite code</span><input id="code" value="${esc(savedInvite())}" autocapitalize="off" autocomplete="off"></label>
+    <p class="error" id="err" hidden></p>
+    <button class="btn primary block" style="margin-top:18px">Create account</button>
+    <p class="center" style="margin-top:14px"><a class="small muted" href="#/login">I already have an account</a></p></form>`);
+  $('#f').onsubmit = e => {
+    e.preventDefault();
+    const email = $('#email').value.trim(), pw = $('#pw').value, code = $('#code').value.trim(), err = $('#err');
+    const fail = msg => { err.textContent = msg; err.hidden = false; };
+    if (!email || !pw || !code) return fail('Fill in your email, a password and the invite code.');
+    if (pw.length < 6) return fail('Pick a password with at least 6 characters.');
+    err.hidden = true;
+    busy($('button', e.target), async () => {
+      try { localStorage.setItem('fw-invite', code); } catch {}
+      try {
+        await DB.createAccount(email, pw);
+        location.hash = '#/';
+      } catch (x) {
+        fail(x.code === 'auth/email-already-in-use' ? 'That email already has an account. Try signing in.'
+          : x.code === 'auth/weak-password' ? 'Pick a longer password.'
+          : x.code === 'auth/operation-not-allowed' || x.code === 'auth/admin-restricted-operation' ? 'New accounts are turned off right now.'
+          : friendlyError(x));
+      }
+    }, 'Creating…');
+  };
+}
+
+// Signed in, but this login hasn't joined with the invite code yet.
+function renderInvite() {
+  view.innerHTML = authShell(`<form id="f" novalidate>
+    <p class="muted small">One more step: enter the invite code you were given.</p>
+    <label class="field"><span class="field-label">Invite code</span><input id="code" autocapitalize="off" autocomplete="off"></label>
+    <p class="error" id="err" hidden></p>
+    <button class="btn primary block" style="margin-top:18px">Join</button>
+    <p class="center" style="margin-top:14px"><button type="button" class="linkish" id="out">Sign out</button></p></form>`);
+  $('#out').onclick = () => DB.signOut();
+  $('#f').onsubmit = e => {
+    e.preventDefault();
+    const code = $('#code').value.trim(), err = $('#err');
+    busy($('button', e.target), async () => {
+      try {
+        await DB.join(code);
+        try { localStorage.setItem('fw-invite', code); } catch {}
+        openAccount(state.user);
+      } catch (x) { err.textContent = 'That invite code isn’t right.'; err.hidden = false; }
+    }, 'Joining…');
   };
 }
 
@@ -374,7 +455,8 @@ function renderLibrary() {
   view.innerHTML = `<div class="library">
     <header class="lib-head"><button class="lib-crest crest-link" id="crest" aria-label="Menu">${CREST}</button>
       <h1 class="lib-title">My Worlds</h1><p class="lib-sub">Pick a door and step inside — there’s no knowing where you might be swept off to.</p></header>
-    <div class="shelf">${worlds.map(tileHtml).join('')}</div></div>`;
+    <div class="shelf">${worlds.map(tileHtml).join('')}</div>
+    ${worlds.length ? '' : '<p class="empty">No doors yet. Tap the doorway above to add one.</p>'}</div>`;
   // Each tile wears its own world's look.
   $$('.tile[data-world]').forEach(el => {
     const w = worldById(el.dataset.world);
@@ -384,10 +466,12 @@ function renderLibrary() {
   });
   // The doorway icon hides everything that isn't a door.
   $('#crest').onclick = () => openModal(`<div class="crest-menu">
-      <a class="btn block" href="#/new" data-close>+ Add a world</a>
+      <a class="btn block" href="#/library" data-close>+ Add a world</a>
       <a class="btn block" href="#/wishlist" data-close>Wishlist</a>
-      <button class="btn block ghost" id="out">Sign out</button></div>`, (root, close) => {
+      <button class="btn block ghost" id="out">Sign out</button>
+      <button class="linkish danger-text" id="gone">Delete my account</button></div>`, (root, close) => {
     $('#out', root).onclick = () => { close(); confirmBox('Sign out?', 'Your worlds stay saved in your account.', 'Sign out', () => DB.signOut()); };
+    $('#gone', root).onclick = () => { close(); deleteAccountFlow(); };
   }, 'small-modal');
   enableTileDrag($('.shelf'));
 }
@@ -564,7 +648,18 @@ function trackToFields(track) {
     }
     return { type: 'list', seasons: '', noun: track.noun || 'Film', items: lines.join('\n') };
   }
-  return { type: 'episodes', seasons: track.seasons.join(', '), noun: track.noun || '', items: '' };
+  // Typed episode titles show as lines, with "# Season N" before each season.
+  let titles = '';
+  if (track.titles && track.titles.some(Boolean)) {
+    let at = 0;
+    titles = track.seasons.map((n, s) => {
+      const lines = track.titles.slice(at, at + n).map(t => t || '');
+      at += n;
+      while (lines.length && !lines[lines.length - 1]) lines.pop();
+      return lines.length ? [`# Season ${s + 1}`, ...lines].join('\n') : '';
+    }).filter(Boolean).join('\n');
+  }
+  return { type: 'episodes', seasons: track.seasons.join(', '), noun: track.noun || '', items: '', titles };
 }
 
 function readTrack(root, old) {
@@ -592,6 +687,20 @@ function readTrack(root, old) {
   if (!seasons.length) throw new Error('Type how many episodes are in each season, like 10, 10, 8.');
   const out = { type: 'episodes', seasons };
   if (old && old.type === 'episodes' && old.noun) out.noun = old.noun;
+  // Optional typed titles: one per line in order; "# Season 3" jumps to that season.
+  if ($('#t-named', root).checked) {
+    const starts = seasons.map((_, s) => seasons.slice(0, s).reduce((a, b) => a + b, 0));
+    const total = seasons.reduce((a, b) => a + b, 0);
+    const titles = Array(total).fill('');
+    let at = 0;
+    $('#t-titles', root).value.split('\n').map(l => l.trim()).filter(Boolean).forEach(l => {
+      const jump = /^#\s*(?:season\s*)?(\d+)/i.exec(l);
+      if (jump) { const s = Number(jump[1]) - 1; if (starts[s] != null) at = starts[s]; return; }
+      if (l.startsWith('#')) return;
+      if (at < total) titles[at++] = l;
+    });
+    if (titles.some(Boolean)) out.titles = titles;
+  }
   return out;
 }
 
@@ -642,7 +751,9 @@ function renderWorldForm(world) {
         ${[['episodes', 'A show'], ['list', 'Movies / books'], ['none', 'No tracker']].map(([v, l]) =>
           `<label><input type="radio" name="ttype" value="${v}" ${tf.type === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}
       </div>
-      <div data-t="episodes"><label class="field"><span class="field-label">Episodes in each season</span><input id="t-seasons" value="${esc(tf.seasons)}" placeholder="10, 10, 8" inputmode="numeric"></label></div>
+      <div data-t="episodes"><label class="field"><span class="field-label">Episodes in each season</span><input id="t-seasons" value="${esc(tf.seasons)}" placeholder="10, 10, 8" inputmode="numeric"></label>
+        <label class="switch"><input type="checkbox" id="t-named" ${tf.titles ? 'checked' : ''}><span class="track"></span><span>Add episode titles</span></label>
+        <label class="field" id="t-titles-wrap" ${tf.titles ? '' : 'hidden'}><span class="field-label">Titles in order, one per line (# Season 2 jumps ahead; any without a title show as Season/Episode)</span><textarea id="t-titles" rows="8" placeholder="# Season 1&#10;Pilot&#10;The Second One&#10;# Season 2&#10;…">${esc(tf.titles || '')}</textarea></label></div>
       <div data-t="list">
         <label class="field"><span class="field-label">Each one is a…</span><input id="t-noun" value="${esc(tf.noun)}" placeholder="Film"></label>
         <label class="field"><span class="field-label">Titles in order, one per line (a line starting with # makes a section)</span><textarea id="t-items" rows="6">${esc(tf.items)}</textarea></label>
@@ -673,6 +784,7 @@ function renderWorldForm(world) {
   };
   $$('input[name=ttype]', root).forEach(r => { r.onchange = showTrack; });
   showTrack();
+  $('#t-named').onchange = e => { $('#t-titles-wrap').hidden = !e.target.checked; };
   const showParts = () => { $('#parts').hidden = !$('#canon').checked; };
   $('#canon').onchange = showParts;
   showParts();
@@ -747,6 +859,7 @@ function renderWorldForm(world) {
       const name = $('#name').value.trim();
       if (!name) throw new Error('Give your world a name.');
       const track = readTrack(root, world && world.track);
+      checkPhotoRoom((prepared && !(look.photo) ? 1 : 0) + (cardPrepared && !(world && world.cardPhoto) ? 1 : 0));
       const canonPicked = Object.fromEntries($$('[data-part]', root).map(c => [c.dataset.part, c.checked]));
       const data = { name, track, canonOn: $('#canon').checked, canonParts: canonPicked, ficsOn: $('#fics').checked };
       if (!isNew) data.cardInk = ink;
