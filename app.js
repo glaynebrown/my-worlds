@@ -674,6 +674,14 @@ function renderWishlist() {
 // ---------- add / edit a world ----------
 function trackToFields(track) {
   if (!track) return { type: 'none', seasons: '', noun: 'Film', items: '' };
+  if (track.type === 'collection') {
+    let lines = track.items, at = 0;
+    if (track.sections) {
+      lines = [];
+      track.sections.forEach(({ name, count }) => { lines.push(`# ${name}`, ...track.items.slice(at, at + count)); at += count; });
+    }
+    return { type: 'collection', seasons: '', noun: 'Film', items: '', coll: lines.join('\n') };
+  }
   if (track.type === 'list') {
     // Sections show as "# Heading" lines in the text box.
     let lines = track.items;
@@ -702,6 +710,25 @@ function trackToFields(track) {
 function readTrack(root, old) {
   const type = $('input[name=ttype]:checked', root).value;
   if (type === 'none') return null;
+  if (type === 'collection') {
+    // Like a movie list with # sections, plus shows written "Title [22, 22, 13]".
+    const lines = $('#t-coll', root).value.split('\n').map(s => s.trim()).filter(Boolean);
+    const items = [], sections = [];
+    lines.forEach(l => {
+      if (l.startsWith('#')) sections.push({ name: l.replace(/^#+\s*/, '') || 'More', count: 0 });
+      else { items.push(l); if (sections.length) sections[sections.length - 1].count++; }
+    });
+    if (!items.length) throw new Error('Add at least one movie or show to the collection.');
+    const out = { type: 'collection', items };
+    if (sections.length) {
+      const before = items.length - sections.reduce((n, s) => n + s.count, 0);
+      if (before) sections.unshift({ name: 'More', count: before });
+      out.sections = sections.filter(s => s.count);
+    }
+    // Typed episode titles stay only if the list didn't change.
+    if (old && old.type === 'collection' && old.titles && old.items.join('\n') === items.join('\n')) out.titles = old.titles;
+    return out;
+  }
   if (type === 'list') {
     const lines = $('#t-items', root).value.split('\n').map(s => s.trim()).filter(Boolean);
     const items = [], sections = [];
@@ -810,12 +837,15 @@ function renderWorldForm(world) {
       ${sharedW ? `<p class="muted small">${lockTrack ? 'This tracker is shared. Only the person who shared it can change it.' : 'This tracker is shared, so changes here update it for everyone.'}</p>` : ''}
       <fieldset class="plain-fieldset" ${lockTrack ? 'disabled' : ''}>
       <div class="seg" role="radiogroup">
-        ${[['episodes', 'A show'], ['list', 'Movies / books'], ['none', 'No tracker']].map(([v, l]) =>
+        ${[['episodes', 'A show'], ['list', 'Movies / books'], ['collection', 'Collection'], ['none', 'No tracker']].map(([v, l]) =>
           `<label><input type="radio" name="ttype" value="${v}" ${tf.type === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}
       </div>
       <div data-t="episodes"><label class="field"><span class="field-label">Episodes in each season (commas or spaces)</span><input id="t-seasons" value="${esc(tf.seasons)}" placeholder="10, 10, 8" autocomplete="off" autocorrect="off"></label>
         <label class="switch"><input type="checkbox" id="t-named" ${tf.titles ? 'checked' : ''}><span class="track"></span><span>Add episode titles</span></label>
         <label class="field" id="t-titles-wrap" ${tf.titles ? '' : 'hidden'}><span class="field-label">Episode titles</span><span class="muted small field-hint">Start each season with a # and the season number or title (examples: # Season 1, # Part 1, # The Beginning). Then list the episode titles underneath, one per line. Or add them one at a time later: tap an episode’s name on the Rewatch card.</span><textarea id="t-titles" rows="8" placeholder="# Season 1&#10;Pilot&#10;The Second One&#10;# Season 2&#10;…">${esc(tf.titles || '')}</textarea></label></div>
+      <div data-t="collection">
+        <label class="field"><span class="field-label">Movies and shows, by section</span><span class="muted small field-hint">Start each section with a # (like # Batman). Then one movie or show per line, in the order you want. For a show, add its episodes per season in brackets: Gotham [22, 22, 22, 12, 12]. The same title in two sections counts as one.</span><textarea id="t-coll" rows="10" placeholder="# Batman&#10;Batman Begins (2005)&#10;Gotham [22, 22, 22, 12, 12]&#10;Justice League (2017)&#10;# Superman&#10;Man of Steel (2013)&#10;Justice League (2017)">${esc(tf.coll || '')}</textarea></label>
+      </div>
       <div data-t="list">
         <label class="field"><span class="field-label">Each one is a…</span><input id="t-noun" value="${esc(tf.noun)}" placeholder="Film"></label>
         <label class="field"><span class="field-label">Titles in order, one per line (a line starting with # makes a section)</span><textarea id="t-items" rows="6">${esc(tf.items)}</textarea></label>

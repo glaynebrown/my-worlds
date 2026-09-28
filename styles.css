@@ -345,7 +345,7 @@ a.ship { text-decoration: none; }
 .w-preview-card { background: var(--card); color: var(--ink); border-radius: 12px; padding: 14px; font-family: var(--font-body); display: flex; justify-content: space-between; align-items: center; gap: 10px; text-align: left; }
 .w-preview-pill { background: var(--accent); color: var(--on-accent); border-radius: 99px; padding: 4px 12px; font-size: .8rem; font-weight: 600; }
 .seg { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
-.seg label { flex: 1; }
+.seg label { flex: 1 1 40%; }
 .seg input { position: absolute; opacity: 0; }
 .seg span { display: block; text-align: center; padding: 9px 8px; border-radius: 10px; border: 1.5px solid var(--line); font-size: .9rem; font-weight: 600; }
 .seg input:checked + span { background: var(--accent); color: var(--on-accent); border-color: transparent; }
@@ -418,3 +418,14 @@ body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
 .block-head:not(.list-head) .sec-h { margin: 30px 0 10px; }
 .block-head .fold-caret { width: 9px; height: 9px; }
 .rw-block:not([open]) > summary .fold-caret { transform: rotate(-45deg); margin-top: 0; }
+
+/* Collection tracker */
+.coll-pick { display: flex; align-items: center; gap: 8px; margin: 4px 0 2px; font-size: .85rem; color: var(--muted); }
+.coll-pick select { font: inherit; font-weight: 600; color: var(--ink); background: color-mix(in srgb, var(--card) 70%, #fff); border: 1.5px solid var(--line); border-radius: 10px; padding: 6px 10px; max-width: 220px; }
+.coll-show > summary { list-style: none; cursor: pointer; }
+.coll-show > summary::-webkit-details-marker { display: none; }
+.coll-show > summary .fold-caret { margin-left: auto; }
+.coll-show:not([open]) > summary .fold-caret { transform: rotate(-45deg); margin-top: 0; }
+.coll-seasons { padding: 10px 4px 4px 14px; }
+.rw-item.seen > .rw-check, .coll-show > summary.seen .rw-check { background: var(--tab, var(--accent)); border-color: transparent; box-shadow: inset 0 0 0 4px var(--card); }
+.w-body .rw-block > .muted, .w-body .rw-block > p.muted { color: var(--page-muted); text-shadow: var(--page-shadow, none); }

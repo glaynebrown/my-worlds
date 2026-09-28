@@ -209,8 +209,52 @@ const Themes = (() => {
 
   // ---------- rewatch tracker ----------
   // theme (optional) adds episode titles for Avatar and TWD.
+  // One line of a Collection: "Man of Steel (2013)" (a movie) or
+  // "Smallville [21, 23, 22]" (a show with that many episodes per season).
+  function parseEntry(raw) {
+    const show = /^(.*?)\s*\[([\d,\s]+)\]\s*$/.exec(raw);
+    const text = show ? show[1] : raw;
+    const y = /^(.*\S)\s*\((\d{4})\)$/.exec(text);
+    return {
+      title: y ? y[1] : text.trim(), year: y ? y[2] : null,
+      seasons: show ? show[2].split(/[^0-9]+/).map(Number).filter(n => n > 0) : null,
+    };
+  }
+
   function steps(track, theme) {
     if (!track) return [];
+    // A Collection: sections (one per character) holding movies and shows, in
+    // the order typed. The same title in two sections is the same thing:
+    // "same" points at its first place, which is where its watched mark lives.
+    if (track.type === 'collection') {
+      const bounds = [];
+      (track.sections || []).reduce((at, { count }) => { bounds.push(at + count); return at + count; }, 0);
+      const out = [], first = {};
+      track.items.forEach((raw, idx) => {
+        const g = track.sections ? Math.max(0, bounds.findIndex(b => idx < b)) : 0;
+        const e = parseEntry(raw);
+        const base = (e.year ? `${e.title} (${e.year})` : e.title).toLowerCase();
+        const add = (key, step) => {
+          if (first[key] == null) first[key] = out.length;
+          out.push({ ...step, group: g, entry: idx, key, same: first[key] });
+        };
+        if (e.seasons) {
+          e.seasons.forEach((n, s) => {
+            for (let ep = 1; ep <= n; ep++) {
+              const key = `${base}|s${s + 1}e${ep}`;
+              const at = first[key] ?? out.length;
+              add(key, {
+                label: `${e.title} · Season ${s + 1}, Episode ${ep}`, short: `S${s + 1} E${ep}`, show: e.title, season: s, e: ep,
+                title: (track.titles && track.titles[at]) || null,
+              });
+            }
+          });
+        } else {
+          add(base, { label: e.title, short: e.year || '', movie: true, title: e.title, year: e.year });
+        }
+      });
+      return out;
+    }
     // key: what rewatch notes are filed under (a label, plus its short name when two titles could match).
     if (track.type === 'list') {
       // Optional sections (Disney: Princesses / Classics / Pixar & friends) and a
@@ -249,7 +293,7 @@ const Themes = (() => {
     });
     return out;
   }
-  const groupName = (track, g) => (track.type === 'list'
+  const groupName = (track, g) => (track.type === 'list' || track.type === 'collection'
     ? (track.sections && track.sections[g] ? track.sections[g].name : `${track.noun || 'Part'}s`)
     : (track.seasonNames && track.seasonNames[g]) || `${track.noun || 'Season'} ${g + 1}`);
 
@@ -338,5 +382,5 @@ const Themes = (() => {
     { world: 1, kind: 'fav', name: 'Maggie Greene', order: 3 },
   ];
 
-  return { BUILT_IN, PRESETS, FONTS, apply, info, palette, steps, groupName, loadFont, isDark, STARTERS, STARTER_ITEMS };
+  return { parseEntry, BUILT_IN, PRESETS, FONTS, apply, info, palette, steps, groupName, loadFont, isDark, STARTERS, STARTER_ITEMS };
 })();

@@ -266,7 +266,7 @@ function headcanonForm(world, h) {
 }
 
 function cutoffSelect(world, steps) {
-  if (!steps.length) return '';
+  if (!steps.length || world.track.type === 'collection') return '';
   const groups = new Map();
   steps.forEach((s, i) => {
     const g = world.track.type === 'list' ? 0 : s.group;
@@ -448,6 +448,7 @@ function drawRewatch(world, body) {
   const sid = world.sharedId && sectionShared(world, 'rewatch') ? world.sharedId : null;
   const sh = sid ? state.shared[sid] : null;
   world = withShared(world);
+  if (world.track && world.track.type === 'collection') return drawCollection(world, body);
   const steps = Themes.steps(world.track, world.theme);
   if (!steps.length) {
     body.innerHTML = `<p class="empty">No rewatch tracker for this world.</p>
@@ -615,6 +616,216 @@ function drawRewatch(world, body) {
       const pool = left.length ? left : steps.map((_, i) => i).filter(i => !watched.has(i));
       const i = pool[Math.floor(Math.random() * pool.length)];
       toast(`Tonight: ${steps[i].title || steps[i].label}`);
+      go(i);
+    };
+  }
+  const reset = $('#reset');
+  if (reset) {
+    reset.onclick = () => confirmBox('Reset the tracker?', 'This clears every watched mark. Your notes stay.', 'Reset', async () => {
+      if (sid) await DB.updateShared(sid, { watched: [] }); else await DB.updateWorld(world, { watched: [] });
+      state.filters[curKey] = null;
+      toast('Tracker reset. Notes kept.');
+    });
+  }
+  const again = $('#again');
+  if (again) {
+    again.onclick = () => (sid ? DB.updateShared(sid, { watched: [], rounds: rounds + 1 }) : DB.updateWorld(world, { watched: [], rounds: rounds + 1 }))
+      .then(() => { state.filters[curKey] = null; toast(`${roundName(rounds + 1)} begins`); refresh(); }, e => toast(friendlyError(e), true));
+  }
+}
+
+// ---------- Rewatch for a Collection (sections of movies and shows) ----------
+// Sections fold; inside them movies are one checkbox and shows fold open to
+// seasons of episodes. The same title in two sections shares one mark (its
+// first place, step.same). The top card follows the section you pick in
+// "Watching", and so do the arrows and "Pick one for me".
+function remember(key, value) {
+  try {
+    const all = JSON.parse(localStorage.getItem('fw-coll') || '{}');
+    if (value === undefined) return all[key];
+    all[key] = value;
+    localStorage.setItem('fw-coll', JSON.stringify(all));
+  } catch {}
+  return undefined;
+}
+
+function drawCollection(world, body) {
+  const sid = world.sharedId && sectionShared(world, 'rewatch') ? world.sharedId : null;
+  const sh = sid ? state.shared[sid] : null;
+  const steps = Themes.steps(world.track, world.theme);
+  const watched = watchedOf(world);
+  const seen = i => watched.has(steps[i].same);
+  const rounds = world.rounds || 0;
+  const roundName = n => (world.firstWatch ? (n === 0 ? 'First watch' : `Rewatch #${n}`) : `Rewatch #${n + 1}`);
+  const groupCount = (world.track.sections || [{}]).length;
+
+  // Notes (shared: everyone's, side by side).
+  const allShared = sh ? sh.notes : null;
+  const notes = new Map((allShared ? allShared.filter(n => n.by === DB.myUid()) : itemsFor(world, 'epnote')).map(n => [n.step, n]));
+  const noteAt = i => notes.get(steps[i].key);
+  const anyNote = i => (allShared ? allShared.some(n => n.step === steps[i].key) : !!noteAt(i));
+  const others = sh ? Object.entries(sh.doc.names || {}).filter(([u]) => u !== DB.myUid() && (sh.doc.members || []).includes(u)).map(([, n]) => n) : [];
+
+  // Which section the top card follows.
+  const secKey = `${world.id}:sec`;
+  let sec = state.filters[secKey] ?? remember(secKey);
+  if (sec == null || sec >= groupCount) {
+    const firstOpen = steps.findIndex((_, i) => !seen(i));
+    sec = firstOpen >= 0 ? steps[firstOpen].group : 0;
+  }
+  state.filters[secKey] = sec;
+  const inSec = steps.map((s, i) => i).filter(i => steps[i].group === sec);
+  const curKey = `${world.id}:cur`;
+  if (state.filters[curKey] == null || !inSec.includes(state.filters[curKey])) {
+    state.filters[curKey] = inSec.find(i => !seen(i)) ?? inSec[inSec.length - 1] ?? 0;
+  }
+  const cur = state.filters[curKey];
+  const pos = inSec.indexOf(cur);
+  const st = steps[cur] || {};
+  const curSeen = seen(cur);
+  const seenInSec = inSec.filter(seen).length;
+  const allDone = steps.length && steps.every((_, i) => seen(i));
+  const bigTitle = st.movie ? st.title : (st.title || st.short);
+  const small = st.movie ? [Themes.groupName(world.track, st.group), st.year].filter(Boolean).join(' · ') : `${st.show} · Season ${st.season + 1}, Episode ${st.e}`;
+
+  const hero = `<div class="card rw-hero">
+      <span class="rw-round">${roundName(rounds)}</span>
+      ${sid ? `<span class="rw-shared">${others.length ? `Shared with ${esc(others.join(' & '))}` : 'Shared · waiting for them to join'}</span>` : ''}
+      ${groupCount > 1 ? `<label class="coll-pick"><span>Watching</span><select id="secpick">${(world.track.sections || []).map((s, g) => `<option value="${g}" ${g === sec ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>` : ''}
+      <div class="rw-nav">
+        <button class="rw-arrow" id="prev" aria-label="Previous" ${pos <= 0 ? 'disabled' : ''}>‹</button>
+        <div class="rw-now">
+          ${st.movie
+            ? `<span class="rw-next${(bigTitle || '').length > 22 ? ' long' : ''}">${esc(bigTitle)}</span>`
+            : `<button class="rw-next rw-title-btn${(bigTitle || '').length > 22 ? ' long' : ''}" id="retitle" aria-label="Edit this episode’s title">${esc(bigTitle)}</button>`}
+          <span class="muted small">${esc(small)}</span>
+        </div>
+        <button class="rw-arrow" id="next" aria-label="Next" ${pos >= inSec.length - 1 ? 'disabled' : ''}>›</button>
+      </div>
+      <div class="rw-actions">
+        <button class="btn watch-btn${curSeen ? ' on' : ''}" id="watched" aria-pressed="${curSeen}">${curSeen ? 'Watched ✓' : 'Watched it'}</button>
+        <button class="note-btn${noteAt(cur) ? ' has-note' : ''}" id="note-cur" aria-label="Notes" title="Notes">${NOTE_ICON}</button>
+      </div>
+      <div class="rw-bar"><span style="width:${Math.round((seenInSec / Math.max(1, inSec.length)) * 100)}%"></span></div>
+      <span class="muted small">${seenInSec} of ${inSec.length} watched${groupCount > 1 ? ` in ${esc(Themes.groupName(world.track, sec))}` : ''}</span>
+      ${inSec.some(i => !seen(i) && i !== cur) ? '<button class="btn small pick-btn" id="pick"><svg viewBox="0 0 24 24" width="15" height="15" aria-hidden="true"><path d="M12 2l2.2 6.3L20.5 10.5l-6.3 2.2L12 19l-2.2-6.3L3.5 10.5l6.3-2.2z" fill="currentColor"/></svg><span>Pick one for me</span></button>' : ''}
+      ${allDone ? `<button class="btn primary" id="again">Start ${roundName(rounds + 1).replace('R', 'r')}</button>` : ''}
+      ${watched.size ? '<button class="btn small ghost" id="reset">Reset tracker</button>' : ''}
+    </div>`;
+
+  // Sections > movies and shows > seasons > episodes.
+  const shutSecs = foldedSections(world.id);
+  const openShows = foldedSections(`${world.id}:shows`); // shows start folded; this lists the open ones
+  const entries = [];
+  steps.forEach((s, i) => {
+    const last = entries[entries.length - 1];
+    if (last && last.entry === s.entry) last.idx.push(i);
+    else entries.push({ entry: s.entry, group: s.group, idx: [i] });
+  });
+  const cls = i => [seen(i) ? 'seen' : '', i === cur ? 'current' : '', anyNote(i) ? 'has-note' : ''].join(' ');
+  const entryHtml = en => {
+    const first = steps[en.idx[0]];
+    if (first.movie) {
+      const i = en.idx[0];
+      return `<button class="rw-item ${cls(i)}" data-i="${i}" aria-pressed="${seen(i)}"><span class="rw-check" aria-hidden="true"></span><span>${esc(first.title)}${first.year ? ` <span class="muted small">· ${first.year}</span>` : ''}</span></button>`;
+    }
+    const done = en.idx.filter(seen).length;
+    const seasons = [];
+    en.idx.forEach(i => { (seasons[steps[i].season] = seasons[steps[i].season] || []).push(i); });
+    return `<details class="coll-show" data-show="${en.entry}" ${openShows.includes(en.entry) ? 'open' : ''}>
+      <summary class="rw-item${done === en.idx.length ? ' seen' : ''}"><span class="rw-check" aria-hidden="true"></span><span>${esc(first.show)} <span class="muted small">· ${done}/${en.idx.length}</span></span><span class="fold-caret" aria-hidden="true"></span></summary>
+      <div class="coll-seasons">${seasons.map((idx, s) => `<div class="rw-season"><span class="rw-season-name">Season ${s + 1}</span><div class="rw-eps">${idx.map(i =>
+        `<button class="rw-ep ${cls(i)}" data-i="${i}" aria-label="${esc(steps[i].label)}${steps[i].title ? `: ${esc(steps[i].title)}` : ''}" aria-pressed="${seen(i)}">${steps[i].e}</button>`).join('')}</div></div>`).join('')}</div>
+    </details>`;
+  };
+  const grid = (world.track.sections || [{ name: '' }]).map((s, g) => {
+    const list = entries.filter(en => en.group === g).map(entryHtml).join('');
+    return world.track.sections
+      ? `<details class="rw-section" data-g="${g}" ${shutSecs.includes(g) ? '' : 'open'}><summary class="rw-season-name">${esc(s.name)}<span class="fold-caret" aria-hidden="true"></span></summary><div class="rw-list">${list}</div></details>`
+      : `<div class="rw-list">${list}</div>`;
+  }).join('');
+
+  // Notes list.
+  const stepTitle = i => (steps[i].movie ? esc(steps[i].title) : `${esc(steps[i].show)} · ${esc(steps[i].short)}${steps[i].title ? ` · ${esc(steps[i].title)}` : ''}`);
+  const firstOf = key => steps.findIndex(s => s.key === key);
+  let notesInner;
+  if (allShared) {
+    const keys = [...new Set(allShared.map(n => n.step))].map(k => [firstOf(k), k]).filter(([i]) => i >= 0).sort((a, b) => a[0] - b[0]);
+    notesInner = keys.length
+      ? `<div class="ep-notes">${keys.map(([i, k]) => `<div class="ep-note card shared-note"><span class="ep-note-at">${stepTitle(i)}</span>
+          ${allShared.filter(n => n.step === k).map(n => `<button class="note-by${n.by === DB.myUid() ? ' mine' : ''}" ${n.by === DB.myUid() ? `data-note="${i}"` : 'disabled'}><span class="note-who">${esc(n.by === DB.myUid() ? 'Me' : (n.byName || 'Someone'))}</span><span class="ep-note-text">${esc(n.text)}</span></button>`).join('')}</div>`).join('')}</div>`
+      : '<p class="muted small">No notes yet. Tap the notebook next to “Watched it” to write about something. Everyone’s notes show here side by side.</p>';
+  } else {
+    const noted = [...notes.values()].map(n => [firstOf(n.step), n]).filter(([i]) => i >= 0).sort((a, b) => a[0] - b[0]);
+    notesInner = noted.length
+      ? `<div class="ep-notes">${noted.map(([i, n]) => `<button class="ep-note card" data-note="${i}"><span class="ep-note-at">${stepTitle(i)}</span><span class="ep-note-text">${esc(n.text)}</span></button>`).join('')}</div>`
+      : '<p class="muted small">No notes yet. Tap the notebook next to “Watched it” to write about something.</p>';
+  }
+  const shutBlocks = foldedSections(`${world.id}:blocks`);
+  const block = (key, head, inner) => `<details class="rw-block" data-block="${key}" ${shutBlocks.includes(key) ? '' : 'open'}><summary class="block-head${key === 'list' ? ' list-head' : ''}">${head}</summary>${inner}</details>`;
+  body.innerHTML = hero
+    + block('list', '<h2 class="sec-h">The list<span class="fold-caret" aria-hidden="true"></span></h2>', `<p class="muted small">Tap a movie or episode to mark it watched (or not).</p>${grid}`)
+    + block('notes', `<h2 class="sec-h">${allShared ? 'Our notes' : 'My notes'}<span class="fold-caret" aria-hidden="true"></span></h2>`, notesInner);
+
+  // ----- actions -----
+  const go = i => { state.filters[curKey] = i; drawCollection(world, body); };
+  const setOne = i => {
+    const at = steps[i].same, on = !watched.has(at);
+    if (sid) return DB.toggleSharedWatched(sid, at, on).catch(e => toast(friendlyError(e), true));
+    const set = new Set(watched);
+    if (on) set.add(at); else set.delete(at);
+    return DB.updateWorld(world, { watched: [...set].sort((a, b) => a - b) }).catch(e => toast(friendlyError(e), true));
+  };
+  const sp = $('#secpick');
+  if (sp) {
+    sp.onchange = () => {
+      state.filters[secKey] = Number(sp.value);
+      remember(secKey, Number(sp.value));
+      state.filters[curKey] = null;
+      drawCollection(world, body);
+    };
+  }
+  $('#prev').onclick = () => go(inSec[pos - 1]);
+  $('#next').onclick = () => go(inSec[pos + 1]);
+  $('#watched').onclick = () => setOne(cur);
+  $('#note-cur').onclick = () => epNoteForm(world, st, noteAt(cur));
+  const rt = $('#retitle');
+  if (rt) {
+    rt.onclick = () => formModal({
+      title: st.label,
+      values: { title: st.title || '' },
+      fields: [{ key: 'title', label: 'Episode title', placeholder: st.label }],
+      onSave: async v => {
+        const titles = Array.from({ length: steps.length }, (_, i) => (world.track.titles && world.track.titles[i]) || '');
+        titles[st.same] = v.title;
+        const track = { ...world.track };
+        if (titles.some(Boolean)) track.titles = titles; else delete track.titles;
+        if (sid) await DB.updateShared(sid, { track }); else await DB.updateWorld(world, { track });
+      },
+    });
+  }
+  $$('[data-i]', body).forEach(el => {
+    el.onclick = () => {
+      const i = Number(el.dataset.i);
+      // Tapping something in another section makes that section the one you're watching.
+      if (steps[i].group !== sec) { state.filters[secKey] = steps[i].group; remember(secKey, steps[i].group); }
+      state.filters[curKey] = i;
+      setOne(i);
+    };
+  });
+  $$('[data-note]', body).forEach(el => { el.onclick = () => { const i = Number(el.dataset.note); epNoteForm(world, steps[i], noteAt(i)); }; });
+  $$('.rw-section', body).forEach(d => d.addEventListener('toggle', () => foldSection(world.id, Number(d.dataset.g), !d.open)));
+  $$('.coll-show', body).forEach(d => d.addEventListener('toggle', () => foldSection(`${world.id}:shows`, Number(d.dataset.show), d.open)));
+  $$('.rw-block', body).forEach(d => d.addEventListener('toggle', () => foldSection(`${world.id}:blocks`, d.dataset.block, !d.open)));
+  const pick = $('#pick');
+  if (pick) {
+    pick.onclick = () => {
+      const pool = inSec.filter(i => !seen(i) && i !== cur);
+      // A show counts once: land on its next unwatched episode.
+      const byEntry = [...new Set(pool.map(i => steps[i].entry))];
+      const entry = byEntry[Math.floor(Math.random() * byEntry.length)];
+      const i = pool.find(j => steps[j].entry === entry);
+      toast(`Tonight: ${steps[i].movie ? steps[i].title : `${steps[i].show}, ${steps[i].short}`}`);
       go(i);
     };
   }
