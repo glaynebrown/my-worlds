@@ -390,3 +390,15 @@ body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
 
 /* Text sitting straight on a photo (worlds with an untinted background photo). */
 .back, .gear, .w-title, .sec-h, .empty, .w-body > .muted, .rw-season-name, .list-head .sec-h, .chip { text-shadow: var(--page-shadow, none); }
+
+/* shared worlds */
+.plain-fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+.plain-fieldset:disabled { opacity: .55; }
+.share-card { padding: 4px 18px 18px; }
+.share-card .form-h { margin-top: 16px; }
+.rw-shared { font-size: .8rem; color: var(--tab, var(--accent)); font-weight: 600; margin-top: -2px; }
+.shared-note { display: flex; flex-direction: column; gap: 8px; }
+.note-by { display: flex; flex-direction: column; gap: 2px; width: 100%; text-align: left; border: 0; background: color-mix(in srgb, var(--line) 45%, transparent); border-radius: 10px; padding: 8px 10px; color: var(--ink); }
+.note-by.mine { background: color-mix(in srgb, var(--tab, var(--accent)) 14%, transparent); cursor: pointer; }
+.note-by:disabled { opacity: 1; cursor: default; }
+.note-who { font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }

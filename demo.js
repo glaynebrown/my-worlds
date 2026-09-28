@@ -3,6 +3,9 @@
    Photos you add stay on this phone only (never uploaded). */
 const DemoStore = (() => {
   let worlds = [], items = [], settings = {};
+  const shared = {}, sharedNotes = {}, sharedWatchers = {};
+  const sharedView = sid => ({ doc: shared[sid] ? clone(shared[sid]) : { id: sid, gone: true }, notes: clone(sharedNotes[sid] || []) });
+  const emitShared = sid => setTimeout(() => (sharedWatchers[sid] || []).forEach(cb => cb(sharedView(sid))));
   let n = 0;
   const id = () => `d${++n}`;
   const listeners = { worlds: [], items: [] };
@@ -80,6 +83,41 @@ const DemoStore = (() => {
       items = items.map(i => (i.id === item.id ? { ...i, ...patch } : i)); emit();
     },
     async deleteItem(item) { items = items.filter(i => i.id !== item.id); emit(); },
+
+    // ----- shared worlds, in memory (one pretend sister can be added for testing) -----
+    myUid: () => 'sample',
+    myEmail: () => 'sample',
+    async createShared(data) {
+      const sid = id();
+      shared[sid] = { ...clone(data), id: sid, owner: 'sample', members: ['sample'] };
+      sharedNotes[sid] = [];
+      emitShared(sid);
+      return sid;
+    },
+    watchShared(sid, cb) {
+      (sharedWatchers[sid] = sharedWatchers[sid] || []).push(cb);
+      setTimeout(() => cb(sharedView(sid)));
+      return () => { sharedWatchers[sid] = (sharedWatchers[sid] || []).filter(f => f !== cb); };
+    },
+    async updateShared(sid, patch) { Object.assign(shared[sid], clone(patch)); emitShared(sid); },
+    async toggleSharedWatched(sid, i, on) {
+      const w = new Set(shared[sid].watched || []);
+      if (on) w.add(i); else w.delete(i);
+      shared[sid].watched = [...w]; emitShared(sid);
+    },
+    async addSharedNote(sid, data) { sharedNotes[sid].push({ ...clone(data), id: id(), by: data.by || 'sample', t: Date.now() }); emitShared(sid); },
+    async updateSharedNote(sid, note, patch) { sharedNotes[sid] = sharedNotes[sid].map(n => (n.id === note.id ? { ...n, ...patch } : n)); emitShared(sid); },
+    async deleteSharedNote(sid, note) { sharedNotes[sid] = sharedNotes[sid].filter(n => n.id !== note.id); emitShared(sid); },
+    async inviteToShared(sid, email) { shared[sid].invited = [...new Set([...(shared[sid].invited || []), email])]; emitShared(sid); },
+    pendingShares: async () => [],
+    joinShared: async () => {},
+    declineShared: async () => {},
+    async leaveShared(sid) { shared[sid].members = shared[sid].members.filter(m => m !== 'sample'); emitShared(sid); },
+    // Test helper: a pretend sister joins and writes a note.
+    _sisterJoins(sid, name = 'Sarah') {
+      shared[sid].members.push('sister'); shared[sid].names = { ...(shared[sid].names || {}), sister: name };
+      shared[sid].invited = []; emitShared(sid);
+    },
 
     // Called once the starter worlds exist, so sample mode has a little to show.
     // Made-up examples only.

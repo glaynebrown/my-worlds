@@ -11,7 +11,7 @@
             #/login  #/reset                                               */
 
 const view = document.getElementById('view');
-const state = { user: null, settings: null, worlds: [], items: [], loaded: false, unwatch: [], filters: {} };
+const state = { user: null, settings: null, worlds: [], items: [], loaded: false, unwatch: [], filters: {}, shared: {} };
 let DB = Store.configured ? Store : null;
 
 // ---------- helpers ----------
@@ -253,7 +253,8 @@ function savedInvite() {
 
 async function openAccount(user) {
     state.unwatch.forEach(stop => stop());
-    Object.assign(state, { user, settings: null, worlds: [], items: [], loaded: false, unwatch: [], needsInvite: false });
+    stopAllShared();
+    Object.assign(state, { user, settings: null, worlds: [], items: [], loaded: false, unwatch: [], needsInvite: false, shared: {} });
     if (!user) return route();
     route();
     try { state.settings = await DB.loadSettings(); } catch (e) { console.error(e); toast(friendlyError(e), true); state.settings = {}; }
@@ -270,12 +271,14 @@ async function openAccount(user) {
     const arrived = (key, list) => {
       state[key] = list;
       got[key] = true;
+      if (key === 'worlds') syncSharedWatches();
       if (state.loaded) { setTimeout(savePhotosForOffline, 3000); return refresh(); }
       if (got.worlds && got.items) {
         setTimeout(savePhotosForOffline, 3000);
         state.loaded = true;
         firstRun();
         route();
+        setTimeout(offerJoins, 1500);
       }
       publishWallpapers();
     };
@@ -740,7 +743,10 @@ function renderWorldForm(world) {
   const fromWish = isNew && wishToOpen ? state.items.find(i => i.id === wishToOpen) : null;
   const custom = isNew || world.theme === 'custom';
   const look = { ...Themes.PRESETS[0], ...(world && world.look) };
-  const tf = trackToFields(world ? world.track : { type: 'episodes', seasons: [] });
+  // A shared world's tracker lives with the group; only the person who shared it changes it.
+  const sharedW = !!(world && world.sharedId);
+  const lockTrack = sharedW && !isSharedOwner(world);
+  const tf = trackToFields(world ? withShared(world).track : { type: 'episodes', seasons: [] });
   const parts = world ? canonParts(world) : { ending: true, ships: true, headcanons: true };
   let prepared = null, dropPhoto = false;
 
@@ -785,6 +791,8 @@ function renderWorldForm(world) {
           <button type="button" class="btn small${world.cardPos ? '' : ' on-auto'}" id="posauto">Auto</button>
         </div></div>`}
       <h2 class="form-h">Rewatch tracker</h2>
+      ${sharedW ? `<p class="muted small">${lockTrack ? 'This tracker is shared. Only the person who shared it can change it.' : 'This tracker is shared, so changes here update it for everyone.'}</p>` : ''}
+      <fieldset class="plain-fieldset" ${lockTrack ? 'disabled' : ''}>
       <div class="seg" role="radiogroup">
         ${[['episodes', 'A show'], ['list', 'Movies / books'], ['none', 'No tracker']].map(([v, l]) =>
           `<label><input type="radio" name="ttype" value="${v}" ${tf.type === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}
@@ -797,6 +805,7 @@ function renderWorldForm(world) {
         <label class="field"><span class="field-label">Titles in order, one per line (a line starting with # makes a section)</span><textarea id="t-items" rows="6">${esc(tf.items)}</textarea></label>
       </div>
       ${isNew || !(world.rounds > 0) ? `<label class="switch" data-t-any><input type="checkbox" id="first" ${(world && world.firstWatch) || (fromWish && fromWish.toWatch) ? 'checked' : ''}><span class="track"></span><span>I’m watching this for the first time</span></label>` : ''}
+      </fieldset>
       <h2 class="form-h">Fics</h2>
       <label class="switch"><input type="checkbox" id="fics" ${!world || world.ficsOn !== false ? 'checked' : ''}><span class="track"></span><span>Include a Fics section</span></label>
       <h2 class="form-h">My Canon</h2>
@@ -808,6 +817,7 @@ function renderWorldForm(world) {
       </div>
       <div class="actions"><span class="spacer"></span><a class="btn" href="${isNew ? '#/' : `#/w/${world.id}`}">Cancel</a><button class="btn primary" id="save">${isNew ? 'Create world' : 'Save'}</button></div>
     </form>
+    ${isNew || DB.demo === undefined ? '' : `<div class="card form-card share-card">${shareSettingsHtml(world)}</div>`}
     ${isNew ? '' : `<div class="card form-card danger-zone">
       <div class="row-btns"><button class="btn small" id="up">Move earlier</button><button class="btn small" id="down">Move later</button></div>
       <button class="btn ghost danger-text block" id="del" style="margin-top:12px">Delete this world</button></div>`}
@@ -909,7 +919,7 @@ function renderWorldForm(world) {
     busy($('#save'), async () => {
       const name = $('#name').value.trim();
       if (!name) throw new Error('Give your world a name.');
-      const track = readTrack(root, world && world.track);
+      const track = lockTrack ? withShared(world).track : readTrack(root, world && withShared(world).track);
       checkPhotoRoom((prepared && !(look.photo) ? 1 : 0) + (cardPrepared && !(world && world.cardPhoto) ? 1 : 0));
       const canonPicked = Object.fromEntries($$('[data-part]', root).map(c => [c.dataset.part, c.checked]));
       const data = { name, track, canonOn: $('#canon').checked, canonParts: canonPicked, ficsOn: $('#fics').checked };
@@ -927,6 +937,10 @@ function renderWorldForm(world) {
         const last = Themes.steps(track).length - 1;
         data.watched = [...watchedOf(world)].filter(i => i <= last);
         data.cutoff = world.cutoff == null || world.cutoff > last ? null : world.cutoff;
+        if (sharedW) {
+          if (!lockTrack) await DB.updateShared(world.sharedId, { track });
+          delete data.watched; // shared marks live with the group
+        }
         await DB.updateWorld(world, data, prepared, dropPhoto);
         if (cardPrepared) await DB.setCardPhoto(world, cardPrepared);
         else if (cardDrop && world.cardPhoto) await DB.setCardPhoto(world, null);
@@ -945,6 +959,7 @@ function renderWorldForm(world) {
       Promise.all(list.map((w, k) => (w.order === k ? null : DB.updateWorld(w, { order: k }))))
         .then(() => toast(dir < 0 ? 'Moved earlier' : 'Moved later'), e => toast(friendlyError(e), true));
     };
+    wireShareSettings(world);
     $('#up').onclick = () => move(-1);
     $('#down').onclick = () => move(1);
     $('#del').onclick = () => {

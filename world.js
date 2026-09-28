@@ -265,6 +265,7 @@ function cutoffSelect(world, steps) {
 }
 
 function drawCanon(world, body) {
+  world = withShared(world);
   const steps = Themes.steps(world.track, world.theme);
   const cut = world.cutoff != null && steps[world.cutoff];
   const ships = itemsIn(world.id, 'ship').sort(byOldest);
@@ -389,11 +390,18 @@ function epNoteForm(world, step, note) {
     values: note || {},
     fields: [{ key: 'text', label: step.title && world.track.type !== 'list' ? `${step.short} · ${step.label}` : step.label, type: 'textarea', big: true, placeholder: 'What stood out this time…' }],
     onSave: async v => {
+      const sid = world.sharedId;
+      if (sid) {
+        if (note && !v.text) return DB.deleteSharedNote(sid, note);
+        if (!v.text) return;
+        if (note) return DB.updateSharedNote(sid, note, { text: v.text, byName: myName() });
+        return DB.addSharedNote(sid, { step: step.key, text: v.text, byName: myName() });
+      }
       if (note && !v.text) return DB.deleteItem(note);
       if (!v.text) return;
       if (note) await DB.updateItem(note, v); else await DB.addItem({ world: world.id, kind: 'epnote', step: step.key, ...v });
     },
-    onDelete: note && (() => confirmBox('Delete this note?', '', 'Delete', () => DB.deleteItem(note))),
+    onDelete: note && (() => confirmBox('Delete this note?', '', 'Delete', () => (world.sharedId ? DB.deleteSharedNote(world.sharedId, note) : DB.deleteItem(note)))),
   });
 }
 
@@ -420,6 +428,11 @@ const watchedOf = world => new Set(Array.isArray(world.watched)
 const NOTE_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 3h11a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6z"/><path d="M6 3v18M4 7h4M4 12h4M4 17h4M11 8h5M11 12h5"/></svg>';
 
 function drawRewatch(world, body) {
+  // A shared world's tracker, watched marks and notes live in shared/{sid} (together.js).
+  const sid = world.sharedId;
+  const sh = sid ? state.shared[sid] : null;
+  if (sid && (!sh || !sh.doc || sh.doc.gone)) { body.innerHTML = '<p class="empty">Opening the shared tracker…</p>'; return; }
+  world = withShared(world);
   const steps = Themes.steps(world.track, world.theme);
   if (!steps.length) {
     body.innerHTML = `<p class="empty">No rewatch tracker for this world.</p>
@@ -434,8 +447,11 @@ function drawRewatch(world, body) {
   const roundName = n => (world.firstWatch ? (n === 0 ? 'First watch' : `Rewatch #${n}`) : `Rewatch #${n + 1}`);
   const info = Themes.info(world);
   const isList = world.track.type === 'list';
-  const notes = new Map(itemsIn(world.id, 'epnote').map(n => [n.step, n]));
-  const noteAt = i => notes.get(steps[i].key);
+  const allShared = sh ? sh.notes : null;
+  const notes = new Map((allShared ? allShared.filter(n => n.by === DB.myUid()) : itemsIn(world.id, 'epnote')).map(n => [n.step, n]));
+  const noteAt = i => notes.get(steps[i].key);   // your own note
+  const anyNote = i => (allShared ? allShared.some(n => n.step === steps[i].key) : !!noteAt(i));
+  const others = sh ? Object.entries(sh.doc.names || {}).filter(([u]) => u !== DB.myUid() && (sh.doc.members || []).includes(u)).map(([, n]) => n) : [];
   const name = i => (isList ? steps[i].label : steps[i].short);
 
   // The episode shown in the big card. Arrows move it without changing
@@ -452,6 +468,7 @@ function drawRewatch(world, body) {
 
   const hero = `<div class="card rw-hero${theEnd ? ' done' : ''}">
       <span class="rw-round">${roundName(rounds)}</span>
+      ${sid ? `<span class="rw-shared">${others.length ? `Shared with ${esc(others.join(' & '))}` : 'Shared · waiting for them to join'}</span>` : ''}
       <div class="rw-nav">
         <button class="rw-arrow" id="prev" aria-label="Previous" ${cur <= 0 ? 'disabled' : ''}>‹</button>
         <div class="rw-now">
@@ -476,7 +493,7 @@ function drawRewatch(world, body) {
 
   // The grid: one row of numbered squares per season (or a checklist of titles).
   const cell = i => {
-    const cls = [watched.has(i) ? 'seen' : '', i === cur ? 'current' : '', cutoff != null && i > cutoff ? 'beyond' : '', noteAt(i) ? 'has-note' : ''].join(' ');
+    const cls = [watched.has(i) ? 'seen' : '', i === cur ? 'current' : '', cutoff != null && i > cutoff ? 'beyond' : '', anyNote(i) ? 'has-note' : ''].join(' ');
     const mark = cutoff === i ? '<span class="cut-mark" aria-hidden="true"></span>' : '';
     return isList
       ? `<button class="rw-item ${cls}" data-i="${i}" aria-pressed="${watched.has(i)}"><span class="rw-check" aria-hidden="true"></span><span>${esc(steps[i].label)}${world.track.labels ? ` <span class="muted small">· ${esc(steps[i].short)}</span>` : /\((\d{4})\)$/.test(world.track.items[i]) ? ` <span class="muted small">· ${world.track.items[i].slice(-5, -1)}</span>` : ''}</span>${cutoff === i ? `<span class="cut-note">${esc(info.theEnd)}</span>` : ''}</button>`
@@ -502,9 +519,17 @@ function drawRewatch(world, body) {
       + (outside.length ? `<details class="not-canon" ${openOutside ? 'open' : ''}><summary>${esc(info.notCanon || 'Not canon')} <span class="muted small">(${esc(Themes.groupName(world.track, outside[0][1]))}–${outside[outside.length - 1][1] + 1})</span></summary>${outside.map(([idx, g]) => row(idx, g)).join('')}</details>` : '');
   }
 
-  // All notes, in watch order.
+  // All notes, in watch order. Shared: everyone's, side by side, with names.
+  const stepTitle = i => `${esc(name(i))}${!isList && steps[i].title ? ` · ${esc(steps[i].title)}` : ''}`;
+  const sharedNotesHtml = () => {
+    const rows = steps.map((s, i) => [i, allShared.filter(n => n.step === s.key).sort((a, b) => (a.by === DB.myUid() ? -1 : b.by === DB.myUid() ? 1 : a.t - b.t))]).filter(([, l]) => l.length);
+    return `<h2 class="sec-h">Our notes</h2>${rows.length
+      ? `<div class="ep-notes">${rows.map(([i, list]) => `<div class="ep-note card shared-note"><span class="ep-note-at">${stepTitle(i)}</span>
+          ${list.map(n => `<button class="note-by${n.by === DB.myUid() ? ' mine' : ''}" ${n.by === DB.myUid() ? `data-note="${i}"` : 'disabled'}><span class="note-who">${esc(n.by === DB.myUid() ? 'Me' : (n.byName || 'Someone'))}</span><span class="ep-note-text">${esc(n.text)}</span></button>`).join('')}</div>`).join('')}</div>`
+      : '<p class="muted small">No notes yet. Tap the notebook next to “Watched it” to write about an episode. Everyone’s notes show here side by side.</p>'}`;
+  };
   const noted = steps.map((s, i) => [i, noteAt(i)]).filter(([, n]) => n);
-  const notesHtml = `<h2 class="sec-h">My notes</h2>${noted.length
+  const notesHtml = allShared ? sharedNotesHtml() : `<h2 class="sec-h">My notes</h2>${noted.length
     ? `<div class="ep-notes">${noted.map(([i, n]) => `<button class="ep-note card" data-note="${i}"><span class="ep-note-at">${esc(name(i))}${!isList && steps[i].title ? ` · ${esc(steps[i].title)}` : ''}</span><span class="ep-note-text">${esc(n.text)}</span></button>`).join('')}</div>`
     : '<p class="muted small">No notes yet. Tap the notebook next to “Watched it” to write about an episode.</p>'}`;
 
@@ -534,13 +559,17 @@ function drawRewatch(world, body) {
         titles[cur] = v.title;
         const track = { ...world.track };
         if (titles.some(Boolean)) track.titles = titles; else delete track.titles;
-        await DB.updateWorld(world, { track });
+        if (sid) await DB.updateShared(sid, { track }); else await DB.updateWorld(world, { track });
       },
     });
   }
   $('#prev').onclick = () => go(cur - 1);
   $('#next').onclick = () => go(cur + 1);
-  $('#watched').onclick = () => save(toggle(cur));
+  // Shared: one mark at a time, so two people tapping at once don't undo each other.
+  const setOne = i => (sid
+    ? DB.toggleSharedWatched(sid, i, !watched.has(i)).catch(e => toast(friendlyError(e), true))
+    : save(toggle(i)));
+  $('#watched').onclick = () => setOne(cur);
   $('#note-cur').onclick = () => epNoteForm(world, steps[cur], noteAt(cur));
   $$('[data-note]', body).forEach(el => {
     el.onclick = () => { const i = Number(el.dataset.note); epNoteForm(world, steps[i], noteAt(i)); };
@@ -549,7 +578,7 @@ function drawRewatch(world, body) {
     el.onclick = () => {
       const i = Number(el.dataset.i);
       state.filters[curKey] = i;
-      save(toggle(i));
+      setOne(i);
     };
   });
   // Movie night: a random one not watched yet this time around.
@@ -569,14 +598,14 @@ function drawRewatch(world, body) {
   const reset = $('#reset');
   if (reset) {
     reset.onclick = () => confirmBox('Reset the tracker?', 'This clears every watched mark. Your notes stay.', 'Reset', async () => {
-      await DB.updateWorld(world, { watched: [] });
+      if (sid) await DB.updateShared(sid, { watched: [] }); else await DB.updateWorld(world, { watched: [] });
       state.filters[curKey] = null;
       toast('Tracker reset. Notes kept.');
     });
   }
   const again = $('#again');
   if (again) {
-    again.onclick = () => DB.updateWorld(world, { watched: [], rounds: (world.rounds || 0) + 1 })
+    again.onclick = () => (sid ? DB.updateShared(sid, { watched: [], rounds: rounds + 1 }) : DB.updateWorld(world, { watched: [], rounds: rounds + 1 }))
       .then(() => { state.filters[curKey] = null; toast(`${roundName(rounds + 1)} begins`); refresh(); }, e => toast(friendlyError(e), true));
   }
 }

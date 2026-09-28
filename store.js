@@ -191,6 +191,54 @@ const Store = (() => {
       await removePhoto(item.photo);
     },
 
+    // ----- shared worlds (see together.js) -----
+    // shared/{sid}: { owner, members: [uid], names: {uid: name}, invited: [email],
+    //   sections: { rewatch: true }, name, theme, look snapshot, track, watched,
+    //   rounds, firstWatch, ended }   shared/{sid}/notes/{id}: { step, text, by, byName, t }
+    myUid: () => uid(),
+    myEmail: () => (auth.currentUser.email || '').toLowerCase(),
+    async createShared(data) {
+      needOnline('Sharing');
+      const ref = db.collection('shared').doc();
+      await ref.set({ ...data, owner: uid(), members: [uid()], createdAt: firebase.firestore.FieldValue.serverTimestamp() });
+      return ref.id;
+    },
+    watchShared(sid, cb, onError) {
+      const ref = db.collection('shared').doc(sid);
+      let doc = null, notes = [];
+      const send = () => cb({ doc, notes });
+      const a = ref.onSnapshot(s => { doc = s.exists ? { id: s.id, ...s.data() } : { id: sid, gone: true }; send(); },
+        e => { doc = { id: sid, gone: true, error: e.code }; send(); if (onError) onError(e); });
+      const b = ref.collection('notes').onSnapshot(s => { notes = s.docs.map(withId); send(); }, () => {});
+      return () => { a(); b(); };
+    },
+    updateShared: (sid, patch) => write(db.collection('shared').doc(sid).update(patch)),
+    toggleSharedWatched: (sid, i, on) => write(db.collection('shared').doc(sid).update({
+      watched: on ? firebase.firestore.FieldValue.arrayUnion(i) : firebase.firestore.FieldValue.arrayRemove(i),
+    })),
+    addSharedNote: (sid, data) => write(db.collection('shared').doc(sid).collection('notes').add({ ...data, by: uid(), t: Date.now() })),
+    updateSharedNote: (sid, note, patch) => write(db.collection('shared').doc(sid).collection('notes').doc(note.id).update(patch)),
+    deleteSharedNote: (sid, note) => write(db.collection('shared').doc(sid).collection('notes').doc(note.id).delete()),
+    async inviteToShared(sid, email) {
+      needOnline('Sharing');
+      await db.collection('shared').doc(sid).update({ invited: firebase.firestore.FieldValue.arrayUnion(email) });
+    },
+    async pendingShares() {
+      const email = (auth.currentUser.email || '').toLowerCase();
+      if (!email || !navigator.onLine) return [];
+      const snap = await db.collection('shared').where('invited', 'array-contains', email).get().catch(() => null);
+      return snap ? snap.docs.map(withId).filter(d => !d.ended) : [];
+    },
+    joinShared: (sid, name) => db.collection('shared').doc(sid).update({
+      members: firebase.firestore.FieldValue.arrayUnion(uid()),
+      invited: firebase.firestore.FieldValue.arrayRemove((auth.currentUser.email || '').toLowerCase()),
+      [`names.${uid()}`]: name,
+    }),
+    declineShared: sid => db.collection('shared').doc(sid).update({
+      invited: firebase.firestore.FieldValue.arrayRemove((auth.currentUser.email || '').toLowerCase()),
+    }),
+    leaveShared: sid => db.collection('shared').doc(sid).update({ members: firebase.firestore.FieldValue.arrayRemove(uid()) }),
+
     // ----- sharing a copy with someone (see share.js) -----
     // Writes shares/{email} plus its worlds and items, in batches.
     async createShare(email, worldList, itemList) {
