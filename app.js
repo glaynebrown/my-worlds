@@ -709,10 +709,18 @@ function readTrack(root, old) {
     const total = seasons.reduce((a, b) => a + b, 0);
     const titles = Array(total).fill('');
     let at = 0;
-    $('#t-titles', root).value.split('\n').map(l => l.trim()).filter(Boolean).forEach(l => {
-      const jump = /^#\s*(?:season\s*)?(\d+)/i.exec(l);
-      if (jump) { const s = Number(jump[1]) - 1; if (starts[s] != null) at = starts[s]; return; }
-      if (l.startsWith('#')) return;
+    // Every line is one episode (an empty line = no title yet). A "#" line starts a
+    // season: "# Season 3" / "# Book 3" goes to that number; "# Any name" goes to the next one.
+    const lines = $('#t-titles', root).value.split('\n').map(l => l.trim());
+    while (lines.length && !lines[lines.length - 1]) lines.pop();
+    let season = -1;
+    lines.forEach(l => {
+      if (l.startsWith('#')) {
+        const num = /(\d+)/.exec(l);
+        season = num ? Number(num[1]) - 1 : season + 1;
+        if (starts[season] != null) at = starts[season];
+        return;
+      }
       if (at < total) titles[at++] = l;
     });
     if (titles.some(Boolean)) out.titles = titles;
@@ -775,7 +783,7 @@ function renderWorldForm(world) {
       </div>
       <div data-t="episodes"><label class="field"><span class="field-label">Episodes in each season (commas or spaces)</span><input id="t-seasons" value="${esc(tf.seasons)}" placeholder="10, 10, 8" autocomplete="off" autocorrect="off"></label>
         <label class="switch"><input type="checkbox" id="t-named" ${tf.titles ? 'checked' : ''}><span class="track"></span><span>Add episode titles</span></label>
-        <label class="field" id="t-titles-wrap" ${tf.titles ? '' : 'hidden'}><span class="field-label">Titles in order, one per line (# Season 2 jumps ahead; any without a title show as Season/Episode)</span><textarea id="t-titles" rows="8" placeholder="# Season 1&#10;Pilot&#10;The Second One&#10;# Season 2&#10;…">${esc(tf.titles || '')}</textarea></label></div>
+        <label class="field" id="t-titles-wrap" ${tf.titles ? '' : 'hidden'}><span class="field-label">Episode titles</span><span class="muted small field-hint">Start each season with a # and the season number or title (examples: # Season 1, # Part 1, # The Beginning). Then list the episode titles underneath, one per line. Or add them one at a time later: tap an episode’s name on the Rewatch card.</span><textarea id="t-titles" rows="8" placeholder="# Season 1&#10;Pilot&#10;The Second One&#10;# Season 2&#10;…">${esc(tf.titles || '')}</textarea></label></div>
       <div data-t="list">
         <label class="field"><span class="field-label">Each one is a…</span><input id="t-noun" value="${esc(tf.noun)}" placeholder="Film"></label>
         <label class="field"><span class="field-label">Titles in order, one per line (a line starting with # makes a section)</span><textarea id="t-items" rows="6">${esc(tf.items)}</textarea></label>

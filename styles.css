@@ -273,6 +273,8 @@ a.ship { text-decoration: none; }
 .rw-label { font-size: .9rem; color: var(--muted); margin-top: 4px; }
 .rw-next { font-family: var(--font-head); font-size: 2.1rem; line-height: 1.1; text-wrap: balance; margin-bottom: 4px; }
 .rw-next.long { font-size: 1.55rem; }
+.rw-title-btn { background: none; border: 0; padding: 0 4px; color: inherit; font-family: var(--font-head); cursor: pointer; display: inline; }
+.field-hint { display: block; margin: -2px 0 8px; }
 .rw-bar { width: 100%; max-width: 320px; height: 8px; border-radius: 99px; background: var(--line); overflow: hidden; margin: 10px 0 2px; }
 .rw-bar span { display: block; height: 100%; background: var(--tab, var(--accent)); border-radius: 99px; }
 .rw-hero .btn.primary { margin-top: 8px; }

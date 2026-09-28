@@ -455,7 +455,9 @@ function drawRewatch(world, body) {
       <div class="rw-nav">
         <button class="rw-arrow" id="prev" aria-label="Previous" ${cur <= 0 ? 'disabled' : ''}>‹</button>
         <div class="rw-now">
-          <span class="rw-next${(steps[cur].title || '').length > 22 ? ' long' : ''}">${esc(steps[cur].title || name(cur))}</span>
+          ${isList
+            ? `<span class="rw-next${(steps[cur].title || '').length > 22 ? ' long' : ''}">${esc(steps[cur].title || name(cur))}</span>`
+            : `<button class="rw-next rw-title-btn${(steps[cur].title || '').length > 22 ? ' long' : ''}" id="retitle" aria-label="Edit this episode’s title">${esc(steps[cur].title || name(cur))}</button>`}
           <span class="muted small">${esc(isList ? steps[cur].short : steps[cur].label)}</span>
         </div>
         <button class="rw-arrow" id="next" aria-label="Next" ${cur >= steps.length - 1 ? 'disabled' : ''}>›</button>
@@ -519,6 +521,23 @@ function drawRewatch(world, body) {
     return set;
   };
 
+  // Tap the episode's name to give it a title (or clear it to go back to Season/Episode).
+  const rt = $('#retitle');
+  if (rt) {
+    rt.onclick = () => formModal({
+      title: steps[cur].label,
+      values: { title: (world.track.titles && world.track.titles[cur]) || steps[cur].title || '' },
+      fields: [{ key: 'title', label: 'Episode title', placeholder: steps[cur].label }],
+      onSave: async v => {
+        const total = steps.length;
+        const titles = Array.from({ length: total }, (_, i) => (world.track.titles && world.track.titles[i]) || '');
+        titles[cur] = v.title;
+        const track = { ...world.track };
+        if (titles.some(Boolean)) track.titles = titles; else delete track.titles;
+        await DB.updateWorld(world, { track });
+      },
+    });
+  }
   $('#prev').onclick = () => go(cur - 1);
   $('#next').onclick = () => go(cur + 1);
   $('#watched').onclick = () => save(toggle(cur));
