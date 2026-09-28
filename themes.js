@@ -180,9 +180,12 @@ const Themes = (() => {
       '--on-accent': isDark(look.accent) || luminance(look.accent) < 0.35 ? '#fff' : '#1b1b1b',
       '--font-head': `'${look.font}', Georgia, serif`,
       '--font-body': `'Lora', Georgia, serif`,
-      '--bg-img': photoUrl
-        ? `linear-gradient(color-mix(in srgb, ${look.bg} 72%, transparent), color-mix(in srgb, ${look.bg} 88%, transparent)), url("${photoUrl}")`
-        : 'none',
+      // look.tint false = the photo exactly as it is, no background color over it.
+      '--bg-img': !photoUrl ? 'none'
+        : look.tint === false ? `url("${photoUrl}")`
+        : `linear-gradient(color-mix(in srgb, ${look.bg} 72%, transparent), color-mix(in srgb, ${look.bg} 88%, transparent)), url("${photoUrl}")`,
+      // Over an untinted photo: no solid band behind the tabs, and a soft shadow so text stays readable.
+      ...(photoUrl && look.tint === false ? { '--tabs-bg': 'transparent', '--page-shadow': isDark(look.bg) ? '0 1px 3px rgba(0,0,0,.6), 0 0 12px rgba(0,0,0,.35)' : '0 0 3px rgba(255,255,255,.85), 0 0 12px rgba(255,255,255,.6)', '--page-muted': page } : {}),
     };
     return Object.entries(vars).map(([k, v]) => `${k}:${v}`).join(';');
   }
@@ -231,17 +234,24 @@ const Themes = (() => {
     const out = [];
     track.seasons.forEach((count, s) => {
       for (let e = 1; e <= count; e++) {
-        const title = named ? names[s][e - 1] : null;
-        out.push(book
+        // Titles someone typed for their own show (track.titles, one per episode in
+        // order; a flat list because the database can't store lists inside lists).
+        const own = track.titles && track.titles[out.length];
+        const title = own || (named ? names[s][e - 1] : null);
+        // A season's own name (track.seasonNames, from "# Season 4 Part 2" lines) shows as written.
+        const sname = track.seasonNames && track.seasonNames[s];
+        const step = book
           ? { label: `Book ${s + 1}, Chapter ${e}`, short: `B${s + 1} Ch${e}`, group: s, e, title, key: `Book ${s + 1}, Chapter ${e}` }
-          : { label: `Season ${s + 1}, Episode ${e}`, short: `S${s + 1} E${e}`, group: s, e, title, key: `Season ${s + 1}, Episode ${e}` });
+          : { label: `Season ${s + 1}, Episode ${e}`, short: `S${s + 1} E${e}`, group: s, e, title, key: `Season ${s + 1}, Episode ${e}` };
+        if (sname) step.label = `${sname}, ${book ? 'Chapter' : 'Episode'} ${e}`;
+        out.push(step);
       }
     });
     return out;
   }
   const groupName = (track, g) => (track.type === 'list'
     ? (track.sections && track.sections[g] ? track.sections[g].name : `${track.noun || 'Part'}s`)
-    : `${track.noun || 'Season'} ${g + 1}`);
+    : (track.seasonNames && track.seasonNames[g]) || `${track.noun || 'Season'} ${g + 1}`);
 
   // The three worlds you start with.
   const STARTERS = [

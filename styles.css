@@ -148,6 +148,8 @@ img { display: block; max-width: 100%; }
 /* A name color you picked beats the theme's own. */
 .tile.inked .tile-name { color: var(--card-ink) !important; }
 .tile.has-photo.light-fade { background-image: linear-gradient(transparent 35%, rgba(255,255,255,.75)), var(--card-photo); }
+/* "Shade behind the name" off: the photo exactly as it is. */
+.tile.has-photo.no-shade, .tile.has-photo.no-shade.light-fade { background-image: var(--card-photo); }
 .tile.light-fade .tile-name { text-shadow: 0 1px 6px rgba(255,255,255,.6); }
 .ink-swatches { flex-wrap: wrap; gap: 8px; }
 .swatch.auto { background: linear-gradient(135deg, #fff 50%, #1c1814 50%); color: transparent; font-size: 0; }

@@ -153,7 +153,7 @@ async function mergeShare(share) {
       if (mine) {
         worldIds[id] = mine.id;
         const patch = {};
-        ['name', 'look', 'cardInk', 'cardPos', 'track', 'cutoff', 'ending', 'canonOn', 'canonParts', 'ficsOn'].forEach(k => { if (w[k] !== undefined) patch[k] = w[k]; });
+        ['name', 'look', 'cardInk', 'cardPos', 'cardShade', 'track', 'cutoff', 'ending', 'canonOn', 'canonParts', 'ficsOn'].forEach(k => { if (w[k] !== undefined) patch[k] = w[k]; });
         if (w.cardPhoto && !mine.cardPhoto) patch.cardPhoto = await copyPhoto('worlds', mine.id, w.cardPhoto);
         if (w.look && w.look.photo) patch.look = { ...w.look, photo: await copyPhoto('worlds', mine.id, w.look.photo) };
         // Keep her watched marks when the tracker is the same shape.

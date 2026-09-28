@@ -464,6 +464,7 @@ function renderLibrary() {
     if (w.cardPhoto) el.style.setProperty('--card-photo', `url('${w.cardPhoto.thumbUrl}')`);
     cardInk(el, w.cardInk);
     cardPos(el, w.cardPos);
+    el.classList.toggle('no-shade', w.cardShade === false);
   });
   // The doorway icon hides everything that isn't a door.
   $('#crest').onclick = () => openModal(`<div class="crest-menu">
@@ -776,6 +777,7 @@ function renderWorldForm(world) {
           ${CARD_INKS.map(([c, n]) => `<button type="button" class="swatch${world.cardInk === c ? ' on' : ''}" style="--c:${c}" data-ink="${c}" aria-label="${n}" title="${n}"></button>`).join('')}
           <label class="swatch custom-ink${world.cardInk && !CARD_INKS.some(([c]) => c === world.cardInk) ? ' on' : ''}" title="Any color" style="--c:${esc(world.cardInk || '#8a6d3b')}"><input type="color" id="inkpick" value="${esc(world.cardInk || '#8a6d3b')}" aria-label="Any color"></label>
         </div></div>
+      <label class="switch"><input type="checkbox" id="shade" ${world.cardShade === false ? '' : 'checked'}><span class="track"></span><span>Shade behind the name (on photos)</span></label>
       <div class="field"><span class="field-label">Name position</span>
         <div class="pos-pick">
           <div class="pos-grid" id="poses">${['top', 'middle', 'bottom'].map(v => ['left', 'center', 'right'].map(h =>
@@ -867,6 +869,7 @@ function renderWorldForm(world) {
     Themes.apply(el, world);
     cardInk(el, ink);
     cardPos(el, pos);
+    el.classList.toggle('no-shade', !$('#shade').checked);
     const url = cardPrepared ? URL.createObjectURL(cardPrepared.thumb.blob) : (!cardDrop && world.cardPhoto ? world.cardPhoto.thumbUrl : null);
     el.classList.toggle('has-photo', !!url);
     if (url) el.style.setProperty('--card-photo', `url('${url}')`);
@@ -886,6 +889,7 @@ function renderWorldForm(world) {
       drawCard();
     };
     $$('#poses .pos-cell').forEach(c => { c.onclick = () => pickPos(c.dataset.pos); });
+    $('#shade').onchange = drawCard;
     $('#posauto').onclick = () => pickPos(null);
     const pickInk = (value, btn) => {
       ink = value || null;
@@ -909,7 +913,7 @@ function renderWorldForm(world) {
       checkPhotoRoom((prepared && !(look.photo) ? 1 : 0) + (cardPrepared && !(world && world.cardPhoto) ? 1 : 0));
       const canonPicked = Object.fromEntries($$('[data-part]', root).map(c => [c.dataset.part, c.checked]));
       const data = { name, track, canonOn: $('#canon').checked, canonParts: canonPicked, ficsOn: $('#fics').checked };
-      if (!isNew) { data.cardInk = ink; data.cardPos = pos; }
+      if (!isNew) { data.cardInk = ink; data.cardPos = pos; data.cardShade = $('#shade').checked; }
       if ($('#first')) data.firstWatch = $('#first').checked;
       if (data.canonOn && !Object.values(canonPicked).some(Boolean)) throw new Error('Pick at least one thing to show on My Canon, or turn it off.');
       if (custom) data.look = { ...root._readLook(), photo: dropPhoto ? null : (look.photo || null) };
