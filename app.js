@@ -664,16 +664,17 @@ function trackToFields(track) {
     }
     return { type: 'list', seasons: '', noun: track.noun || 'Film', items: lines.join('\n') };
   }
-  // Typed episode titles show as lines, with "# Season N" before each season.
+  // Typed episode titles show as lines, with a "# season name" line before every season.
   let titles = '';
-  if (track.titles && track.titles.some(Boolean)) {
+  const names = track.seasonNames || [];
+  if ((track.titles && track.titles.some(Boolean)) || names.some(Boolean)) {
     let at = 0;
     titles = track.seasons.map((n, s) => {
-      const lines = track.titles.slice(at, at + n).map(t => t || '');
+      const lines = (track.titles || []).slice(at, at + n).map(t => t || '');
       at += n;
       while (lines.length && !lines[lines.length - 1]) lines.pop();
-      return lines.length ? [`# Season ${s + 1}`, ...lines].join('\n') : '';
-    }).filter(Boolean).join('\n');
+      return [`# ${names[s] || `Season ${s + 1}`}`, ...lines].join('\n');
+    }).join('\n');
   }
   return { type: 'episodes', seasons: track.seasons.join(', '), noun: track.noun || '', items: '', titles };
 }
@@ -709,20 +710,24 @@ function readTrack(root, old) {
     const total = seasons.reduce((a, b) => a + b, 0);
     const titles = Array(total).fill('');
     let at = 0;
-    // Every line is one episode (an empty line = no title yet). A "#" line starts a
-    // season: "# Season 3" / "# Book 3" goes to that number; "# Any name" goes to the next one.
+    // Every line is one episode (an empty line = no title yet). Each "#" line starts
+    // the next season, and whatever follows the # is that season's name, as written.
     const lines = $('#t-titles', root).value.split('\n').map(l => l.trim());
     while (lines.length && !lines[lines.length - 1]) lines.pop();
     let season = -1;
+    const seasonNames = seasons.map(() => '');
     lines.forEach(l => {
       if (l.startsWith('#')) {
-        const num = /(\d+)/.exec(l);
-        season = num ? Number(num[1]) - 1 : season + 1;
-        if (starts[season] != null) at = starts[season];
+        season++;
+        if (season < seasons.length) seasonNames[season] = l.replace(/^#+\s*/, '');
+        if (starts[season] != null) at = starts[season]; else at = total;
         return;
       }
       if (at < total) titles[at++] = l;
     });
+    // Names that just say "Season 3" for season 3 aren't worth storing.
+    const custom = seasonNames.map((n, s) => (n && n.toLowerCase() !== `season ${s + 1}` ? n : ''));
+    if (custom.some(Boolean)) out.seasonNames = custom;
     if (titles.some(Boolean)) out.titles = titles;
   }
   return out;
@@ -748,7 +753,8 @@ function renderWorldForm(world) {
     <label class="field"><span class="field-label">Title font</span><select id="font">${Themes.FONTS.map(f => `<option ${f === look.font ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select></label>
     <div class="field"><span class="field-label">Background photo (optional)</span>
       <div class="photo-btns"><label class="btn small">Choose photo<input type="file" accept="image/*" hidden id="bgfile"></label>
-      <button type="button" class="btn small ghost" id="bgdrop" ${look.photo ? '' : 'hidden'}>Remove</button></div></div>
+      <button type="button" class="btn small ghost" id="bgdrop" ${look.photo ? '' : 'hidden'}>Remove</button></div>
+      <label class="switch" id="tintwrap" ${look.photo ? '' : 'hidden'}><input type="checkbox" id="tint" ${look.tint === false ? '' : 'checked'}><span class="track"></span><span>Tint photo with background color</span></label></div>
     <div class="preview-wrap"><span class="field-label">Preview</span><div class="w-preview" id="prev">
       <div class="w-preview-title" id="prev-title"></div><div class="w-preview-card">“A quote would sit here.”<span class="w-preview-pill">Board</span></div></div></div>`;
 
@@ -822,6 +828,7 @@ function renderWorldForm(world) {
   if (custom) {
     const readLook = () => ({
       bg: $('#c-bg').value, card: $('#c-card').value, ink: $('#c-ink').value, accent: $('#c-accent').value, font: $('#font').value,
+      tint: $('#tint').checked,
     });
     const drawPreview = () => {
       const l = readLook();
@@ -842,9 +849,10 @@ function renderWorldForm(world) {
     $('#bgfile').onchange = async e => {
       const file = e.target.files[0];
       if (!file) return;
-      try { prepared = await Photos.prepare(file); dropPhoto = false; $('#bgdrop').hidden = false; drawPreview(); } catch (x) { toast(friendlyError(x), true); }
+      try { prepared = await Photos.prepare(file); dropPhoto = false; $('#bgdrop').hidden = false; $('#tintwrap').hidden = false; drawPreview(); } catch (x) { toast(friendlyError(x), true); }
     };
-    $('#bgdrop').onclick = e => { prepared = null; dropPhoto = true; e.target.hidden = true; drawPreview(); };
+    $('#bgdrop').onclick = e => { prepared = null; dropPhoto = true; e.target.hidden = true; $('#tintwrap').hidden = true; drawPreview(); };
+    $('#tint').onchange = drawPreview;
     Themes.FONTS.forEach(Themes.loadFont);
     drawPreview();
 

@@ -174,7 +174,7 @@ img { display: block; max-width: 100%; }
 .w-tabs {
   display: flex; gap: 3px; padding: 4px 0 12px;
   position: sticky; top: 0; z-index: 10;
-  background: linear-gradient(var(--bg) 78%, transparent);
+  background: var(--tabs-bg, linear-gradient(var(--bg) 78%, transparent));
 }
 /* Every section fits across the screen: no sideways scrolling. */
 .w-tabs a {
@@ -352,6 +352,7 @@ a.ship { text-decoration: none; }
 .switch input:checked + .track { background: var(--accent); }
 .switch input:checked + .track::after { transform: translateX(20px); }
 .danger-zone { padding: 16px 18px; }
+#tintwrap { margin-top: 12px; }
 
 /* photo pick + ship colors (in pop-ups) */
 .photo-pick { display: flex; gap: 14px; align-items: center; }
@@ -384,3 +385,6 @@ a.ship { text-decoration: none; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation: none !important; transition: none !important; } }
 /* Sample-mode banner sits above the sticky section tabs. */
 body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
+
+/* Text sitting straight on a photo (worlds with an untinted background photo). */
+.back, .gear, .w-title, .sec-h, .empty, .w-body > .muted, .rw-season-name, .list-head .sec-h, .chip { text-shadow: var(--page-shadow, none); }
