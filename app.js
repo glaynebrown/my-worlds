@@ -773,7 +773,7 @@ function renderWorldForm(world) {
         ${[['episodes', 'A show'], ['list', 'Movies / books'], ['none', 'No tracker']].map(([v, l]) =>
           `<label><input type="radio" name="ttype" value="${v}" ${tf.type === v ? 'checked' : ''}><span>${l}</span></label>`).join('')}
       </div>
-      <div data-t="episodes"><label class="field"><span class="field-label">Episodes in each season</span><input id="t-seasons" value="${esc(tf.seasons)}" placeholder="10, 10, 8" inputmode="numeric"></label>
+      <div data-t="episodes"><label class="field"><span class="field-label">Episodes in each season (commas or spaces)</span><input id="t-seasons" value="${esc(tf.seasons)}" placeholder="10, 10, 8" autocomplete="off" autocorrect="off"></label>
         <label class="switch"><input type="checkbox" id="t-named" ${tf.titles ? 'checked' : ''}><span class="track"></span><span>Add episode titles</span></label>
         <label class="field" id="t-titles-wrap" ${tf.titles ? '' : 'hidden'}><span class="field-label">Titles in order, one per line (# Season 2 jumps ahead; any without a title show as Season/Episode)</span><textarea id="t-titles" rows="8" placeholder="# Season 1&#10;Pilot&#10;The Second One&#10;# Season 2&#10;…">${esc(tf.titles || '')}</textarea></label></div>
       <div data-t="list">
