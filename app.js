@@ -595,6 +595,8 @@ const POS_H = { left: 'flex-start', center: 'center', right: 'flex-end' };
 function cardPos(el, pos) {
   const [v, h] = (pos || '').split('-');
   el.classList.toggle('positioned', !!(POS_V[v] && POS_H[h]));
+  el.classList.toggle('pos-top', POS_V[v] && POS_H[h] && v === 'top');
+  el.classList.toggle('pos-bottom', POS_V[v] && POS_H[h] && v === 'bottom');
   if (POS_V[v] && POS_H[h]) {
     el.style.setProperty('--pos-v', POS_V[v]);
     el.style.setProperty('--pos-h', POS_H[h]);

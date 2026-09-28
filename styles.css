@@ -134,6 +134,9 @@ img { display: block; max-width: 100%; }
 /* Name position you picked beats the theme's own spot. */
 .tile.positioned { justify-content: var(--pos-v) !important; align-items: var(--pos-h) !important; text-align: var(--pos-t) !important; }
 .tile.positioned .tile-name { margin-top: 0 !important; margin-bottom: 0 !important; }
+/* Same gap from the edge as Disney's title. */
+.tile.positioned.pos-top .tile-name { margin-top: 10% !important; }
+.tile.positioned.pos-bottom .tile-name { margin-bottom: 10% !important; }
 .pos-pick { display: flex; align-items: center; gap: 14px; }
 .pos-grid { display: grid; grid-template-columns: repeat(3, 30px); grid-template-rows: repeat(3, 38px); gap: 4px; padding: 6px; border-radius: 10px; background: var(--line); }
 .pos-cell { border: 0; border-radius: 6px; background: var(--card); display: grid; place-items: center; padding: 0; }
