@@ -205,13 +205,34 @@ const Store = (() => {
     },
     watchShared(sid, cb, onError) {
       const ref = db.collection('shared').doc(sid);
-      let doc = null, notes = [];
-      const send = () => cb({ doc, notes });
+      let doc = null, notes = [], sItems = [];
+      const send = () => cb({ doc, notes, items: sItems });
       const a = ref.onSnapshot(s => { doc = s.exists ? { id: s.id, ...s.data() } : { id: sid, gone: true }; send(); },
         e => { doc = { id: sid, gone: true, error: e.code }; send(); if (onError) onError(e); });
       const b = ref.collection('notes').onSnapshot(s => { notes = s.docs.map(withId); send(); }, () => {});
-      return () => { a(); b(); };
+      const c = ref.collection('items').onSnapshot(s => { sItems = s.docs.map(withId); send(); }, () => {});
+      return () => { a(); b(); c(); };
     },
+    // Shared boards, quotes, favorites, canon, fics: shared/{sid}/items, each
+    // tagged with who added it (by, byName). Photos stay in the adder's storage.
+    async addSharedItem(sid, data, prepared) {
+      const ref = db.collection('shared').doc(sid).collection('items').doc();
+      const photo = prepared ? await uploadPhoto('items', ref.id, prepared) : null;
+      await write(ref.set({ ...data, ...(photo ? { photo } : {}), by: uid(), t: data.t || Date.now() }));
+      return ref.id;
+    },
+    async updateSharedItem(sid, item, patch, prepared, dropPhoto) {
+      if (prepared) patch = { ...patch, photo: await uploadPhoto('items', item.id, prepared) };
+      else if (dropPhoto) patch = { ...patch, photo: null };
+      await write(db.collection('shared').doc(sid).collection('items').doc(item.id).update(patch));
+      if (item.photo && (prepared || dropPhoto) && item.by === uid()) await removePhoto(item.photo);
+    },
+    async deleteSharedItem(sid, item) {
+      await write(db.collection('shared').doc(sid).collection('items').doc(item.id).delete());
+      if (item.by === uid()) await removePhoto(item.photo);
+    },
+    // Removes one of your items without deleting its photo (it moved into a shared world).
+    deleteItemOnly: item => write(items().doc(item.id).delete()),
     updateShared: (sid, patch) => write(db.collection('shared').doc(sid).update(patch)),
     toggleSharedWatched: (sid, i, on) => write(db.collection('shared').doc(sid).update({
       watched: on ? firebase.firestore.FieldValue.arrayUnion(i) : firebase.firestore.FieldValue.arrayRemove(i),

@@ -455,7 +455,9 @@ function tileHtml(w) {
 
 function renderLibrary() {
   const worlds = sortedWorlds();
+  const nick = (state.settings && state.settings.displayName) || '';
   view.innerHTML = `<div class="library">
+    ${nick ? `<p class="lib-me">${esc(nick)}</p>` : ''}
     <header class="lib-head"><button class="lib-crest crest-link" id="crest" aria-label="Menu">${CREST}</button>
       <h1 class="lib-title">My Worlds</h1><p class="lib-sub">Pick a door and step inside — there’s no knowing where you might be swept off to.</p></header>
     <div class="shelf">${worlds.map(tileHtml).join('')}</div>
@@ -471,18 +473,32 @@ function renderLibrary() {
   });
   // The doorway icon hides everything that isn't a door.
   $('#crest').onclick = () => openModal(`<div class="crest-menu">
+      <button class="btn block ghost name-row" id="nick"><span class="muted small">Your name</span><span>${esc(nick || 'Add your name')}</span></button>
       <a class="btn block" href="#/library" data-close>+ Add a world</a>
       <a class="btn block" href="#/wishlist" data-close>Wishlist</a>
       <button class="btn block ghost" id="out">Sign out</button>
       <button class="linkish danger-text" id="gone">Delete my account</button></div>`, (root, close) => {
     $('#out', root).onclick = () => { close(); confirmBox('Sign out?', 'Your worlds stay saved in your account.', 'Sign out', () => DB.signOut()); };
     $('#gone', root).onclick = () => { close(); deleteAccountFlow(); };
+    $('#nick', root).onclick = () => { close(); nicknameForm(); };
   }, 'small-modal');
   enableTileDrag($('.shelf'));
 }
 
-// Hold a door (about half a second) to pick it up, drag it, let go to drop.
-// A quick tap still opens the world, and a swipe still scrolls the page.
+// Your name or nickname: top left of the home page, and filled in when you share a world.
+function nicknameForm() {
+  formModal({
+    title: 'Your name',
+    values: { name: (state.settings && state.settings.displayName) || '' },
+    fields: [{ key: 'name', label: 'Name or nickname', placeholder: 'Gabriella' }],
+    onSave: async v => {
+      await DB.saveSettings({ displayName: v.name });
+      state.settings.displayName = v.name;
+      if (!parseHash()[0]) renderLibrary();
+    },
+  });
+}
+
 let dragListeners = null; // the last library's listeners, removed when it redraws
 let tileSorting = false;  // no redraws while a door is being dragged
 
@@ -744,7 +760,7 @@ function renderWorldForm(world) {
   const custom = isNew || world.theme === 'custom';
   const look = { ...Themes.PRESETS[0], ...(world && world.look) };
   // A shared world's tracker lives with the group; only the person who shared it changes it.
-  const sharedW = !!(world && world.sharedId);
+  const sharedW = !!(world && world.sharedId && sectionShared(world, 'rewatch'));
   const lockTrack = sharedW && !isSharedOwner(world);
   const tf = trackToFields(world ? withShared(world).track : { type: 'episodes', seasons: [] });
   const parts = world ? canonParts(world) : { ending: true, ships: true, headcanons: true };

@@ -89,6 +89,9 @@ img { display: block; max-width: 100%; }
 .lib-crest { color: var(--accent); display: inline-block; }
 .crest-link { text-decoration: none; -webkit-tap-highlight-color: transparent; background: none; border: 0; padding: 0; cursor: pointer; }
 .crest-menu { display: grid; gap: 10px; }
+.name-row { flex-direction: column; gap: 2px; min-height: 54px; }
+.lib-me { position: absolute; top: 14px; left: 2px; margin: 0; font-family: var(--font-head); font-style: italic; font-size: 1.15rem; color: var(--title, #ecd9ae); max-width: 40%; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.library { position: relative; }
 .crest-menu .linkish { justify-self: center; margin-top: 4px; }
 .linkish.danger-text { color: #c0564c; }
 /* Library picker */
@@ -402,3 +405,16 @@ body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
 .note-by.mine { background: color-mix(in srgb, var(--tab, var(--accent)) 14%, transparent); cursor: pointer; }
 .note-by:disabled { opacity: 1; cursor: default; }
 .note-who { font-size: .75rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; color: var(--muted); }
+
+.by-line { display: block; font-size: .72rem; font-weight: 600; letter-spacing: .03em; color: var(--muted); margin-top: 6px; font-family: var(--font-body); font-style: normal; text-transform: none; }
+.ship .by-line { color: rgba(255,255,255,.85); }
+.share-secs { display: grid; grid-template-columns: 1fr 1fr; gap: 0 10px; margin-bottom: 6px; }
+.modal .field-label { display: block; }
+
+/* Rewatch: The list / notes fold with an arrow */
+.rw-block > summary { list-style: none; cursor: pointer; }
+.rw-block > summary::-webkit-details-marker { display: none; }
+.block-head .sec-h { display: inline-flex; align-items: center; gap: 10px; }
+.block-head:not(.list-head) .sec-h { margin: 30px 0 10px; }
+.block-head .fold-caret { width: 9px; height: 9px; }
+.rw-block:not([open]) > summary .fold-caret { transform: rotate(-45deg); margin-top: 0; }

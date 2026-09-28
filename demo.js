@@ -4,7 +4,8 @@
 const DemoStore = (() => {
   let worlds = [], items = [], settings = {};
   const shared = {}, sharedNotes = {}, sharedWatchers = {};
-  const sharedView = sid => ({ doc: shared[sid] ? clone(shared[sid]) : { id: sid, gone: true }, notes: clone(sharedNotes[sid] || []) });
+  const sharedItems = {};
+  const sharedView = sid => ({ doc: shared[sid] ? clone(shared[sid]) : { id: sid, gone: true }, notes: clone(sharedNotes[sid] || []), items: clone(sharedItems[sid] || []) });
   const emitShared = sid => setTimeout(() => (sharedWatchers[sid] || []).forEach(cb => cb(sharedView(sid))));
   let n = 0;
   const id = () => `d${++n}`;
@@ -108,6 +109,19 @@ const DemoStore = (() => {
     async addSharedNote(sid, data) { sharedNotes[sid].push({ ...clone(data), id: id(), by: data.by || 'sample', t: Date.now() }); emitShared(sid); },
     async updateSharedNote(sid, note, patch) { sharedNotes[sid] = sharedNotes[sid].map(n => (n.id === note.id ? { ...n, ...patch } : n)); emitShared(sid); },
     async deleteSharedNote(sid, note) { sharedNotes[sid] = sharedNotes[sid].filter(n => n.id !== note.id); emitShared(sid); },
+    async addSharedItem(sid, data, prepared) {
+      const it = { ...clone(data), id: id(), by: data.by || 'sample', t: data.t || Date.now() };
+      if (prepared) it.photo = localPhoto(prepared);
+      (sharedItems[sid] = sharedItems[sid] || []).push(it); emitShared(sid);
+      return it.id;
+    },
+    async updateSharedItem(sid, item, patch, prepared, dropPhoto) {
+      patch = clone(patch);
+      if (prepared) patch.photo = localPhoto(prepared); else if (dropPhoto) patch.photo = null;
+      sharedItems[sid] = sharedItems[sid].map(i => (i.id === item.id ? { ...i, ...patch } : i)); emitShared(sid);
+    },
+    async deleteSharedItem(sid, item) { sharedItems[sid] = sharedItems[sid].filter(i => i.id !== item.id); emitShared(sid); },
+    async deleteItemOnly(item) { items = items.filter(i => i.id !== item.id); emit(); },
     async inviteToShared(sid, email) { shared[sid].invited = [...new Set([...(shared[sid].invited || []), email])]; emitShared(sid); },
     pendingShares: async () => [],
     joinShared: async () => {},

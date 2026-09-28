@@ -13,6 +13,7 @@ const empty = (world, text) => `<p class="empty">${esc(text || Themes.info(world
 const addBtn = (id, label) => `<button class="btn primary add-btn" id="${id}"><span aria-hidden="true">+</span> ${esc(label)}</button>`;
 
 function renderWorld(world, section) {
+  world = withShared(world);
   const sections = SECTIONS.filter(([k]) => (k !== 'canon' || world.canonOn) && (k !== 'fics' || world.ficsOn !== false));
   if (!sections.some(([k]) => k === section)) section = 'board';
   const colors = Themes.info(world).tabColors || {};
@@ -63,7 +64,7 @@ function photoBoard(world, body, pins, newItem, emptyText) {
   const key = `${newItem.kind}:${newItem.ship || world.id}`;
   body.insertAdjacentHTML('beforeend', `<label class="btn primary add-btn"><span aria-hidden="true">+</span> Add photos<input type="file" accept="image/*" multiple hidden class="pinfile"></label>
     <p class="muted small progress" ${uploads[key] ? '' : 'hidden'}>${esc(uploads[key] || '')}</p>
-    ${pins.length ? `<div class="board">${pins.map(p => `<button class="pin" data-id="${p.id}"><img src="${esc(p.photo && p.photo.thumbUrl)}" alt="${esc(p.caption || 'Photo')}" loading="lazy" ${p.photo ? `width="${p.photo.w}" height="${p.photo.h}"` : ''}>${p.caption ? `<span class="pin-cap">${esc(p.caption)}</span>` : ''}</button>`).join('')}</div>` : empty(world, emptyText)}`);
+    ${pins.length ? `<div class="board">${pins.map(p => `<button class="pin" data-id="${p.id}"><img src="${esc(p.photo && p.photo.thumbUrl)}" alt="${esc(p.caption || 'Photo')}" loading="lazy" ${p.photo ? `width="${p.photo.w}" height="${p.photo.h}"` : ''}>${p.caption || byLine(p) ? `<span class="pin-cap">${esc(p.caption || '')}${byLine(p)}</span>` : ''}</button>`).join('')}</div>` : empty(world, emptyText)}`);
 
   $('.pinfile', body).onchange = async e => {
     const files = [...e.target.files];
@@ -79,7 +80,7 @@ function photoBoard(world, body, pins, newItem, emptyText) {
     try {
       for (const f of files) {
         show(`Adding ${done + 1} of ${files.length}…`);
-        await DB.addItem({ ...newItem, caption: '' }, await Photos.prepare(f));
+        await addItemFor(world, { ...newItem, caption: '' }, await Photos.prepare(f));
         done++;
       }
       toast(done === 1 ? 'Photo added' : `${done} photos added`);
@@ -89,14 +90,19 @@ function photoBoard(world, body, pins, newItem, emptyText) {
 
   $$('.pin', body).forEach(el => {
     el.onclick = () => {
-      const pin = state.items.find(i => i.id === el.dataset.id);
+      const pin = findItem(el.dataset.id);
       // Offline, the full-size photo may not be saved on the phone yet; the small one always is.
+      if (!canEdit(pin)) {
+        return openModal(`<img class="viewer-img" src="${esc(pin.photo.url)}" onerror="this.onerror=null;this.src='${esc(pin.photo.thumbUrl)}'" alt="">
+          ${pin.caption ? `<p style="margin-top:10px">${esc(pin.caption)}</p>` : ''}<p class="muted small" style="margin-top:8px">Added by ${esc(pin.byName || 'someone else')}.</p>
+          <div class="actions"><span class="spacer"></span><button class="btn" data-close>Close</button></div>`, null, 'viewer');
+      }
       openModal(`<img class="viewer-img" src="${esc(pin.photo.url)}" onerror="this.onerror=null;this.src='${esc(pin.photo.thumbUrl)}'" alt="">
         <label class="field"><span class="field-label">Caption (optional)</span><input id="cap" value="${esc(pin.caption || '')}"></label>
         <div class="actions"><button class="btn ghost danger-text" id="del">Delete</button><span class="spacer"></span><button class="btn" data-close>Close</button><button class="btn primary" id="save">Save</button></div>`,
       (root, close) => {
-        $('#save', root).onclick = e => busy(e.target, async () => { await DB.updateItem(pin, { caption: $('#cap', root).value.trim() }); close(); });
-        $('#del', root).onclick = () => { close(); confirmBox('Delete this photo?', 'It’s removed for good.', 'Delete', () => DB.deleteItem(pin)); };
+        $('#save', root).onclick = e => busy(e.target, async () => { await updateItemFor(pin, { caption: $('#cap', root).value.trim() }); close(); });
+        $('#del', root).onclick = () => { close(); confirmBox('Delete this photo?', 'It’s removed for good.', 'Delete', () => deleteItemFor(pin)); };
       }, 'viewer');
     };
   });
@@ -104,11 +110,12 @@ function photoBoard(world, body, pins, newItem, emptyText) {
 
 function drawBoard(world, body) {
   body.innerHTML = '';
-  photoBoard(world, body, itemsIn(world.id, 'pin').sort(byNewest), { world: world.id, kind: 'pin' });
+  photoBoard(world, body, itemsFor(world, 'pin').sort(byNewest), { world: world.id, kind: 'pin' });
 }
 
 // ---------- Quotes ----------
 function quoteForm(world, q) {
+  if (q && !canEdit(q)) return viewOnly(q, `<h2>Quote</h2><p class="quote-text" style="margin-top:8px">${esc(q.text)}</p>${q.who || q.where ? `<p class="muted small">— ${esc([q.who, q.where].filter(Boolean).join(', '))}</p>` : ''}`);
   formModal({
     title: q ? 'Edit quote' : 'Add a quote',
     values: q || {},
@@ -119,30 +126,31 @@ function quoteForm(world, q) {
     ],
     onSave: async v => {
       if (!v.text) throw new Error('Type the quote first.');
-      if (q) await DB.updateItem(q, v); else await DB.addItem({ world: world.id, kind: 'quote', ...v });
+      if (q) await updateItemFor(q, v); else await addItemFor(world, { world: world.id, kind: 'quote', ...v });
     },
-    onDelete: q && (() => confirmBox('Delete this quote?', '', 'Delete', () => DB.deleteItem(q))),
+    onDelete: q && (() => confirmBox('Delete this quote?', '', 'Delete', () => deleteItemFor(q))),
   });
 }
 
 function drawQuotes(world, body) {
-  const all = itemsIn(world.id, 'quote').sort(byNewest);
+  const all = itemsFor(world, 'quote').sort(byNewest);
   const { html, pick } = chips(world, 'who', all.map(q => q.who));
   const list = pick ? all.filter(q => q.who === pick) : all;
   body.innerHTML = `${addBtn('addq', 'Add a quote')}${html}
     ${list.length ? `<div class="quotes">${list.map(q => `<button class="quote card" data-id="${q.id}">
       <span class="quote-text">${esc(q.text)}</span>
-      ${q.who || q.where ? `<span class="quote-by">— ${esc([q.who, q.where].filter(Boolean).join(', '))}</span>` : ''}</button>`).join('')}</div>` : empty(world)}`;
+      ${q.who || q.where ? `<span class="quote-by">— ${esc([q.who, q.where].filter(Boolean).join(', '))}</span>` : ''}${byLine(q)}</button>`).join('')}</div>` : empty(world)}`;
   $('#addq').onclick = () => quoteForm(world);
   wireChips(body, () => drawQuotes(world, body));
-  $$('.quote', body).forEach(el => { el.onclick = () => quoteForm(world, state.items.find(i => i.id === el.dataset.id)); });
+  $$('.quote', body).forEach(el => { el.onclick = () => quoteForm(world, findItem(el.dataset.id)); });
 }
 
 // ---------- Favorites ----------
-const favsOf = world => itemsIn(world.id, 'fav').sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || byOldest(a, b));
+const favsOf = world => itemsFor(world, 'fav').sort((a, b) => (a.order ?? 0) - (b.order ?? 0) || byOldest(a, b));
 const initials = name => name.split(/\s+/).filter(Boolean).slice(0, 2).map(s => s[0].toUpperCase()).join('');
 
 function favForm(world, f) {
+  if (f && !canEdit(f)) return viewOnly(f, `<h2>${esc(f.name)}</h2>${f.quote ? `<p style="margin-top:8px"><i>“${esc(f.quote)}”</i></p>` : ''}${f.note ? `<p>${esc(f.note)}</p>` : ''}`);
   formModal({
     title: f ? `Edit ${f.name}` : 'Add a favorite',
     values: f || {},
@@ -156,10 +164,10 @@ function favForm(world, f) {
     onSave: async (v, { photo, dropPhoto }) => {
       if (!v.name) throw new Error('Add a name.');
       if (photo && !(f && f.photo)) checkPhotoRoom(1);
-      if (f) await DB.updateItem(f, v, photo, dropPhoto);
-      else await DB.addItem({ world: world.id, kind: 'fav', order: favsOf(world).length, ...v }, photo);
+      if (f) await updateItemFor(f, v, photo, dropPhoto);
+      else await addItemFor(world, { world: world.id, kind: 'fav', order: favsOf(world).length, ...v }, photo);
     },
-    onDelete: f && (() => confirmBox(`Remove ${f.name}?`, '', 'Remove', () => DB.deleteItem(f))),
+    onDelete: f && (() => confirmBox(`Remove ${f.name}?`, '', 'Remove', () => deleteItemFor(f))),
   });
   if (!f) return;
   $$('[data-move]').forEach(b => {
@@ -168,7 +176,7 @@ function favForm(world, f) {
       const i = list.findIndex(x => x.id === f.id), j = i + Number(b.dataset.move);
       if (j < 0 || j >= list.length) return toast(j < 0 ? 'Already first.' : 'Already last.');
       [list[i], list[j]] = [list[j], list[i]];
-      Promise.all(list.map((x, k) => (x.order === k ? null : DB.updateItem(x, { order: k }))))
+      Promise.all(list.map((x, k) => (x.order === k ? null : updateItemFor(x, { order: k }))))
         .then(() => toast(j < i ? 'Moved up' : 'Moved down'), e => toast(friendlyError(e), true));
     };
   });
@@ -180,28 +188,31 @@ function drawFavs(world, body) {
     ${list.length ? `<div class="favs">${list.map((f, i) => `<button class="fav card" data-id="${f.id}">
       <span class="fav-rank">${i + 1}</span>
       <span class="fav-photo">${f.photo ? `<img src="${esc(f.photo.thumbUrl)}" alt="" loading="lazy">` : `<span class="fav-initials">${esc(initials(f.name))}</span>`}</span>
-      <span class="fav-name">${esc(f.name)}</span>
+      <span class="fav-name">${esc(f.name)}</span>${byLine(f)}
       ${f.quote ? `<span class="fav-quote">“${esc(f.quote)}”</span>` : ''}
       ${f.note ? `<span class="fav-note">${esc(f.note)}</span>` : ''}</button>`).join('')}</div>` : empty(world)}`;
   $('#addf').onclick = () => favForm(world);
-  $$('.fav', body).forEach(el => { el.onclick = () => favForm(world, state.items.find(i => i.id === el.dataset.id)); });
+  $$('.fav', body).forEach(el => { el.onclick = () => favForm(world, findItem(el.dataset.id)); });
 }
 
 // ---------- My Canon ----------
 // Which parts My Canon shows (picked in world settings). Older worlds show all three.
 const canonParts = world => ({ ending: true, ships: true, headcanons: true, ...(world.canonParts || {}) });
-const shipPhotos = ship => state.items.filter(i => i.kind === 'shippic' && i.ship === ship.id).sort(byNewest);
+const shipPhotos = ship => (ship._sid
+  ? ((state.shared[ship._sid] || {}).items || []).map(i => ({ ...i, world: ship.world, _sid: ship._sid }))
+  : state.items).filter(i => i.kind === 'shippic' && i.ship === ship.id).sort(byNewest);
 
 function endingForm(world) {
   formModal({
     title: 'My ending',
     values: { ending: world.ending },
     fields: [{ key: 'ending', label: 'How it really ends', type: 'textarea', big: true, placeholder: 'In my version…' }],
-    onSave: v => DB.updateWorld(world, { ending: v.ending }),
+    onSave: v => setCanonField(world, { ending: v.ending }),
   });
 }
 
 function shipForm(world, s) {
+  if (s && !canEdit(s)) return viewOnly(s, `<h2>${esc(s.name)}</h2>${s.note ? `<p style="margin-top:8px">${esc(s.note)}</p>` : ''}`);
   formModal({
     title: s ? `Edit ${s.name}` : 'Add a ship',
     values: s || {},
@@ -212,13 +223,13 @@ function shipForm(world, s) {
     ],
     onSave: async v => {
       if (!v.name) throw new Error('Name the ship.');
-      if (s) await DB.updateItem(s, v); else await DB.addItem({ world: world.id, kind: 'ship', ...v });
+      if (s) await updateItemFor(s, v); else await addItemFor(world, { world: world.id, kind: 'ship', ...v });
     },
     onDelete: s && (() => {
       const pics = shipPhotos(s);
       confirmBox(`Remove ${s.name}?`, pics.length ? `Its ${pics.length} photo${pics.length === 1 ? '' : 's'} will be deleted too.` : '', 'Remove', async () => {
-        for (const p of pics) await DB.deleteItem(p);
-        await DB.deleteItem(s);
+        for (const p of pics) await deleteItemFor(p);
+        await deleteItemFor(s);
         if (parseHash()[2] === 'ship') location.hash = `#/w/${world.id}/canon`;
       });
     }),
@@ -227,7 +238,9 @@ function shipForm(world, s) {
 
 // A ship's own page: its colors across the top, then a photo board.
 function renderShip(world, shipId) {
-  const ship = state.items.find(i => i.id === shipId && i.kind === 'ship');
+  world = withShared(world);
+  const found = findItem(shipId);
+  const ship = found && found.kind === 'ship' ? found : null;
   if (!ship) { location.replace(`#/w/${world.id}/canon`); return; }
   const [a, b] = ship.colors || Themes.palette(world).map(p => p[1]);
   view.innerHTML = `<div class="page world">
@@ -239,15 +252,16 @@ function renderShip(world, shipId) {
 }
 
 function headcanonForm(world, h) {
+  if (h && !canEdit(h)) return viewOnly(h, `<h2>Headcanon</h2><p style="margin-top:8px">${esc(h.text).replace(/\n/g, '<br>')}</p>`);
   formModal({
     title: h ? 'Edit headcanon' : 'Add a headcanon',
     values: h || {},
     fields: [{ key: 'text', label: 'In my world…', type: 'textarea' }],
     onSave: async v => {
       if (!v.text) throw new Error('Write the headcanon first.');
-      if (h) await DB.updateItem(h, v); else await DB.addItem({ world: world.id, kind: 'headcanon', ...v });
+      if (h) await updateItemFor(h, v); else await addItemFor(world, { world: world.id, kind: 'headcanon', ...v });
     },
-    onDelete: h && (() => confirmBox('Delete this headcanon?', '', 'Delete', () => DB.deleteItem(h))),
+    onDelete: h && (() => confirmBox('Delete this headcanon?', '', 'Delete', () => deleteItemFor(h))),
   });
 }
 
@@ -268,8 +282,8 @@ function drawCanon(world, body) {
   world = withShared(world);
   const steps = Themes.steps(world.track, world.theme);
   const cut = world.cutoff != null && steps[world.cutoff];
-  const ships = itemsIn(world.id, 'ship').sort(byOldest);
-  const heads = itemsIn(world.id, 'headcanon').sort(byNewest);
+  const ships = itemsFor(world, 'ship').sort(byOldest);
+  const heads = itemsFor(world, 'headcanon').sort(byNewest);
   const info = Themes.info(world);
   const parts = canonParts(world);
 
@@ -297,13 +311,13 @@ function drawCanon(world, body) {
     ${ships.length ? `<div class="ships">${ships.map(s => {
       const [a, b] = s.colors || Themes.palette(world).map(p => p[1]);
       const pics = shipPhotos(s);
-      return `<a class="ship" href="#/w/${world.id}/ship/${s.id}" style="--a:${a};--b:${b}"><span class="ship-name">${esc(s.name)}</span>${s.note ? `<span class="ship-note">${esc(s.note)}</span>` : ''}
+      return `<a class="ship" href="#/w/${world.id}/ship/${s.id}" style="--a:${a};--b:${b}"><span class="ship-name">${esc(s.name)}</span>${s.note ? `<span class="ship-note">${esc(s.note)}</span>` : ''}${byLine(s)}
         ${pics.length ? `<span class="ship-strip">${pics.slice(0, 4).map(p => `<img src="${esc(p.photo.thumbUrl)}" alt="" loading="lazy">`).join('')}${pics.length > 4 ? `<span class="ship-more">+${pics.length - 4}</span>` : ''}</span>` : '<span class="ship-hint">Tap to add photos</span>'}</a>`;
     }).join('')}</div>` : ''}
     <button class="btn small" id="adds">+ Add a ship</button>` : ''}
 
     ${parts.headcanons ? `<h2 class="sec-h">Headcanons</h2>
-    ${heads.length ? `<div class="heads">${heads.map(h => `<button class="head card" data-id="${h.id}">${esc(h.text).replace(/\n/g, '<br>')}</button>`).join('')}</div>` : ''}
+    ${heads.length ? `<div class="heads">${heads.map(h => `<button class="head card" data-id="${h.id}">${esc(h.text).replace(/\n/g, '<br>')}${byLine(h)}</button>`).join('')}</div>` : ''}
     <button class="btn small" id="addh">+ Add a headcanon</button>` : ''}`;
 
   const on = (sel, fn) => { const el = $(sel, body); if (el) el.onclick = fn; };
@@ -314,10 +328,10 @@ function drawCanon(world, body) {
   if (sel) {
     sel.onchange = () => {
       const v = sel.value === '' ? null : Number(sel.value);
-      DB.updateWorld(world, { cutoff: v }).then(() => toast(v == null ? 'Back to the real ending' : `Your story ends at ${steps[v].short || steps[v].label}`), e => toast(friendlyError(e), true));
+      setCanonField(world, { cutoff: v }).then(() => toast(v == null ? 'Back to the real ending' : `Your story ends at ${steps[v].short || steps[v].label}`), e => toast(friendlyError(e), true));
     };
   }
-  $$('.head', body).forEach(el => { el.onclick = () => headcanonForm(world, state.items.find(i => i.id === el.dataset.id)); });
+  $$('.head', body).forEach(el => { el.onclick = () => headcanonForm(world, findItem(el.dataset.id)); });
 }
 
 // ---------- Fics ----------
@@ -330,7 +344,8 @@ function tidyLink(url) {
 }
 
 function ficForm(world, f) {
-  const ships = [...new Set(itemsIn(world.id, 'ship').map(s => s.name).concat(itemsIn(world.id, 'fic').map(x => x.ship)).filter(Boolean))];
+  if (f && !canEdit(f)) return viewOnly(f, `<h2>${esc(f.title)}</h2>${f.author ? `<p class="muted small">by ${esc(f.author)}</p>` : ''}${f.note ? `<p style="margin-top:8px">${esc(f.note)}</p>` : ''}${f.url ? `<p style="margin-top:10px"><a class="btn small" href="${esc(f.url)}" target="_blank" rel="noopener">Open on AO3 ↗</a></p>` : ''}`);
+  const ships = [...new Set(itemsFor(world, 'ship').map(s => s.name).concat(itemsFor(world, 'fic').map(x => x.ship)).filter(Boolean))];
   formModal({
     title: f ? 'Edit fic' : 'Save a fic',
     values: f || {},
@@ -348,9 +363,9 @@ function ficForm(world, f) {
         const id = /works\/(\d+)/.exec(v.url);
         v.title = id ? `AO3 work ${id[1]}` : 'Untitled fic';
       }
-      if (f) await DB.updateItem(f, v); else await DB.addItem({ world: world.id, kind: 'fic', ...v });
+      if (f) await updateItemFor(f, v); else await addItemFor(world, { world: world.id, kind: 'fic', ...v });
     },
-    onDelete: f && (() => confirmBox('Remove this fic?', 'Only the saved link is removed, not the fic.', 'Remove', () => DB.deleteItem(f))),
+    onDelete: f && (() => confirmBox('Remove this fic?', 'Only the saved link is removed, not the fic.', 'Remove', () => deleteItemFor(f))),
   });
   // Ship suggestions from this world's ships and earlier fics.
   if (ships.length) {
@@ -364,21 +379,21 @@ function ficForm(world, f) {
 }
 
 function drawFics(world, body) {
-  const all = itemsIn(world.id, 'fic').sort(byNewest);
+  const all = itemsFor(world, 'fic').sort(byNewest);
   const { html, pick } = chips(world, 'ship', all.map(f => f.ship));
   const list = pick ? all.filter(f => f.ship === pick) : all;
   body.innerHTML = `${addBtn('addfic', 'Save a fic')}${html}
     ${list.length ? `<div class="fics">${list.map(f => `<div class="fic card">
       <a class="fic-main" href="${esc(f.url || '#')}" target="_blank" rel="noopener">
         <span class="fic-title">${esc(f.title)}</span>
-        ${f.author ? `<span class="fic-by">by ${esc(f.author)}</span>` : ''}
+        ${f.author ? `<span class="fic-by">by ${esc(f.author)}</span>` : ''}${byLine(f)}
         ${f.ship ? `<span class="tag">${esc(f.ship)}</span>` : ''}
         ${f.note ? `<span class="fic-note">${esc(f.note)}</span>` : ''}
       </a>
       <button class="fic-edit" data-id="${f.id}" aria-label="Edit ${esc(f.title)}">Edit</button></div>`).join('')}</div>` : empty(world)}`;
   $('#addfic').onclick = () => ficForm(world);
   wireChips(body, () => drawFics(world, body));
-  $$('.fic-edit', body).forEach(el => { el.onclick = () => ficForm(world, state.items.find(i => i.id === el.dataset.id)); });
+  $$('.fic-edit', body).forEach(el => { el.onclick = () => ficForm(world, findItem(el.dataset.id)); });
 }
 
 // ---------- Rewatch ----------
@@ -390,18 +405,18 @@ function epNoteForm(world, step, note) {
     values: note || {},
     fields: [{ key: 'text', label: step.title && world.track.type !== 'list' ? `${step.short} · ${step.label}` : step.label, type: 'textarea', big: true, placeholder: 'What stood out this time…' }],
     onSave: async v => {
-      const sid = world.sharedId;
+      const sid = world.sharedId && sectionShared(world, 'rewatch') ? world.sharedId : null;
       if (sid) {
         if (note && !v.text) return DB.deleteSharedNote(sid, note);
         if (!v.text) return;
-        if (note) return DB.updateSharedNote(sid, note, { text: v.text, byName: myName() });
-        return DB.addSharedNote(sid, { step: step.key, text: v.text, byName: myName() });
+        if (note) return DB.updateSharedNote(sid, note, { text: v.text, byName: shareName(world) });
+        return DB.addSharedNote(sid, { step: step.key, text: v.text, byName: shareName(world) });
       }
-      if (note && !v.text) return DB.deleteItem(note);
+      if (note && !v.text) return deleteItemFor(note);
       if (!v.text) return;
-      if (note) await DB.updateItem(note, v); else await DB.addItem({ world: world.id, kind: 'epnote', step: step.key, ...v });
+      if (note) await updateItemFor(note, v); else await addItemFor(world, { world: world.id, kind: 'epnote', step: step.key, ...v });
     },
-    onDelete: note && (() => confirmBox('Delete this note?', '', 'Delete', () => (world.sharedId ? DB.deleteSharedNote(world.sharedId, note) : DB.deleteItem(note)))),
+    onDelete: note && (() => confirmBox('Delete this note?', '', 'Delete', () => (world.sharedId && sectionShared(world, 'rewatch') ? DB.deleteSharedNote(world.sharedId, note) : deleteItemFor(note)))),
   });
 }
 
@@ -429,9 +444,9 @@ const NOTE_ICON = '<svg viewBox="0 0 24 24" width="24" height="24" fill="none" s
 
 function drawRewatch(world, body) {
   // A shared world's tracker, watched marks and notes live in shared/{sid} (together.js).
-  const sid = world.sharedId;
+  if (world.sharedId && (!state.shared[world.sharedId] || !state.shared[world.sharedId].doc)) { body.innerHTML = '<p class="empty">Opening the shared tracker…</p>'; return; }
+  const sid = world.sharedId && sectionShared(world, 'rewatch') ? world.sharedId : null;
   const sh = sid ? state.shared[sid] : null;
-  if (sid && (!sh || !sh.doc || sh.doc.gone)) { body.innerHTML = '<p class="empty">Opening the shared tracker…</p>'; return; }
   world = withShared(world);
   const steps = Themes.steps(world.track, world.theme);
   if (!steps.length) {
@@ -448,7 +463,7 @@ function drawRewatch(world, body) {
   const info = Themes.info(world);
   const isList = world.track.type === 'list';
   const allShared = sh ? sh.notes : null;
-  const notes = new Map((allShared ? allShared.filter(n => n.by === DB.myUid()) : itemsIn(world.id, 'epnote')).map(n => [n.step, n]));
+  const notes = new Map((allShared ? allShared.filter(n => n.by === DB.myUid()) : itemsFor(world, 'epnote')).map(n => [n.step, n]));
   const noteAt = i => notes.get(steps[i].key);   // your own note
   const anyNote = i => (allShared ? allShared.some(n => n.step === steps[i].key) : !!noteAt(i));
   const others = sh ? Object.entries(sh.doc.names || {}).filter(([u]) => u !== DB.myUid() && (sh.doc.members || []).includes(u)).map(([, n]) => n) : [];
@@ -523,19 +538,23 @@ function drawRewatch(world, body) {
   const stepTitle = i => `${esc(name(i))}${!isList && steps[i].title ? ` · ${esc(steps[i].title)}` : ''}`;
   const sharedNotesHtml = () => {
     const rows = steps.map((s, i) => [i, allShared.filter(n => n.step === s.key).sort((a, b) => (a.by === DB.myUid() ? -1 : b.by === DB.myUid() ? 1 : a.t - b.t))]).filter(([, l]) => l.length);
-    return `<h2 class="sec-h">Our notes</h2>${rows.length
+    return `${rows.length
       ? `<div class="ep-notes">${rows.map(([i, list]) => `<div class="ep-note card shared-note"><span class="ep-note-at">${stepTitle(i)}</span>
           ${list.map(n => `<button class="note-by${n.by === DB.myUid() ? ' mine' : ''}" ${n.by === DB.myUid() ? `data-note="${i}"` : 'disabled'}><span class="note-who">${esc(n.by === DB.myUid() ? 'Me' : (n.byName || 'Someone'))}</span><span class="ep-note-text">${esc(n.text)}</span></button>`).join('')}</div>`).join('')}</div>`
       : '<p class="muted small">No notes yet. Tap the notebook next to “Watched it” to write about an episode. Everyone’s notes show here side by side.</p>'}`;
   };
   const noted = steps.map((s, i) => [i, noteAt(i)]).filter(([, n]) => n);
-  const notesHtml = allShared ? sharedNotesHtml() : `<h2 class="sec-h">My notes</h2>${noted.length
+  const notesInner = allShared ? sharedNotesHtml() : `${noted.length
     ? `<div class="ep-notes">${noted.map(([i, n]) => `<button class="ep-note card" data-note="${i}"><span class="ep-note-at">${esc(name(i))}${!isList && steps[i].title ? ` · ${esc(steps[i].title)}` : ''}</span><span class="ep-note-text">${esc(n.text)}</span></button>`).join('')}</div>`
     : '<p class="muted small">No notes yet. Tap the notebook next to “Watched it” to write about an episode.</p>'}`;
 
   const canPick = world.track.shuffle && steps.some((_, i) => !watched.has(i));
-  body.innerHTML = `${hero}<div class="list-head"><h2 class="sec-h">${isList ? 'The list' : 'Episodes'}</h2>${canPick ? `<button class="btn small pick-btn" id="pick"><svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" aria-hidden=\"true\"><path d=\"M12 2l2.2 6.3L20.5 10.5l-6.3 2.2L12 19l-2.2-6.3L3.5 10.5l6.3-2.2z\" fill=\"currentColor\"/></svg><span>Pick one for me</span></button>` : ''}</div>
-    <p class="muted small">Tap one to mark it watched (or not). Skipping is fine.</p>${grid}${notesHtml}`;
+  // "The list" / "Episodes" and the notes fold closed with their arrows (remembered on this phone).
+  const shutBlocks = foldedSections(`${world.id}:blocks`);
+  const block = (key, head, inner) => `<details class="rw-block" data-block="${key}" ${shutBlocks.includes(key) ? '' : 'open'}><summary class="block-head">${head}</summary>${inner}</details>`;
+  const notesHtml = block('notes', `<h2 class="sec-h">${allShared ? 'Our notes' : 'My notes'}<span class="fold-caret" aria-hidden="true"></span></h2>`, notesInner);
+  body.innerHTML = `${hero}<details class="rw-block" data-block="list" ${shutBlocks.includes('list') ? '' : 'open'}><summary class="block-head list-head"><h2 class="sec-h">${isList ? 'The list' : 'Episodes'}<span class="fold-caret" aria-hidden="true"></span></h2>${canPick ? `<button class="btn small pick-btn" id="pick"><svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" aria-hidden=\"true\"><path d=\"M12 2l2.2 6.3L20.5 10.5l-6.3 2.2L12 19l-2.2-6.3L3.5 10.5l6.3-2.2z\" fill=\"currentColor\"/></svg><span>Pick one for me</span></button>` : ''}</summary>
+    <p class="muted small">Tap one to mark it watched (or not). Skipping is fine.</p>${grid}</details>${notesHtml}`;
 
   const go = i => { state.filters[curKey] = i; drawRewatch(world, body); };
   const save = (set, msg) => DB.updateWorld(world, { watched: [...set].sort((a, b) => a - b) })
@@ -585,9 +604,13 @@ function drawRewatch(world, body) {
   $$('.rw-section', body).forEach(d => {
     d.addEventListener('toggle', () => foldSection(world.id, Number(d.dataset.g), !d.open));
   });
+  $$('.rw-block', body).forEach(d => {
+    d.addEventListener('toggle', () => foldSection(`${world.id}:blocks`, d.dataset.block, !d.open));
+  });
   const pick = $('#pick');
   if (pick) {
-    pick.onclick = () => {
+    pick.onclick = e => {
+      e.preventDefault(); e.stopPropagation(); // don't fold the list
       const left = steps.map((_, i) => i).filter(i => !watched.has(i) && i !== cur);
       const pool = left.length ? left : steps.map((_, i) => i).filter(i => !watched.has(i));
       const i = pool[Math.floor(Math.random() * pool.length)];
