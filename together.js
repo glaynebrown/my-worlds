@@ -40,7 +40,8 @@ const isSharedOwner = world => {
   const sh = world.sharedId && state.shared[world.sharedId];
   return !!(sh && sh.doc && sh.doc.owner === DB.myUid());
 };
-const sectionNames = d => SHARE_SECTIONS.filter(([k]) => (d.sections || { rewatch: true })[k]).map(([, l]) => l.replace(' (tracker + notes)', ''));
+const sectionNames = d => SHARE_SECTIONS.filter(([k]) => (d.sections || { rewatch: true })[k])
+  .map(([k, l]) => (k === 'rewatch' && (d.sections || {}).rewatchMarks === false ? 'Rewatch list (you each keep your own watched marks)' : l.replace(' (tracker + notes)', '')));
 const sharedDoc = world => (world.sharedId && state.shared[world.sharedId] && state.shared[world.sharedId].doc) || null;
 
 // The world as its Rewatch should see it: the shared tracker when there is one.
@@ -48,9 +49,11 @@ function withShared(world) {
   const d = sharedDoc(world);
   if (!d || d.gone) return world;
   const sec = d.sections || { rewatch: true };
-  const out = sec.rewatch
-    ? { ...world, track: d.track, watched: d.watched || [], rounds: d.rounds || 0, firstWatch: !!d.firstWatch }
-    : { ...world };
+  // Rewatch shared: everyone gets the same list. Watched marks are shared too
+  // unless "Share watched marks too" is off, then each person keeps their own.
+  const out = !sec.rewatch ? { ...world }
+    : sec.rewatchMarks === false ? { ...world, track: d.track }
+    : { ...world, track: d.track, watched: d.watched || [], rounds: d.rounds || 0, firstWatch: !!d.firstWatch };
   if (sec.canon) {
     const c = d.canon || {};
     Object.assign(out, { canonOn: true, canonParts: c.canonParts || { ending: true, ships: true, headcanons: true }, ending: c.ending || '', cutoff: c.cutoff ?? null });
@@ -64,6 +67,7 @@ const SHARE_SECTIONS = [['rewatch', 'Rewatch (tracker + notes)'], ['board', 'Boa
 const SECTION_OF = { pin: 'board', quote: 'quotes', fav: 'favs', ship: 'canon', shippic: 'canon', headcanon: 'canon', fic: 'fics' };
 const KINDS_OF = { board: ['pin'], quotes: ['quote'], favs: ['fav'], canon: ['ship', 'headcanon', 'shippic'], fics: ['fic'] };
 
+const marksShared = world => sectionShared(world, 'rewatch') && (sharedDoc(world).sections || {}).rewatchMarks !== false;
 function sectionShared(world, section) {
   const d = sharedDoc(world);
   return !!(d && !d.gone && (d.sections || {})[section]);
@@ -167,7 +171,8 @@ function shareSettingsHtml(world) {
     <p class="small">${names.length ? `Shared with <b>${esc(names.join(', '))}</b>.` : 'Shared, but no one has joined yet.'}</p>
     ${pending.length ? `<p class="muted small">Waiting on: ${pending.map(esc).join(', ')}</p>` : ''}
     <span class="field-label" style="margin-top:12px">Shared sections</span>
-    <div class="share-secs">${SHARE_SECTIONS.map(([k, label]) => `<label class="check"><input type="checkbox" data-secset="${k}" ${sec[k] ? 'checked' : ''} ${owner ? '' : 'disabled'}><span>${label}</span></label>`).join('')}</div>
+    <div class="share-secs">${SHARE_SECTIONS.map(([k, label]) => `<label class="check"><input type="checkbox" data-secset="${k}" ${sec[k] ? 'checked' : ''} ${owner ? '' : 'disabled'}><span>${label}</span></label>`
+      + (k === 'rewatch' ? `<label class="check sub-check"><input type="checkbox" data-secset="rewatchMarks" ${sec.rewatchMarks !== false ? 'checked' : ''} ${owner && sec.rewatch ? '' : 'disabled'}><span>Share watched marks too</span></label>` : '')).join('')}</div>
     ${owner ? '<button type="button" class="btn small" id="share-secs-save" hidden>Save shared sections</button>' : '<p class="muted small">Only the person who shared it can change these.</p>'}
     <div class="row-btns">
       ${owner ? '<button type="button" class="btn small" id="share-go">Invite someone…</button><button type="button" class="btn small ghost danger-text" id="share-stop">Stop sharing</button>'
@@ -183,8 +188,15 @@ function wireShareSettings(world) {
       const d = sharedDoc(world), was = d.sections || { rewatch: true };
       const now = Object.fromEntries($$('[data-secset]').map(c => [c.dataset.secset, c.checked]));
       if (!Object.values(now).some(Boolean)) throw new Error('Keep at least one section shared, or tap Stop sharing.');
-      const turnedOn = Object.keys(now).filter(k => now[k] && !was[k]);
+      const turnedOn = Object.keys(now).filter(k => now[k] && !(k === 'rewatchMarks' ? was[k] !== false && was.rewatch : was[k]));
       const patch = { sections: now };
+      // Marks turned off: you keep the marks as they were. Turned back on: the group starts from yours.
+      if (was.rewatch && was.rewatchMarks !== false && !now.rewatchMarks) {
+        await DB.updateWorld(world, { watched: d.watched || [], rounds: d.rounds || 0, firstWatch: !!d.firstWatch });
+      }
+      if (now.rewatch && now.rewatchMarks && turnedOn.includes('rewatchMarks') && !turnedOn.includes('rewatch')) {
+        Object.assign(patch, { watched: [...watchedOf(world)], rounds: world.rounds || 0, firstWatch: !!world.firstWatch });
+      }
       // Newly shared: your own things there join the shared world.
       if (turnedOn.includes('rewatch')) Object.assign(patch, { track: world.track, watched: [...watchedOf(world)], rounds: world.rounds || 0, firstWatch: !!world.firstWatch });
       if (turnedOn.includes('canon') && !d.canon) patch.canon = { ending: world.ending || '', cutoff: world.cutoff ?? null, canonParts: canonParts(world) };
@@ -216,7 +228,9 @@ function shareWorldFlow(world) {
   if (!world.track) return toast('Set up a Rewatch tracker for this world first.', true);
   openModal(`<form id="sf" novalidate><h2>Share ${esc(world.name)}</h2>
     ${world.sharedId ? '<p class="muted small">They’ll join with the sections already shared.</p>' : `<span class="field-label" style="margin-top:12px">What to share</span>
-    <div class="share-secs">${SHARE_SECTIONS.map(([k, label]) => `<label class="check"><input type="checkbox" data-sec="${k}" ${k === 'rewatch' ? 'checked' : ''}><span>${label}</span></label>`).join('')}</div>
+    <div class="share-secs">${SHARE_SECTIONS.map(([k, label]) => `<label class="check"><input type="checkbox" data-sec="${k}" ${k === 'rewatch' ? 'checked' : ''}><span>${label}</span></label>`
+      + (k === 'rewatch' ? '<label class="check sub-check"><input type="checkbox" data-sec="rewatchMarks" checked><span>Share watched marks too</span></label>' : '')).join('')}</div>
+    <p class="muted small">Unchecking “Share watched marks too” shares the list itself but keeps each person’s watching separate.</p>
     <p class="muted small">Anything unchecked stays private to each of you. What you already have in checked sections moves into the shared world.</p>`}
     <label class="field"><span class="field-label">Their email (the one they sign in with)</span><input type="email" id="to" autocapitalize="off" autocomplete="off" inputmode="email"></label>
     <label class="field"><span class="field-label">Your name for this share (shown on your notes)</span><input id="me" value="${esc(world.sharedId ? shareName(world) : myName())}"></label>
@@ -248,8 +262,9 @@ function shareWorldFlow(world) {
 }
 
 // Turns your world into a shared one: tracker + your rewatch notes move to shared/{sid}.
-async function startSharing(world, me, email, secs = ['rewatch']) {
+async function startSharing(world, me, email, secs = ['rewatch', 'rewatchMarks']) {
   const sections = Object.fromEntries(SHARE_SECTIONS.map(([k]) => [k, secs.includes(k)]));
+  sections.rewatchMarks = secs.includes('rewatchMarks');
   const sid = await DB.createShared({
     name: world.name, theme: world.theme, sections,
     canon: { ending: world.ending || '', cutoff: world.cutoff ?? null, canonParts: canonParts(world) },
@@ -327,7 +342,10 @@ async function detachShared(world, view) {
   try {
     const d = view && view.doc && !view.doc.gone ? view.doc : null;
     const patch = { sharedId: null };
-    if (d) Object.assign(patch, { track: d.track, watched: d.watched || [], rounds: d.rounds || 0, firstWatch: !!d.firstWatch });
+    if (d && (d.sections || { rewatch: true }).rewatch) {
+      patch.track = d.track;
+      if ((d.sections || {}).rewatchMarks !== false) Object.assign(patch, { watched: d.watched || [], rounds: d.rounds || 0, firstWatch: !!d.firstWatch });
+    }
     // Everyone's notes become this person's own: theirs as written, others' with names.
     const byStep = {};
     ((view && view.notes) || []).forEach(n => { (byStep[n.step] = byStep[n.step] || []).push(n); });

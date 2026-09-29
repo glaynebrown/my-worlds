@@ -986,7 +986,7 @@ function renderWorldForm(world) {
         data.cutoff = world.cutoff == null || world.cutoff > last ? null : world.cutoff;
         if (sharedW) {
           if (!lockTrack) await DB.updateShared(world.sharedId, { track });
-          delete data.watched; // shared marks live with the group
+          if (marksShared(world)) delete data.watched; // shared marks live with the group
         }
         await DB.updateWorld(world, data, prepared, dropPhoto);
         if (cardPrepared) await DB.setCardPhoto(world, cardPrepared);

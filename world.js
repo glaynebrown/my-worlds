@@ -446,6 +446,7 @@ function drawRewatch(world, body) {
   // A shared world's tracker, watched marks and notes live in shared/{sid} (together.js).
   if (world.sharedId && (!state.shared[world.sharedId] || !state.shared[world.sharedId].doc)) { body.innerHTML = '<p class="empty">Opening the shared tracker…</p>'; return; }
   const sid = world.sharedId && sectionShared(world, 'rewatch') ? world.sharedId : null;
+  const marksSid = sid && marksShared(world) ? sid : null; // shared watched marks, or your own
   const sh = sid ? state.shared[sid] : null;
   world = withShared(world);
   if (world.track && world.track.type === 'collection') return drawCollection(world, body);
@@ -585,8 +586,8 @@ function drawRewatch(world, body) {
   $('#prev').onclick = () => go(cur - 1);
   $('#next').onclick = () => go(cur + 1);
   // Shared: one mark at a time, so two people tapping at once don't undo each other.
-  const setOne = i => (sid
-    ? DB.toggleSharedWatched(sid, i, !watched.has(i)).catch(e => toast(friendlyError(e), true))
+  const setOne = i => (marksSid
+    ? DB.toggleSharedWatched(marksSid, i, !watched.has(i)).catch(e => toast(friendlyError(e), true))
     : save(toggle(i)));
   $('#watched').onclick = () => setOne(cur);
   $('#note-cur').onclick = () => epNoteForm(world, steps[cur], noteAt(cur));
@@ -621,14 +622,14 @@ function drawRewatch(world, body) {
   const reset = $('#reset');
   if (reset) {
     reset.onclick = () => confirmBox('Reset the tracker?', 'This clears every watched mark. Your notes stay.', 'Reset', async () => {
-      if (sid) await DB.updateShared(sid, { watched: [] }); else await DB.updateWorld(world, { watched: [] });
+      if (marksSid) await DB.updateShared(marksSid, { watched: [] }); else await DB.updateWorld(world, { watched: [] });
       state.filters[curKey] = null;
       toast('Tracker reset. Notes kept.');
     });
   }
   const again = $('#again');
   if (again) {
-    again.onclick = () => (sid ? DB.updateShared(sid, { watched: [], rounds: rounds + 1 }) : DB.updateWorld(world, { watched: [], rounds: rounds + 1 }))
+    again.onclick = () => (marksSid ? DB.updateShared(marksSid, { watched: [], rounds: rounds + 1 }) : DB.updateWorld(world, { watched: [], rounds: rounds + 1 }))
       .then(() => { state.filters[curKey] = null; toast(`${roundName(rounds + 1)} begins`); refresh(); }, e => toast(friendlyError(e), true));
   }
 }
@@ -650,6 +651,7 @@ function remember(key, value) {
 
 function drawCollection(world, body) {
   const sid = world.sharedId && sectionShared(world, 'rewatch') ? world.sharedId : null;
+  const marksSid = sid && marksShared(world) ? sid : null; // shared watched marks, or your own
   const sh = sid ? state.shared[sid] : null;
   const steps = Themes.steps(world.track, world.theme);
   const watched = watchedOf(world);
@@ -769,7 +771,7 @@ function drawCollection(world, body) {
   const go = i => { state.filters[curKey] = i; drawCollection(world, body); };
   const setOne = i => {
     const at = steps[i].same, on = !watched.has(at);
-    if (sid) return DB.toggleSharedWatched(sid, at, on).catch(e => toast(friendlyError(e), true));
+    if (marksSid) return DB.toggleSharedWatched(marksSid, at, on).catch(e => toast(friendlyError(e), true));
     const set = new Set(watched);
     if (on) set.add(at); else set.delete(at);
     return DB.updateWorld(world, { watched: [...set].sort((a, b) => a - b) }).catch(e => toast(friendlyError(e), true));
@@ -830,14 +832,14 @@ function drawCollection(world, body) {
   const reset = $('#reset');
   if (reset) {
     reset.onclick = () => confirmBox('Reset the tracker?', 'This clears every watched mark. Your notes stay.', 'Reset', async () => {
-      if (sid) await DB.updateShared(sid, { watched: [] }); else await DB.updateWorld(world, { watched: [] });
+      if (marksSid) await DB.updateShared(marksSid, { watched: [] }); else await DB.updateWorld(world, { watched: [] });
       state.filters[curKey] = null;
       toast('Tracker reset. Notes kept.');
     });
   }
   const again = $('#again');
   if (again) {
-    again.onclick = () => (sid ? DB.updateShared(sid, { watched: [], rounds: rounds + 1 }) : DB.updateWorld(world, { watched: [], rounds: rounds + 1 }))
+    again.onclick = () => (marksSid ? DB.updateShared(marksSid, { watched: [], rounds: rounds + 1 }) : DB.updateWorld(world, { watched: [], rounds: rounds + 1 }))
       .then(() => { state.filters[curKey] = null; toast(`${roundName(rounds + 1)} begins`); refresh(); }, e => toast(friendlyError(e), true));
   }
 }

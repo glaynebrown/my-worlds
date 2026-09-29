@@ -443,3 +443,7 @@ body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
 /* "Shared with Bella": its own small line under a world's name */
 .tile-sub { display: block; margin-top: 4px; font-family: var(--font-body); font-size: .72rem; font-weight: 600; letter-spacing: .02em; text-transform: none; font-style: normal; opacity: .85; line-height: 1.2; }
 .w-sub { margin: 6px 0 0; font-size: .85rem; font-weight: 600; letter-spacing: .02em; color: var(--page-muted); text-shadow: var(--page-shadow, none); }
+
+.sub-check { grid-column: 1 / -1; padding-left: 28px; font-size: .88rem; }
+.sub-check:has(input:disabled) { opacity: .5; }
+.share-secs > label:first-child { grid-column: 1 / -1; }
