@@ -23,6 +23,19 @@ const shareName = world => {
   const d = sharedDoc(world);
   return (d && d.names && d.names[DB.myUid()]) || myName();
 };
+// A shared world's name without an old "(with Bella)" ending, and the small
+// "Shared with Bella" line shown under it on the door and the world's title.
+const plainName = world => (world.sharedId ? world.name.replace(/\s*\(with [^)]*\)\s*$/, '') : world.name);
+function sharedWithLine(world) {
+  if (!world.sharedId) return '';
+  const d = sharedDoc(world);
+  if (d && !d.gone) {
+    const others = Object.entries(d.names || {}).filter(([u]) => u !== DB.myUid() && (d.members || []).includes(u)).map(([, n]) => n);
+    return others.length ? `Shared with ${others.join(' & ')}` : 'Shared';
+  }
+  const old = /\(with ([^)]*)\)\s*$/.exec(world.name);
+  return old ? `Shared with ${old[1]}` : 'Shared';
+}
 const isSharedOwner = world => {
   const sh = world.sharedId && state.shared[world.sharedId];
   return !!(sh && sh.doc && sh.doc.owner === DB.myUid());
@@ -289,7 +302,7 @@ async function joinSharedWorld(d, me) {
   const L = d.look || {};
   const order = Math.max(-1, ...state.worlds.map(w => w.order ?? 0)) + 1;
   const data = {
-    name: from ? `${d.name} (with ${from})` : d.name, theme: d.theme, sharedId: d.id, track: d.track,
+    name: d.name, theme: d.theme, sharedId: d.id, track: d.track,
     canonOn: true, canonParts: { ending: true, ships: true, headcanons: true }, cutoff: null, ending: '',
     ficsOn: true, watched: [], rounds: 0, order,
   };

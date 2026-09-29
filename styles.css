@@ -429,3 +429,7 @@ body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
 .coll-seasons { padding: 10px 4px 4px 14px; }
 .rw-item.seen > .rw-check, .coll-show > summary.seen .rw-check { background: var(--tab, var(--accent)); border-color: transparent; box-shadow: inset 0 0 0 4px var(--card); }
 .w-body .rw-block > .muted, .w-body .rw-block > p.muted { color: var(--page-muted); text-shadow: var(--page-shadow, none); }
+
+/* "Shared with Bella": its own small line under a world's name */
+.tile-sub { display: block; margin-top: 4px; font-family: var(--font-body); font-size: .72rem; font-weight: 600; letter-spacing: .02em; text-transform: none; font-style: normal; opacity: .85; line-height: 1.2; }
+.w-sub { margin: 6px 0 0; font-size: .85rem; font-weight: 600; letter-spacing: .02em; color: var(--page-muted); text-shadow: var(--page-shadow, none); }

@@ -450,7 +450,7 @@ function tileHtml(w) {
   const photo = w.cardPhoto && w.cardPhoto.thumbUrl;
   return `<div class="tile${photo ? ' has-photo' : ''}" role="link" tabindex="0" data-world="${w.id}">
     <span class="tile-art" aria-hidden="true"></span>
-    <span class="tile-name">${esc(w.name)}</span></div>`;
+    <span class="tile-name">${esc(plainName(w))}${w.sharedId ? `<span class="tile-sub">${esc(sharedWithLine(w))}</span>` : ''}</span></div>`;
 }
 
 function renderLibrary() {

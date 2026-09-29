@@ -23,7 +23,7 @@ function renderWorld(world, section) {
       <a class="back" href="#/">‹ Worlds</a>
       <a class="gear" href="#/w/${world.id}/settings" aria-label="World settings"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5"/></svg></a>
     </header>
-    <div class="w-hero"><h1 class="w-title">${esc(world.name)}</h1><div class="w-flourish" aria-hidden="true"></div></div>
+    <div class="w-hero"><h1 class="w-title">${esc(plainName(world))}</h1>${world.sharedId ? `<p class="w-sub">${esc(sharedWithLine(world))}</p>` : ''}<div class="w-flourish" aria-hidden="true"></div></div>
     <nav class="w-tabs" aria-label="Sections">${sections.map(([k, label]) =>
       `<a href="#/w/${world.id}/${k}" style="${colors[k] ? `--tab:${colors[k]}` : ''}" ${k === section ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
     <section class="w-body" id="wb" style="${colors[section] ? `--tab:${colors[section]}` : ''}"></section>
@@ -484,7 +484,6 @@ function drawRewatch(world, body) {
 
   const hero = `<div class="card rw-hero${theEnd ? ' done' : ''}">
       <span class="rw-round">${roundName(rounds)}</span>
-      ${sid ? `<span class="rw-shared">${others.length ? `Shared with ${esc(others.join(' & '))}` : 'Shared · waiting for them to join'}</span>` : ''}
       <div class="rw-nav">
         <button class="rw-arrow" id="prev" aria-label="Previous" ${cur <= 0 ? 'disabled' : ''}>‹</button>
         <div class="rw-now">
@@ -690,7 +689,6 @@ function drawCollection(world, body) {
 
   const hero = `<div class="card rw-hero">
       <span class="rw-round">${roundName(rounds)}</span>
-      ${sid ? `<span class="rw-shared">${others.length ? `Shared with ${esc(others.join(' & '))}` : 'Shared · waiting for them to join'}</span>` : ''}
       ${groupCount > 1 ? `<label class="coll-pick"><span>Watching</span><select id="secpick">${(world.track.sections || []).map((s, g) => `<option value="${g}" ${g === sec ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>` : ''}
       <div class="rw-nav">
         <button class="rw-arrow" id="prev" aria-label="Previous" ${pos <= 0 ? 'disabled' : ''}>‹</button>
