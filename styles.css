@@ -152,7 +152,17 @@ img { display: block; max-width: 100%; }
 .tile.inked .tile-name { color: var(--card-ink) !important; }
 .tile.has-photo.light-fade { background-image: linear-gradient(transparent 35%, rgba(255,255,255,.75)), var(--card-photo); }
 /* "Shade behind the name" off: the photo exactly as it is. */
-.tile.has-photo.no-shade, .tile.has-photo.no-shade.light-fade { background-image: var(--card-photo); }
+/* The shade follows the name: top names get it at the top, middle names a band across the middle.
+   (Disney, Pirates and The Last of Us put their names at the top unless you move them.) */
+.tile.has-photo.pos-top,
+[data-theme="disney"].tile.has-photo:not(.positioned), [data-theme="potc"].tile.has-photo:not(.positioned), [data-theme="tlou"].tile.has-photo:not(.positioned) {
+  background-image: linear-gradient(rgba(0,0,0,.7), transparent 65%), var(--card-photo); }
+.tile.has-photo.pos-middle { background-image: linear-gradient(transparent 15%, rgba(0,0,0,.6) 50%, transparent 85%), var(--card-photo); }
+.tile.has-photo.light-fade.pos-top,
+[data-theme="disney"].tile.has-photo.light-fade:not(.positioned), [data-theme="potc"].tile.has-photo.light-fade:not(.positioned), [data-theme="tlou"].tile.has-photo.light-fade:not(.positioned) {
+  background-image: linear-gradient(rgba(255,255,255,.75), transparent 65%), var(--card-photo); }
+.tile.has-photo.light-fade.pos-middle { background-image: linear-gradient(transparent 15%, rgba(255,255,255,.7) 50%, transparent 85%), var(--card-photo); }
+.tile.has-photo.no-shade, .tile.has-photo.no-shade.light-fade, [data-theme].tile.has-photo.no-shade { background-image: var(--card-photo) !important; }
 .tile.light-fade .tile-name { text-shadow: 0 1px 6px rgba(255,255,255,.6); }
 .ink-swatches { flex-wrap: wrap; gap: 8px; }
 .swatch.auto { background: linear-gradient(135deg, #fff 50%, #1c1814 50%); color: transparent; font-size: 0; }

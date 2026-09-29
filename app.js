@@ -617,6 +617,7 @@ function cardPos(el, pos) {
   el.classList.toggle('positioned', !!(POS_V[v] && POS_H[h]));
   el.classList.toggle('pos-top', POS_V[v] && POS_H[h] && v === 'top');
   el.classList.toggle('pos-bottom', POS_V[v] && POS_H[h] && v === 'bottom');
+  el.classList.toggle('pos-middle', POS_V[v] && POS_H[h] && v === 'middle');
   if (POS_V[v] && POS_H[h]) {
     el.style.setProperty('--pos-v', POS_V[v]);
     el.style.setProperty('--pos-h', POS_H[h]);
