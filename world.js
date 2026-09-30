@@ -25,7 +25,7 @@ function renderWorld(world, section) {
     </header>
     <div class="w-hero"><h1 class="w-title">${esc(plainName(world))}</h1>${world.sharedId ? `<p class="w-sub">${esc(sharedWithLine(world))}</p>` : ''}<div class="w-flourish" aria-hidden="true"></div></div>
     <nav class="w-tabs" aria-label="Sections">${sections.map(([k, label]) =>
-      `<a href="#/w/${world.id}/${k}" style="${colors[k] ? `--tab:${colors[k]}` : ''}" ${k === section ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
+      `<a href="#/w/${world.id}/${k}" style="${colors[k] ? `--tab:${colors[k]}` : ''}" ${k === section ? 'aria-current="page"' : ''}>${k === 'rewatch' && world.firstWatch && !(world.rounds > 0) ? 'Watch' : label}</a>`).join('')}</nav>
     <section class="w-body" id="wb" style="${colors[section] ? `--tab:${colors[section]}` : ''}"></section>
   </div>`;
 
@@ -555,7 +555,7 @@ function drawRewatch(world, body) {
   const block = (key, head, inner) => `<details class="rw-block" data-block="${key}" ${shutBlocks.includes(key) ? '' : 'open'}><summary class="block-head">${head}</summary>${inner}</details>`;
   const notesHtml = block('notes', `<h2 class="sec-h">${allShared ? 'Our notes' : 'My notes'}<span class="fold-caret" aria-hidden="true"></span></h2>`, notesInner);
   body.innerHTML = `${hero}<details class="rw-block" data-block="list" ${shutBlocks.includes('list') ? '' : 'open'}><summary class="block-head list-head"><h2 class="sec-h">${isList ? 'The list' : 'Episodes'}<span class="fold-caret" aria-hidden="true"></span></h2>${canPick ? `<button class="btn small pick-btn" id="pick"><svg viewBox=\"0 0 24 24\" width=\"15\" height=\"15\" aria-hidden=\"true\"><path d=\"M12 2l2.2 6.3L20.5 10.5l-6.3 2.2L12 19l-2.2-6.3L3.5 10.5l6.3-2.2z\" fill=\"currentColor\"/></svg><span>Pick one for me</span></button>` : ''}</summary>
-    <p class="muted small">Tap one to mark it watched (or not). Skipping is fine.</p>${grid}</details>${notesHtml}`;
+    <p class="muted small">Tap one to bring it up; tap it again to mark it watched (or not). Skipping is fine.</p>${grid}</details>${notesHtml}`;
 
   const go = i => { state.filters[curKey] = i; drawRewatch(world, body); };
   const save = (set, msg) => DB.updateWorld(world, { watched: [...set].sort((a, b) => a - b) })
@@ -594,10 +594,12 @@ function drawRewatch(world, body) {
   $$('[data-note]', body).forEach(el => {
     el.onclick = () => { const i = Number(el.dataset.note); epNoteForm(world, steps[i], noteAt(i)); };
   });
+  // In the list: the first tap brings it up in the card; tapping the one
+  // that's already up marks it watched (or not).
   $$('[data-i]', body).forEach(el => {
     el.onclick = () => {
       const i = Number(el.dataset.i);
-      state.filters[curKey] = i;
+      if (i !== cur) return go(i);
       setOne(i);
     };
   });
@@ -764,7 +766,7 @@ function drawCollection(world, body) {
   const shutBlocks = foldedSections(`${world.id}:blocks`);
   const block = (key, head, inner) => `<details class="rw-block" data-block="${key}" ${shutBlocks.includes(key) ? '' : 'open'}><summary class="block-head${key === 'list' ? ' list-head' : ''}">${head}</summary>${inner}</details>`;
   body.innerHTML = hero
-    + block('list', '<h2 class="sec-h">The list<span class="fold-caret" aria-hidden="true"></span></h2>', `<p class="muted small">Tap a movie or episode to mark it watched (or not).</p>${grid}`)
+    + block('list', '<h2 class="sec-h">The list<span class="fold-caret" aria-hidden="true"></span></h2>', `<p class="muted small">Tap a movie or episode to bring it up; tap it again to mark it watched (or not).</p>${grid}`)
     + block('notes', `<h2 class="sec-h">${allShared ? 'Our notes' : 'My notes'}<span class="fold-caret" aria-hidden="true"></span></h2>`, notesInner);
 
   // ----- actions -----
@@ -807,9 +809,12 @@ function drawCollection(world, body) {
   $$('[data-i]', body).forEach(el => {
     el.onclick = () => {
       const i = Number(el.dataset.i);
-      // Tapping something in another section makes that section the one you're watching.
-      if (steps[i].group !== sec) { state.filters[secKey] = steps[i].group; remember(secKey, steps[i].group); }
-      state.filters[curKey] = i;
+      // First tap brings it up in the card (and makes its section the one you're
+      // watching); tapping the one that's already up marks it watched (or not).
+      if (i !== cur) {
+        if (steps[i].group !== sec) { state.filters[secKey] = steps[i].group; remember(secKey, steps[i].group); }
+        return go(i);
+      }
       setOne(i);
     };
   });
