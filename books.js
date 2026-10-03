@@ -2017,6 +2017,14 @@ function nextInSeries(book) {
   const next = Math.floor(n) + 1;
   return state.books.some(b => seriesKey(b) === seriesKey(book) && Math.floor(seriesNum(b)) === next) ? null : next;
 }
+// The next book in the series that's already on your shelves but not read or started yet.
+function waitingNext(book) {
+  const n = seriesNum(book);
+  if (!book.series || !n || !finishedBook(book)) return null;
+  const nb = state.books.filter(b => seriesKey(b) === seriesKey(book) && seriesNum(b) > n && !finishedBook(b))
+    .sort((a, z) => seriesNum(a) - seriesNum(z))[0];
+  return nb && !inReading(nb) ? nb : null;
+}
 // A library book (from your bookcase) that is this series' book n, if there is one.
 const libSeriesBook = (lib, key, n) => libChoices(lib).find(e => seriesKey(e) === key && Math.floor(seriesNum(e)) === n);
 
@@ -2028,6 +2036,13 @@ function addSeriesBook(series, n) {
 }
 
 function nextCardHtml(book) {
+  const w = waitingNext(book);
+  if (w) {
+    const shelf = (shelvesOf().find(s => s.id === shelfOf(w)) || {}).name || 'your';
+    return `<div class="card next-book" id="nextbook"><div class="nb-text"><span class="nb-head">Next in ${esc(book.series)}</span>
+        <span class="nb-title">${esc(w.title)}</span><span class="muted small">On your ${esc(shelf)} shelf</span></div>
+        <button class="btn small primary" id="startnext" data-book="${esc(w.id)}">${hasShelf('reading') ? 'Start reading' : 'Open it'}</button></div>`;
+  }
   const n = nextInSeries(book);
   if (!n) return '';
   return `<div class="card next-book" id="nextbook"><div class="nb-text"><span class="nb-head">Next in ${esc(book.series)}</span>
@@ -2035,6 +2050,20 @@ function nextCardHtml(book) {
       <button class="btn small primary" id="addnext">+ Add book ${n}</button></div>`;
 }
 function wireNextCard(book, body) {
+  // Already on a shelf: one tap moves it to Currently reading, with today as its start date.
+  const start = $('#startnext', body);
+  if (start) {
+    const w = bookById(start.dataset.book);
+    start.onclick = () => {
+      if (!hasShelf('reading')) { location.hash = `#/b/${w.id}`; return; }
+      busy(start, async () => {
+        await DB.updateBook(w, shelfMovePatch(w, 'reading'));
+        toast(`${w.title} is on Currently reading. Enjoy!`);
+        location.hash = `#/b/${w.id}`;
+      }, 'Starting…');
+    };
+    return;
+  }
   const btn = $('#addnext', body);
   if (!btn) return;
   const n = nextInSeries(book);
