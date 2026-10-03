@@ -408,3 +408,11 @@
 /* Two series side by side: a little space between them, so each plate is clearly its own. */
 .ser-grp + .ser-grp { margin-left: 8px; }
 .ser-grp.before-set .ser-plate { max-width: calc(100% - 2px); }
+
+/* Opened from the Home Screen: iPhone softly blurs the strip just under the
+   clock, so the Watch | Read switch and your name sit a little lower there. */
+@media (display-mode: standalone) {
+  .side-toggle { top: 26px; }
+  .library .lib-me { top: 30px; }
+  .library .lib-head { padding-top: 62px; }
+}
