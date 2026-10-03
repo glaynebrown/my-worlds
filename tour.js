@@ -1,4 +1,4 @@
-/* How to use: a guided tour of each side, shown on a pretend phone.
+/* Take the tour: a guided tour of each side, shown on a pretend phone.
 
    The pretend screens are made from the app's own pieces (door tiles, spines,
    tabs, the Watch card) filled with sample worlds and books, so they look just
@@ -9,7 +9,7 @@
    - First time (settings.tourSeen not set, on any account that's been set
      up): both tours back to back, starting with the side you're on. The flip
      icon is the bridge from one side to the other.
-   - After that: "How to use" in each side's gear menu replays that side. */
+   - After that: "Take the tour" in each side's gear menu replays that side. */
 
 let tourOpen = false;
 
@@ -28,7 +28,7 @@ const TOUR_STEPS = {
     { scene: 'booksHome', target: '.slot:not(.add-slot)', text: 'Tap a book to open it. Hold one to move it, even onto another shelf.' },
     { scene: 'booksHome', target: '.add-slot', text: 'Tap + to put a new book on that shelf.' },
     { scene: 'booksHome', target: '.home-gear', text: 'Add books, edit your shelves and set a reading goal here.' },
-    { scene: 'book', target: '.w-tabs', gap: 170, text: 'Every book has its own pages: About, Notes, Quotes, Reviews and a Board. A Map can be turned on in its settings.' },
+    { scene: 'book', target: '.w-tabs', gap: 170, text: 'Every book has About, Notes, Quotes and a Board. Reviews, a Map, My Canon and Fics are optional pages you can turn on or off in its settings.' },
     { scene: 'bookNotes', target: '.bnote', text: 'Add notes as you read. Each one gets the date and your page.' },
     { scene: 'bookReviews', target: '.icon-btn', text: 'Done reading? Copy your notes for Claude, then paste the review it writes back here.' },
     { scene: 'book', target: '.gear', text: 'Change a book’s look and spine, or start a buddy read and share it with your sister.' },
@@ -156,7 +156,7 @@ function startTour(sides, firstTime) {
   root.className = 'tour';
   root.setAttribute('role', 'dialog');
   root.setAttribute('aria-modal', 'true');
-  root.setAttribute('aria-label', 'How to use');
+  root.setAttribute('aria-label', 'The tour');
   root.innerHTML = `<div class="tour-top"><span class="tour-name"></span>
       <button class="tour-x" type="button">${firstTime ? 'Skip tour' : 'Close'}</button></div>
     <div class="tour-stage">
@@ -185,7 +185,7 @@ function startTour(sides, firstTime) {
 
   function draw(flipIn) {
     const s = steps[at];
-    $('.tour-name', root).textContent = `How to use · ${s.side === 'worlds' ? 'Worlds' : 'Books'}`;
+    $('.tour-name', root).textContent = `The tour · ${s.side === 'worlds' ? 'Worlds' : 'Books'}`;
     $('.tour-dots', root).innerHTML = steps.map((_, i) => `<span${i === at ? ' class="on"' : ''}></span>`).join('');
     $('.tour-back', root).disabled = at === 0;
     $('.tour-next', root).textContent = at === steps.length - 1 ? 'Done' : 'Next ›';

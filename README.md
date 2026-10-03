@@ -10,10 +10,10 @@ any you add) has its own look and these sections:
 - **Fics**: saved AO3 links with ship and a note to self
 - **Rewatch**: where you are, and it stops at your canon ending
 
-**How to use** (tour.js + tour.css): a guided tour on a pretend phone (sample
+**Take the tour** (tour.js + tour.css): a guided tour on a pretend phone (sample
 doors and books, a glowing spot, an arrow and an info bubble). Everyone sees
 both sides' tours once (settings.tourSeen), starting with the side they're on;
-after that, "How to use" in each side's gear menu replays that side.
+after that, "Take the tour" in each side's gear menu replays that side.
 
 Plus a **Books** side (tap the big doorway/book icon at the top to flip sides; settings are under the gear, top right; books.js + books.css):
 a wooden bookcase with your shelves (Currently reading / Read / Want to read /

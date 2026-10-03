@@ -550,7 +550,7 @@ function renderLibrary() {
   $('#hgear').onclick = () => openModal(`<div class="crest-menu">
       <a class="btn block" href="#/library" data-close>+ Add a world</a>
       <a class="btn block" href="#/wishlist" data-close>Wishlist</a>
-      <button class="btn block" id="m-tour">How to use</button>
+      <button class="btn block" id="m-tour">Take the tour</button>
       <hr class="menu-rule">${accountRows(nick)}</div>`, (root, close) => {
     $('#m-tour', root).onclick = () => { close(); startTour(['worlds']); };
     wireAccount(root, close, 'worlds');

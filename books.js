@@ -419,7 +419,7 @@ function renderBooks() {
       <button class="btn block" id="m-add">+ Add a book</button>
       <button class="btn block" id="m-shelves">Edit shelves</button>
       <a class="btn block" href="#/books/stats" data-close>Reading goal &amp; stats</a>
-      <button class="btn block" id="m-tour">How to use</button>
+      <button class="btn block" id="m-tour">Take the tour</button>
       <hr class="menu-rule">${accountRows(nick)}</div>`, (root, close) => {
     $('#m-add', root).onclick = () => { close(); addBook(); };
     $('#m-tour', root).onclick = () => { close(); startTour(['books']); };

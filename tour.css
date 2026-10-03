@@ -1,4 +1,4 @@
-/* How to use (tour.js): a pretend phone with a glowing spot, an arrow and an
+/* Take the tour (tour.js): a pretend phone with a glowing spot, an arrow and an
    info bubble. Sits above everything, in the library's colors. */
 .tour { position: fixed; inset: 0; z-index: 200; display: flex; flex-direction: column; gap: 8px;
   padding: calc(env(safe-area-inset-top) + 10px) 16px calc(env(safe-area-inset-bottom) + 12px);
