@@ -23,7 +23,7 @@ function renderWorld(world, section) {
   view.innerHTML = `<div class="page world">
     <header class="w-head">
       <a class="back" href="#/">‹ Worlds</a>
-      <a class="gear" href="#/w/${world.id}/settings" aria-label="World settings"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5"/></svg></a>
+      <a class="gear" href="#/w/${world.id}/settings" aria-label="World settings"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"><path d="M9.15 4.95L10.05 1.99L13.95 1.99L14.85 4.95L14.97 5L17.7 3.54L20.46 6.3L19 9.03L19.05 9.15L22.01 10.05L22.01 13.95L19.05 14.85L19 14.97L20.46 17.7L17.7 20.46L14.97 19L14.85 19.05L13.95 22.01L10.05 22.01L9.15 19.05L9.03 19L6.3 20.46L3.54 17.7L5 14.97L4.95 14.85L1.99 13.95L1.99 10.05L4.95 9.15L5 9.03L3.54 6.3L6.3 3.54L9.03 5Z"/><circle cx="12" cy="12" r="3.3"/></svg></a>
     </header>
     <div class="w-hero"><h1 class="w-title">${esc(plainName(world))}</h1>${world.sharedId ? `<p class="w-sub">${esc(sharedWithLine(world))}</p>` : ''}<div class="w-flourish" aria-hidden="true"></div></div>
     ${worldBooksHtml(world)}
