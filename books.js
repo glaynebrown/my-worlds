@@ -178,7 +178,8 @@ const ORNAMENTS = [
   ['dots', 'Dots', "<circle cx='5' cy='12' r='2.2'/><circle cx='12' cy='12' r='2.2'/><circle cx='19' cy='12' r='2.2'/>"],
   ['diamond', 'Diamond', "<path d='M12 4l6 8-6 8-6-8z'/><path d='M0 11.1h4.5v1.8H0zM19.5 11.1H24v1.8h-4.5z'/>"],
   ['circles', 'Circles', "<circle cx='12' cy='4.5' r='3.4'/><circle cx='12' cy='12' r='2.6'/><circle cx='12' cy='18.4' r='1.9'/>"],
-  ['moon', 'Moon', "<path d='M14.5 2.5a9.5 9.5 0 1 0 7 15.8A8 8 0 0 1 14.5 2.5z'/>"],
+  // Traced from the crescent moon picture we were given (thin, open crescent).
+  ['moon', 'Moon', "<path d='M10.40 0.10L8.55 0.49L6.02 1.55L3.98 3.01L2.23 4.96L1.65 5.83L0.87 7.38L0.29 9.13L0.10 10.11L0.10 10.79L0.00 10.88L0.10 13.89L0.68 16.13L1.55 17.98L2.62 19.53L4.47 21.38L6.41 22.64L8.94 23.61L10.49 23.90L13.41 23.90L15.64 23.42L17.88 22.45L19.82 21.09L21.09 19.82L22.45 17.88L23.32 15.94L23.81 14.09L23.90 12.53L23.71 13.60L23.22 14.87L21.96 16.91L20.31 18.56L19.04 19.43L17.68 20.11L16.52 20.50L14.96 20.70L14.87 20.79L12.24 20.70L9.91 20.02L8.74 19.43L7.38 18.46L5.64 16.62L5.05 15.74L4.28 14.09L3.89 12.83L3.79 11.76L3.69 11.66L3.79 8.84L4.37 6.80L5.05 5.44L5.93 4.18L7.87 2.33L9.91 1.17L11.76 0.58L12.83 0.49L12.92 0.39L15.35 0.49L14.19 0.19L12.63 0.10L12.53 0.00Z'/>"],
   ['sun', 'Sun', "<circle cx='12' cy='12' r='4.6'/>" + ORN_STROKE('M12 1.5v3.2M12 19.3v3.2M1.5 12h3.2M19.3 12h3.2M4.6 4.6l2.2 2.2M17.2 17.2l2.2 2.2M4.6 19.4l2.2-2.2M17.2 6.8l2.2-2.2', 2.2)],
   ['star', 'Star', "<path d='M12 1.5l3 6.9 7.5.7-5.7 5 1.7 7.4L12 17.6l-6.5 3.9 1.7-7.4-5.7-5 7.5-.7z'/>"],
   ['snowflake', 'Snowflake', ORN_STROKE('M12 1.5v21M2.9 6.8l18.2 10.4M2.9 17.2l18.2-10.4M9.2 2.9L12 5.6l2.8-2.7M9.2 21.1l2.8-2.7 2.8 2.7M3.4 10.4l3.8-1-1-3.8M20.6 13.6l-3.8 1 1 3.8M3.4 13.6l3.8 1-1 3.8M20.6 10.4l-3.8-1 1-3.8', 1.7)],
@@ -665,7 +666,7 @@ function drawAbout(book, body) {
       <div class="about-top">
         <button class="about-cover" id="cover" aria-label="See the cover">${coverHtml(book, '', true)}</button>
         <div class="about-info">
-          ${book.series ? `<p class="about-series">${esc(book.series)}${book.seriesNo ? ` · Book ${esc(book.seriesNo)}` : ''}</p>` : ''}
+          ${book.series ? `<a class="about-series" href="${seriesHref(book.series)}">${esc(book.series)}${book.seriesNo ? ` · Book ${esc(book.seriesNo)}` : ''}&nbsp;›</a>` : ''}
           ${starsHtml(book.rating || 0)}
           ${book.pages ? `<p class="muted small">${esc(book.pages)} pages</p>` : ''}
           <label class="mini-field"><span>Shelf</span><select id="shelf">${shelvesOf().map(s => `<option value="${esc(s.id)}" ${shelfOf(book) === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
@@ -677,6 +678,7 @@ function drawAbout(book, body) {
     <h2 class="sec-h">Reading dates</h2>
     <div class="reads">${reads.map((r, i) => readHtml(r, i, reads.length)).join('')}</div>
     <button class="btn small" id="reread">+ Start a re-read</button>
+    ${nextCardHtml(book)}
     ${book.blurb ? `<h2 class="sec-h">The story</h2><div class="card blurb"><p class="blurb-text" id="blurb">${esc(book.blurb)}</p><button class="linkish" id="more">More</button></div>` : ''}`;
 
   const save = (patch, msg) => DB.updateBook(book, patch).then(() => msg && toast(msg), e => toast(friendlyError(e), true));
@@ -736,6 +738,7 @@ function drawAbout(book, body) {
     if (hasShelf('reading')) patch.shelf = 'reading';
     save(patch, 'Re-read started. Enjoy it again!');
   };
+  wireNextCard(book, body);
   const more = $('#more', body);
   if (more) {
     const text = $('#blurb', body);
@@ -1403,6 +1406,17 @@ function renderBookForm(book) {
 
   draw();
   if (isNew) fillFromLibrary(b.shelf);
+  // Adding the next book in a series: series and number filled in, and a search started.
+  if (isNew && newBookPrefill) {
+    const pre = newBookPrefill;
+    newBookPrefill = null;
+    $('#series').value = pre.series;
+    $('#seriesNo').value = pre.seriesNo;
+    $('#series').dispatchEvent(new Event('input'));
+    if (pre.author) $('#author').value = pre.author;
+    $('#q').value = [pre.series, pre.seriesNo, pre.author].filter(Boolean).join(' ');
+    if ($('#sf').requestSubmit) $('#sf').requestSubmit();
+  }
 
   // ----- save -----
   root.onsubmit = e => {
@@ -1810,6 +1824,98 @@ function fillFromLibrary(defShelf) {
           }, 'Adding…');
         });
       };
+    });
+  });
+}
+
+// ---------- series: a series page, and adding the next book ----------
+const seriesHref = name => `#/books/series/${encodeURIComponent(name)}`;
+const seriesNum = b => parseFloat(b.seriesNo) || 0;
+const finishedBook = b => !!lastEnd(b);
+let newBookPrefill = null; // { series, seriesNo } for the next Add a book
+
+// The book after this one in its series, if you've finished this one and don't have the next yet.
+function nextInSeries(book) {
+  const n = seriesNum(book);
+  if (!book.series || !n || !finishedBook(book)) return null;
+  const next = Math.floor(n) + 1;
+  return state.books.some(b => seriesKey(b) === seriesKey(book) && Math.floor(seriesNum(b)) === next) ? null : next;
+}
+// A library book (from your bookcase) that is this series' book n, if there is one.
+const libSeriesBook = (lib, key, n) => libChoices(lib).find(e => seriesKey(e) === key && Math.floor(seriesNum(e)) === n);
+
+function addSeriesBook(series, n) {
+  const mate = state.books.find(b => seriesKey(b) === series.trim().toLowerCase() && b.author);
+  newBookPrefill = { series, seriesNo: String(n), author: mate ? mate.author : '' };
+  newBookShelf = hasShelf('want') ? 'want' : shelvesOf()[0].id;
+  location.hash = '#/books/new';
+}
+
+function nextCardHtml(book) {
+  const n = nextInSeries(book);
+  if (!n) return '';
+  return `<div class="card next-book" id="nextbook"><div class="nb-text"><span class="nb-head">Next in ${esc(book.series)}</span>
+      <span class="nb-title" id="nbtitle">Book ${n}</span></div>
+      <button class="btn small primary" id="addnext">+ Add book ${n}</button></div>`;
+}
+function wireNextCard(book, body) {
+  const btn = $('#addnext', body);
+  if (!btn) return;
+  const n = nextInSeries(book);
+  btn.onclick = () => addSeriesBook(book.series, n);
+  // In the library already? Then it's one tap, with its cover and details.
+  bookLibrary().then(lib => {
+    const e = libSeriesBook(lib, seriesKey(book), n);
+    if (!e || !btn.isConnected) return;
+    $('#nbtitle', body).textContent = e.title;
+    btn.textContent = '+ Add to Want to read';
+    btn.onclick = () => busy(btn, async () => {
+      const id = await addFromLibrary(e, hasShelf('want') ? 'want' : shelvesOf()[0].id);
+      toast(`${e.title} is on your shelf`);
+      location.hash = `#/b/${id}`;
+    }, 'Adding…');
+  });
+}
+
+// #/books/series/NAME: every book in the series in order, what's read, and what's missing.
+function renderSeries(name) {
+  const key = (name || '').trim().toLowerCase();
+  const list = sortBooks(state.books.filter(b => seriesKey(b) === key), 'drag');
+  if (!list.length) { location.replace('#/books'); return; }
+  const display = list[0].series;
+  const nums = list.map(seriesNum).filter(n => n > 0);
+  const max = Math.max(0, ...nums.map(Math.floor));
+  const missing = [];
+  for (let i = 1; i <= max; i++) if (!nums.some(n => Math.floor(n) === i)) missing.push(i);
+  const done = list.filter(finishedBook).length;
+  const rows = [...list.map(b => ({ n: seriesNum(b) || 1e6, b })), ...missing.map(n => ({ n, missing: true }))].sort((a, z) => a.n - z.n);
+  const status = b => (finishedBook(b) ? 'Read ✓' : (shelvesOf().find(sh => sh.id === shelfOf(b)) || {}).name || '');
+  view.innerHTML = `<div class="page series-page">
+    <header class="w-head"><a class="back" href="#/books">‹ Books</a></header>
+    <h1 class="w-title small-title">${esc(display)}</h1>
+    <div class="ser-progress"><span>${done} of ${list.length + missing.length} read</span>
+      <span class="goal-bar"><span style="width:${Math.round((done / (list.length + missing.length)) * 100)}%"></span></span></div>
+    <div class="ser-list">${rows.map(r => (r.missing
+      ? `<div class="card ser-row missing" data-n="${r.n}"><span class="ser-cover ser-blank">${r.n}</span>
+          <span class="ser-txt"><span class="ser-no">Book ${r.n}</span><span class="ser-title muted" data-libtitle="${r.n}">Not on your shelves</span></span>
+          <button class="btn small" data-addn="${r.n}">+ Add</button></div>`
+      : `<button class="card ser-row" data-book="${esc(r.b.id)}"><span class="ser-cover">${coverHtml(r.b)}</span>
+          <span class="ser-txt"><span class="ser-no">${r.b.seriesNo ? `Book ${esc(r.b.seriesNo)}` : 'In the series'}</span><span class="ser-title">${esc(r.b.title)}</span>
+          <span class="muted small">${esc(status(r.b))}${r.b.rating ? ` · ${r.b.rating} ★` : ''}</span></span></button>`)).join('')}</div>
+    <p class="center"><button class="btn small" id="addafter">+ Add book ${max + 1}</button></p>
+  </div>`;
+  paintCovers(view);
+  $$('.ser-row[data-book]').forEach(el => { el.onclick = () => openBook($('.ser-cover', el), bookById(el.dataset.book)); });
+  $('#addafter').onclick = () => addSeriesBook(display, max + 1);
+  $$('[data-addn]').forEach(b => { b.onclick = () => addSeriesBook(display, Number(b.dataset.addn)); });
+  // Missing books that are in the library: show their titles and add them in one tap.
+  bookLibrary().then(lib => {
+    $$('.ser-row.missing').forEach(row => {
+      const n = Number(row.dataset.n), e = libSeriesBook(lib, key, n);
+      if (!e || !row.isConnected) return;
+      $('[data-libtitle]', row).textContent = `${e.title} · in the library`;
+      const b = $('[data-addn]', row);
+      b.onclick = () => busy(b, async () => { await addFromLibrary(e, hasShelf('want') ? 'want' : shelvesOf()[0].id); toast(`${e.title} is on your shelf`); }, 'Adding…');
     });
   });
 }

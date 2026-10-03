@@ -227,6 +227,7 @@ function route() {
     setPageTheme(null);
     if (id === 'new') return renderBookForm(null);
     if (id === 'pick') return renderBookPick();
+    if (id === 'series') return renderSeries(decodeURIComponent(sub || ''));
     if (id === 'stats') return renderStats();
     return renderBooks();
   }
