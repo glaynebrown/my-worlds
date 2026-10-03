@@ -10,6 +10,20 @@ any you add) has its own look and these sections:
 - **Fics**: saved AO3 links with ship and a note to self
 - **Rewatch**: where you are, and it stops at your canon ending
 
+Plus a **Books** side (the Worlds | Books switch at the top; books.js + books.css):
+a wooden bookcase with your shelves (Currently reading / Read / Want to read /
+DNF, editable, each with its own sort; hold a book to drag it). Spine thickness
+comes from the page count; tap a book and it flies open. Inside: About (cover,
+half-star rating, shelf, page progress, reading dates per read with physical /
+audiobook), Notes (date + page, or chapter for audiobooks), Quotes (page
+optional), Reviews (full + spoiler-free; "Copy for review" makes a prompt for
+Claude and "Paste Claude's reply" fills both in), Board, Map (optional, with
+pins) and My Canon (optional). Looks per book (book looks, world looks, or your
+own colors); series share a look. Books can link to a world ("The books" row on
+the world's page). Reading goal + stats at #/books/stats. Buddy reads share a
+book like a shared world (stars, dates and reviews stay personal). Book search
+uses Open Library (free, no key), with Google Books as a backup.
+
 Plain HTML/CSS/JS + Firebase (Auth, Firestore, Storage), hosted on GitHub Pages.
 Until `firebase-config.js` is filled in, the app offers **sample mode** (nothing saved).
 
@@ -32,7 +46,7 @@ S5 E1, Zutara is on the Avatar ships list, Daryl/Rick/Glenn/Maggie are TWD favor
 
 ## Site files (upload these to GitHub)
 
-index.html, styles.css, themes.css, themes.js, app.js, world.js, store.js,
+index.html, styles.css, themes.css, books.css, themes.js, app.js, world.js, share.js, library.js, together.js, books.js, store.js,
 demo.js, photos.js, firebase-config.js, sw.js, manifest.json,
 icon-192.png, icon-512.png, apple-touch-icon.png
 
@@ -43,3 +57,36 @@ icon-192.png, icon-512.png, apple-touch-icon.png
 Use **Add a world** on the library screen (pick a look, colors, title font,
 optional background photo, and a tracker). For a fully custom look like the
 first three, the theme goes in `themes.css` + `themes.js` as a new built-in.
+
+## Sharing a copy (e.g. with a sister)
+
+1. Signed in as you, open the hidden page `…/my-worlds/#/share`, type her email, send.
+   (Copies worlds, looks, trackers, boards, quotes, favorites, ships, headcanons;
+   not fics, rewatch notes, wishlist, watched marks, or the Zutara ship. Adds Zukka.)
+2. Firebase console → Authentication → Users → Add user with that same email.
+3. She signs in; her worlds are built from the copy and the copy is deleted.
+   Her data lives under her own users/{uid}; the two accounts never touch.
+
+## Inviting friends (they make their own accounts)
+
+- Invite link: `https://glaynebrown.github.io/my-worlds/?invite=Mellon9`
+  ("New here? Create an account" appears on the sign-in screen). The code is
+  checked by firestore.rules (`users/{uid}` can only be created with it); to
+  change it, edit the rules and redeploy.
+- Needs Firebase console → Authentication → Settings → User actions:
+  Enable create (sign-up) and Enable deletion both ON.
+- New people pick doors from the Library (library.js): built-in worlds start
+  neutral but use your home-card photos/name colors (your app publishes them to
+  library/wallpapers whenever it opens).
+- Everyone except you has a 500-photo limit. "Delete my account" is in the
+  doorway menu.
+
+## Shared worlds (Step 1: shared Rewatch)
+
+World settings → Share → "Share this world…" → their email + your name. They
+must already have an account; the invite pops up the next time they open the
+app and joining adds a separate door "<World> (with <you>)". One set of watched
+marks for the group; each person's rewatch notes show side by side. Only the
+sharer can change the tracker or Stop sharing; others can Leave. Either way
+everyone keeps a personal copy (tracker, marks, all notes). Data: shared/{sid}
++ shared/{sid}/notes (firestore.rules), code in together.js.

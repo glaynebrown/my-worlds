@@ -7,6 +7,8 @@ const SECTIONS = [
   ['canon', 'My Canon'], ['fics', 'Fics'], ['rewatch', 'Rewatch'],
 ];
 
+// A world's address, or a book's (books borrow My Canon and ship pages; see books.js).
+const worldHref = w => `${w._book ? '#/b/' : '#/w/'}${w.id}`;
 const byNewest = (a, b) => (b.t || 0) - (a.t || 0);
 const byOldest = (a, b) => (a.t || 0) - (b.t || 0);
 const empty = (world, text) => `<p class="empty">${esc(text || Themes.info(world).empty)}</p>`;
@@ -24,11 +26,13 @@ function renderWorld(world, section) {
       <a class="gear" href="#/w/${world.id}/settings" aria-label="World settings"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5"/></svg></a>
     </header>
     <div class="w-hero"><h1 class="w-title">${esc(plainName(world))}</h1>${world.sharedId ? `<p class="w-sub">${esc(sharedWithLine(world))}</p>` : ''}<div class="w-flourish" aria-hidden="true"></div></div>
+    ${worldBooksHtml(world)}
     <nav class="w-tabs" aria-label="Sections">${sections.map(([k, label]) =>
       `<a href="#/w/${world.id}/${k}" style="${colors[k] ? `--tab:${colors[k]}` : ''}" ${k === section ? 'aria-current="page"' : ''}>${k === 'rewatch' && world.firstWatch && !(world.rounds > 0) ? 'Watch' : label}</a>`).join('')}</nav>
     <section class="w-body" id="wb" style="${colors[section] ? `--tab:${colors[section]}` : ''}"></section>
   </div>`;
 
+  wireWorldBooks();
   const body = $('#wb');
   ({ board: drawBoard, quotes: drawQuotes, favs: drawFavs, canon: drawCanon, fics: drawFics, rewatch: drawRewatch })[section](world, body);
 }
@@ -230,7 +234,7 @@ function shipForm(world, s) {
       confirmBox(`Remove ${s.name}?`, pics.length ? `Its ${pics.length} photo${pics.length === 1 ? '' : 's'} will be deleted too.` : '', 'Remove', async () => {
         for (const p of pics) await deleteItemFor(p);
         await deleteItemFor(s);
-        if (parseHash()[2] === 'ship') location.hash = `#/w/${world.id}/canon`;
+        if (parseHash()[2] === 'ship') location.hash = `${worldHref(world)}/canon`;
       });
     }),
   });
@@ -241,10 +245,10 @@ function renderShip(world, shipId) {
   world = withShared(world);
   const found = findItem(shipId);
   const ship = found && found.kind === 'ship' ? found : null;
-  if (!ship) { location.replace(`#/w/${world.id}/canon`); return; }
+  if (!ship) { location.replace(`${worldHref(world)}/canon`); return; }
   const [a, b] = ship.colors || Themes.palette(world).map(p => p[1]);
   view.innerHTML = `<div class="page world">
-    <header class="w-head"><a class="back" href="#/w/${world.id}/canon">‹ My Canon</a><button class="linkish edit-ship" id="edit">Edit</button></header>
+    <header class="w-head"><a class="back" href="${worldHref(world)}/canon">‹ ${world._book ? 'Canon' : 'My Canon'}</a><button class="linkish edit-ship" id="edit">Edit</button></header>
     <div class="ship ship-hero" style="--a:${a};--b:${b}"><span class="ship-name">${esc(ship.name)}</span>${ship.note ? `<span class="ship-note">${esc(ship.note)}</span>` : ''}</div>
     <section class="w-body" id="wb"></section></div>`;
   $('#edit').onclick = () => shipForm(world, ship);
@@ -311,7 +315,7 @@ function drawCanon(world, body) {
     ${ships.length ? `<div class="ships">${ships.map(s => {
       const [a, b] = s.colors || Themes.palette(world).map(p => p[1]);
       const pics = shipPhotos(s);
-      return `<a class="ship" href="#/w/${world.id}/ship/${s.id}" style="--a:${a};--b:${b}"><span class="ship-name">${esc(s.name)}</span>${s.note ? `<span class="ship-note">${esc(s.note)}</span>` : ''}${byLine(s)}
+      return `<a class="ship" href="${worldHref(world)}/ship/${s.id}" style="--a:${a};--b:${b}"><span class="ship-name">${esc(s.name)}</span>${s.note ? `<span class="ship-note">${esc(s.note)}</span>` : ''}${byLine(s)}
         ${pics.length ? `<span class="ship-strip">${pics.slice(0, 4).map(p => `<img src="${esc(p.photo.thumbUrl)}" alt="" loading="lazy">`).join('')}${pics.length > 4 ? `<span class="ship-more">+${pics.length - 4}</span>` : ''}</span>` : '<span class="ship-hint">Tap to add photos</span>'}</a>`;
     }).join('')}</div>` : ''}
     <button class="btn small" id="adds">+ Add a ship</button>` : ''}

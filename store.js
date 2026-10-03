@@ -20,6 +20,14 @@
           kind 'headcanon' { text }
           kind 'wish'      wishlist entry (world: null) { text, note, toWatch }
           kind 'epnote'    rewatch notes { step: full episode/film label, text }
+       Books keep their things here too (world: bookId): 'bnote' reading notes
+       { text, page, chapter, date, read }, 'quote' { text, who, page }, 'pin',
+       'mapmark' { x, y, label, note }, and My Canon's 'ship'/'headcanon'.
+     users/{uid}/books/{id}       one book (see books.js):
+        { title, author, series, seriesNo, pages, cover (photo) or coverUrl,
+          blurb, shelf, order, rating, reads: [{ start, end, physical, audio }],
+          page, chapter, review, reviewSafe, theme, look, spineFont, spineInk,
+          spineBg, worldId, mapOn, map (photo), canonOn, canonParts, ending, t }
 
    Storage: users/{uid}/items/{id}/... and users/{uid}/worlds/{id}/...
 
@@ -54,6 +62,7 @@ const Store = (() => {
   const userDoc = () => db.collection('users').doc(uid());
   const worlds = () => userDoc().collection('worlds');
   const items = () => userDoc().collection('items');
+  const books = () => userDoc().collection('books');
   const withId = d => ({ id: d.id, ...d.data() });
 
   const ignoreMissing = e => { if (e.code !== 'storage/object-not-found') throw e; };
@@ -114,14 +123,14 @@ const Store = (() => {
       needOnline('Deleting your account');
       const user = auth.currentUser;
       await user.reauthenticateWithCredential(firebase.auth.EmailAuthProvider.credential(user.email, password));
-      const [ws, is] = await Promise.all([worlds().get(), items().get()]);
-      const all = [...is.docs.map(withId), ...ws.docs.map(withId)];
+      const [ws, is, bs] = await Promise.all([worlds().get(), items().get(), books().get()]);
+      const all = [...is.docs.map(withId), ...ws.docs.map(withId), ...bs.docs.map(withId)];
       let n = 0;
       for (const d of all) {
-        await Promise.all([removePhoto(d.photo), removePhoto(d.cardPhoto), removePhoto(d.look && d.look.photo)]);
+        await Promise.all([removePhoto(d.photo), removePhoto(d.cardPhoto), removePhoto(d.look && d.look.photo), removePhoto(d.cover), removePhoto(d.map)]);
         if (onStep) onStep(++n, all.length);
       }
-      const refs = [...is.docs, ...ws.docs].map(d => d.ref);
+      const refs = [...is.docs, ...ws.docs, ...bs.docs].map(d => d.ref);
       for (let k = 0; k < refs.length; k += 400) {
         const batch = db.batch();
         refs.slice(k, k + 400).forEach(r => batch.delete(r));
@@ -167,6 +176,45 @@ const Store = (() => {
       batch.delete(worlds().doc(world.id));
       await write(batch.commit());
       await Promise.all([...inside.map(i => removePhoto(i.photo)), removePhoto(world.look && world.look.photo), removePhoto(world.cardPhoto)]);
+    },
+
+    // ----- books (books.js) -----
+    watchBooks: (cb, onError) => books().onSnapshot(snap => cb(snap.docs.map(withId)), onError),
+
+    // prepared = a cover photo from the camera roll (or none: a found cover's link is in data.coverUrl).
+    async addBook(data, prepared) {
+      const ref = books().doc();
+      if (prepared) data = { ...data, cover: await uploadPhoto('books', ref.id, prepared) };
+      await write(ref.set({ ...data, t: Date.now() }));
+      return ref.id;
+    },
+
+    // prepared = a new background photo for the book's look; dropPhoto = remove it.
+    async updateBook(book, patch, prepared, dropPhoto) {
+      const old = book.look && book.look.photo;
+      if (prepared) patch = { ...patch, look: { ...patch.look, photo: await uploadPhoto('books', book.id, prepared) } };
+      else if (dropPhoto && patch.look) patch = { ...patch, look: { ...patch.look, photo: null } };
+      await write(books().doc(book.id).update(patch));
+      if (old && (prepared || dropPhoto)) await removePhoto(old);
+    },
+
+    // The cover or the map: key 'cover' | 'map', prepared or null to remove it.
+    async setBookPhoto(book, key, prepared) {
+      const old = book[key];
+      const photo = prepared ? await uploadPhoto('books', book.id, prepared) : null;
+      await write(books().doc(book.id).update({ [key]: photo }));
+      if (old) await removePhoto(old);
+    },
+    // A photo that isn't saved on a book yet (a buddy read's shared map).
+    uploadBookPhoto: (id, prepared) => uploadPhoto('books', id, prepared),
+    removePhoto,
+
+    async deleteBook(book, inside) {
+      const batch = db.batch();
+      inside.forEach(item => batch.delete(items().doc(item.id)));
+      batch.delete(books().doc(book.id));
+      await write(batch.commit());
+      await Promise.all([...inside.map(i => removePhoto(i.photo)), removePhoto(book.cover), removePhoto(book.map), removePhoto(book.look && book.look.photo)]);
     },
 
     // ----- items -----

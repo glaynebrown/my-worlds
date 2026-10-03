@@ -8,10 +8,13 @@
             #/w/ID/SECTION     board | quotes | favs | canon | fics | rewatch
             #/w/ID/ship/SID    one ship's page (photos)
             #/w/ID/settings    edit a world
+            #/books            the bookcase (books.js); #/books/new, #/books/stats
+            #/b/ID[/SECTION]   a book: about | notes | quotes | reviews | board | map | canon
+            #/b/ID/settings    #/b/ID/ship/SID
             #/login  #/reset                                               */
 
 const view = document.getElementById('view');
-const state = { user: null, settings: null, worlds: [], items: [], loaded: false, unwatch: [], filters: {}, shared: {} };
+const state = { user: null, settings: null, worlds: [], items: [], books: [], loaded: false, unwatch: [], filters: {}, shared: {} };
 let DB = Store.configured ? Store : null;
 
 // ---------- helpers ----------
@@ -111,7 +114,8 @@ function formModal({ title, fields, values = {}, onSave, onDelete, deleteLabel =
         `<button type="button" class="swatch${cur[n] === c ? ' on' : ''}" style="--c:${c}" data-c="${c}" aria-label="${esc(name)}" title="${esc(name)}"></button>`).join('')}</div>`;
       return `<div class="field"><span class="field-label">${esc(f.label)}</span><div class="two-colors">${row(0)}<span class="amp">+</span>${row(1)}</div></div>`;
     }
-    return `<label class="field"><span class="field-label">${esc(f.label)}</span><input name="${f.key}" type="${f.type === 'url' ? 'url' : 'text'}" value="${esc(v || '')}" placeholder="${esc(f.placeholder || '')}" ${f.type === 'url' ? 'inputmode="url" autocapitalize="off"' : ''}></label>`;
+    const type = { url: 'url', date: 'date', number: 'number' }[f.type] || 'text';
+    return `<label class="field"><span class="field-label">${esc(f.label)}</span><input name="${f.key}" type="${type}" value="${esc(v ?? '')}" placeholder="${esc(f.placeholder || '')}" ${f.type === 'url' ? 'inputmode="url" autocapitalize="off"' : f.type === 'number' ? 'inputmode="numeric" min="0"' : ''}></label>`;
   };
 
   openModal(`<form id="mf" novalidate><h2>${esc(title)}</h2>${fields.map(fieldHtml).join('')}${extra}
@@ -162,7 +166,7 @@ function formModal({ title, fields, values = {}, onSave, onDelete, deleteLabel =
         if (ok !== false) close();
       });
     };
-    const first = $('input:not([type=file]),textarea', root);
+    const first = $('input:not([type=file]):not([type=date]),textarea', root);
     if (first && !values[first.name]) setTimeout(() => first.focus(), 60);
   });
 }
@@ -172,12 +176,20 @@ function parseHash() {
   return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
 }
 
+// ---------- Worlds | Books switch (top of both home pages) ----------
+let homeChecked = false;
+let waitingFor = null; // a book id route() is giving a moment to arrive
+function lastSide() { try { return localStorage.getItem('fw-side') || 'worlds'; } catch { return 'worlds'; } }
+function rememberSide(side) { try { localStorage.setItem('fw-side', side); } catch {} }
+const sideToggle = on => `<nav class="side-toggle" aria-label="Worlds or books">
+  <a href="#/" ${on === 'worlds' ? 'aria-current="page"' : ''}>Worlds</a><a href="#/books" ${on === 'books' ? 'aria-current="page"' : ''}>Books</a></nav>`;
+
 const THEME_COLOR = { library: '#16110e', avatar: '#efe3c8', twd: '#1f1e1a', hp: '#1a120c', disney: '#171a3d', lotr: '#121812', narnia: '#16222f', got: '#14161a', firefly: '#141a26', tlou: '#1b211c', potc: '#0f1f26' };
 function setPageTheme(world) {
   const body = document.body;
   if (world) Themes.apply(body, world);
   else { body.dataset.theme = 'library'; body.removeAttribute('style'); }
-  const color = world ? (world.theme === 'custom' ? world.look.bg : THEME_COLOR[world.theme]) : THEME_COLOR.library;
+  const color = world ? (world.theme === 'custom' ? (world.look || Themes.BOOK_PRESETS[0]).bg : THEME_COLOR[world.theme]) : THEME_COLOR.library;
   $('meta[name="theme-color"]').setAttribute('content', color);
 }
 
@@ -193,6 +205,33 @@ function route() {
   if (!state.loaded) { setPageTheme(null); view.innerHTML = '<p class="loading">Opening the library…</p>'; return; }
   if (state.importing) return; // share.js shows its own progress
 
+  if (page === 'b') {
+    const book = bookById(id);
+    // A book saved a moment ago may not have arrived yet: give it a second.
+    if (!book) {
+      if (!waitingFor || waitingFor.id !== id) {
+        waitingFor = { id, until: Date.now() + 1200 };
+        setTimeout(() => { if (parseHash()[1] === id) route(); }, 1250);
+      }
+      if (Date.now() < waitingFor.until) { view.innerHTML = '<p class="loading">Opening the book…</p>'; return; }
+      waitingFor = null;
+      location.replace('#/books');
+      return;
+    }
+    waitingFor = null;
+    setPageTheme(book);
+    if (sub === 'ship') return renderShip(withShared(book), extra);
+    return sub === 'settings' ? renderBookForm(book) : renderBook(book, sub);
+  }
+  if (page === 'books') {
+    setPageTheme(null);
+    if (id === 'new') return renderBookForm(null);
+    if (id === 'stats') return renderStats();
+    return renderBooks();
+  }
+  // Opening the app goes back to whichever side (Worlds or Books) you were on last.
+  if (!page && !homeChecked && lastSide() === 'books') { homeChecked = true; location.replace('#/books'); return; }
+  homeChecked = true;
   if (page === 'w') {
     const world = worldById(id);
     if (!world) { location.replace('#/'); return; }
@@ -211,9 +250,9 @@ function route() {
 
 // Re-draw from fresh data, but never while a form is being filled in.
 function refresh() {
-  const [page, , sub] = parseHash();
-  if (modalOpen || tileSorting) { missedRefresh = true; return; }
-  if (page === 'new' || sub === 'settings') return;
+  const [page, id, sub] = parseHash();
+  if (modalOpen || tileSorting || spineSorting) { missedRefresh = true; return; }
+  if (page === 'new' || sub === 'settings' || (page === 'books' && id === 'new') || mapBusy()) return;
   const y = window.scrollY;
   route();
   window.scrollTo(0, y);
@@ -224,13 +263,13 @@ window.addEventListener('hashchange', () => {
   // Switching sections inside a world keeps your place near the tabs; anything else starts at the top.
   const [p1, id1] = (lastHash || '').replace(/^#\/?/, '').split('/');
   const [p2, id2] = parseHash();
-  const sameWorld = p1 === 'w' && p2 === 'w' && id1 === id2;
+  const sameWorld = (p1 === 'w' || p1 === 'b') && p1 === p2 && id1 === id2;
   const y = window.scrollY;
   lastHash = location.hash;
   $$('.modal-bg').forEach(m => m.remove());
   modalOpen = 0;
-  $$('.tile-ghost').forEach(g => g.remove());
-  tileSorting = false;
+  $$('.tile-ghost, .spine-ghost').forEach(g => g.remove());
+  tileSorting = spineSorting = false;
   route();
   const tabs = $('.w-tabs');
   window.scrollTo(0, sameWorld && tabs ? Math.min(y, tabs.offsetTop) : 0);
@@ -254,7 +293,7 @@ function savedInvite() {
 async function openAccount(user) {
     state.unwatch.forEach(stop => stop());
     stopAllShared();
-    Object.assign(state, { user, settings: null, worlds: [], items: [], loaded: false, unwatch: [], needsInvite: false, shared: {} });
+    Object.assign(state, { user, settings: null, worlds: [], items: [], books: [], loaded: false, unwatch: [], needsInvite: false, shared: {} });
     if (!user) return route();
     route();
     try { state.settings = await DB.loadSettings(); } catch (e) { console.error(e); toast(friendlyError(e), true); state.settings = {}; }
@@ -267,13 +306,14 @@ async function openAccount(user) {
     if (state.settings.libraryMode || state.settings.sharedFrom) {
       DB.loadWallpapers().then(w => { state.wallpapers = w; if (parseHash()[0] === 'library') refresh(); }).catch(() => {});
     }
-    const got = { worlds: false, items: false };
+    const got = { worlds: false, items: false, books: false };
     const arrived = (key, list) => {
-      state[key] = list;
+      // Books wear a name like worlds do, so shared-world code works for them too.
+      state[key] = key === 'books' ? list.map(b => ({ ...b, _book: true, name: b.title })) : list;
       got[key] = true;
-      if (key === 'worlds') syncSharedWatches();
+      if (key === 'worlds' || key === 'books') syncSharedWatches();
       if (state.loaded) { setTimeout(savePhotosForOffline, 3000); return refresh(); }
-      if (got.worlds && got.items) {
+      if (got.worlds && got.items && got.books) {
         setTimeout(savePhotosForOffline, 3000);
         state.loaded = true;
         firstRun();
@@ -286,6 +326,7 @@ async function openAccount(user) {
     state.unwatch = [
       DB.watchWorlds(list => arrived('worlds', list), onError),
       DB.watchItems(list => arrived('items', list), onError),
+      DB.watchBooks(list => arrived('books', list), onError),
     ];
 }
 
@@ -456,8 +497,9 @@ function tileHtml(w) {
 function renderLibrary() {
   const worlds = sortedWorlds();
   const nick = (state.settings && state.settings.displayName) || '';
+  rememberSide('worlds');
   view.innerHTML = `<div class="library">
-    ${nick ? `<p class="lib-me">${esc(nick)}</p>` : ''}
+    ${nick ? `<p class="lib-me">${esc(nick)}</p>` : ''}${sideToggle('worlds')}
     <header class="lib-head"><button class="lib-crest crest-link" id="crest" aria-label="Menu">${CREST}</button>
       <h1 class="lib-title">My Worlds</h1><p class="lib-sub">Pick a door and step inside — there’s no knowing where you might be swept off to.</p></header>
     <div class="shelf">${worlds.map(tileHtml).join('')}</div>
@@ -1037,7 +1079,8 @@ async function savePhotosForOffline() {
   savingPhotos = true;
   try {
     const urls = [...state.items.map(i => i.photo && i.photo.thumbUrl), ...state.worlds.map(w => w.cardPhoto && w.cardPhoto.thumbUrl),
-      ...state.worlds.map(w => w.look && w.look.photo && w.look.photo.url)].filter(u => u && !savedPhotos.has(u));
+      ...state.worlds.map(w => w.look && w.look.photo && w.look.photo.url),
+      ...state.books.flatMap(b => [b.cover && b.cover.url, b.coverUrl, b.map && b.map.url, b.look && b.look.photo && b.look.photo.url])].filter(u => u && !savedPhotos.has(u));
     for (let k = 0; k < urls.length; k += 4) {
       await Promise.all(urls.slice(k, k + 4).map(u => fetch(u).then(() => savedPhotos.add(u), () => {})));
     }

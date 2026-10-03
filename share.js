@@ -17,7 +17,7 @@ const KEEP_SHIPS = /^zutara$/i; // ships that stay only in your account
 function buildShare() {
   const skipShips = new Set(state.items.filter(i => i.kind === 'ship' && KEEP_SHIPS.test((i.name || '').trim())).map(i => i.id));
   const items = state.items
-    .filter(i => SHARE_KINDS.includes(i.kind) && !skipShips.has(i.id) && !(i.kind === 'shippic' && skipShips.has(i.ship)))
+    .filter(i => SHARE_KINDS.includes(i.kind) && state.worlds.some(w => w.id === i.world) && !skipShips.has(i.id) && !(i.kind === 'shippic' && skipShips.has(i.ship)))
     .map(i => ({ ...i }));
   const worlds = state.worlds.map(w => {
     const copy = { ...w, watched: [], rounds: 0 };

@@ -59,13 +59,15 @@ function withShared(world) {
     Object.assign(out, { canonOn: true, canonParts: c.canonParts || { ending: true, ships: true, headcanons: true }, ending: c.ending || '', cutoff: c.cutoff ?? null });
   }
   if (sec.fics) out.ficsOn = true;
+  if (sec.map) Object.assign(out, { mapOn: true, map: d.map || null }); // a buddy read's shared map
   return out;
 }
 
 // ---------- which sections are shared, and routing saves to the right place ----------
 const SHARE_SECTIONS = [['rewatch', 'Rewatch (tracker + notes)'], ['board', 'Board'], ['quotes', 'Quotes'], ['favs', 'Favorites'], ['canon', 'My Canon'], ['fics', 'Fics']];
-const SECTION_OF = { pin: 'board', quote: 'quotes', fav: 'favs', ship: 'canon', shippic: 'canon', headcanon: 'canon', fic: 'fics' };
-const KINDS_OF = { board: ['pin'], quotes: ['quote'], favs: ['fav'], canon: ['ship', 'headcanon', 'shippic'], fics: ['fic'] };
+// (bnote and mapmark are a book's reading notes and map pins; see books.js.)
+const SECTION_OF = { pin: 'board', quote: 'quotes', fav: 'favs', ship: 'canon', shippic: 'canon', headcanon: 'canon', fic: 'fics', bnote: 'notes', mapmark: 'map' };
+const KINDS_OF = { board: ['pin'], quotes: ['quote'], favs: ['fav'], canon: ['ship', 'headcanon', 'shippic'], fics: ['fic'], notes: ['bnote'], map: ['mapmark'] };
 
 const marksShared = world => sectionShared(world, 'rewatch') && (sharedDoc(world).sections || {}).rewatchMarks !== false;
 function sectionShared(world, section) {
@@ -83,7 +85,7 @@ function itemsFor(world, kind) {
 function findItem(id) {
   const mine = state.items.find(i => i.id === id);
   if (mine) return mine;
-  for (const w of state.worlds.filter(x => x.sharedId)) {
+  for (const w of [...state.worlds, ...state.books].filter(x => x.sharedId)) {
     const hit = ((state.shared[w.sharedId] || {}).items || []).find(i => i.id === id);
     if (hit) return { ...hit, world: w.id, _sid: w.sharedId };
   }
@@ -110,7 +112,7 @@ function setCanonField(world, patch) {
     Object.entries(patch).forEach(([k, v]) => { p[`canon.${k}`] = v; });
     return DB.updateShared(world.sharedId, p);
   }
-  return DB.updateWorld(world, patch);
+  return world._book ? DB.updateBook(world, patch) : DB.updateWorld(world, patch);
 }
 
 // Something another person added: shown, not editable.
@@ -136,7 +138,7 @@ async function moveIntoShared(world, sid, sections, me) {
 // Listen to every shared world this account has a door for.
 function syncSharedWatches() {
   if (!DB.watchShared) return;
-  const want = new Set(state.worlds.filter(w => w.sharedId).map(w => w.sharedId));
+  const want = new Set([...state.worlds, ...state.books].filter(w => w.sharedId).map(w => w.sharedId));
   Object.keys(sharedStops).forEach(sid => {
     if (!want.has(sid)) { sharedStops[sid](); delete sharedStops[sid]; delete state.shared[sid]; }
   });
@@ -144,7 +146,7 @@ function syncSharedWatches() {
     if (sharedStops[sid]) return;
     sharedStops[sid] = DB.watchShared(sid, view => {
       state.shared[sid] = view;
-      const world = state.worlds.find(w => w.sharedId === sid);
+      const world = state.worlds.find(w => w.sharedId === sid) || state.books.find(b => b.sharedId === sid);
       const d = view.doc;
       // Ended by the owner, or no longer a member: keep a personal copy.
       if (world && d && !d.gone && (d.ended || !(d.members || []).includes(DB.myUid()))) detachShared(world, view);
@@ -292,7 +294,8 @@ async function offerJoins() {
   offered = true;
   const list = await DB.pendingShares().catch(() => []);
   for (const d of list) {
-    if (state.worlds.some(w => w.sharedId === d.id)) continue;
+    if (state.worlds.some(w => w.sharedId === d.id) || state.books.some(b => b.sharedId === d.id)) continue;
+    if (d.type === 'book') { await offerBuddyRead(d); continue; } // books.js
     const from = (d.names || {})[d.owner] || 'Someone';
     await new Promise(resolve => openModal(`<form id="jf" novalidate><h2>${esc(from)} shared ${esc(d.name)} with you</h2>
       <p>You’ll share: <b>${esc(sectionNames(d).join(', '))}</b>. Anything else in it stays private to each of you. It becomes a new door; your own worlds don’t change.</p>
@@ -360,6 +363,12 @@ async function detachShared(world, view) {
     const sec = (d && d.sections) || {};
     if (d && sec.canon) Object.assign(patch, { canonOn: true, ending: (d.canon && d.canon.ending) || '', cutoff: d.canon ? d.canon.cutoff ?? null : null, canonParts: (d.canon && d.canon.canonParts) || canonParts(world) });
     if (d && sec.fics) patch.ficsOn = true;
+    // A buddy read's map comes along too (your own copy of the picture).
+    if (d && sec.map) {
+      patch.mapOn = true;
+      patch.map = d.map || null;
+      if (d.map && d.mapBy !== DB.myUid()) { try { patch.map = await DB.copyPhoto('books', world.id, d.map); } catch (e) { console.warn('Kept the map link', e); } }
+    }
     const shared = ((view && view.items) || []).filter(i => sec[SECTION_OF[i.kind]]);
     const shipIds = {};
     const ordered = [...shared.filter(i => i.kind === 'ship'), ...shared.filter(i => i.kind !== 'ship')];
@@ -373,7 +382,7 @@ async function detachShared(world, view) {
       const newId = nid ? (await DB.setItem(nid, { ...data, world: world.id }), nid) : await DB.addItem({ ...data, world: world.id });
       if (it.kind === 'ship') shipIds[id] = newId;
     }
-    await DB.updateWorld(world, patch);
+    if (world._book) await DB.updateBook(world, patch); else await DB.updateWorld(world, patch);
     toast(`${world.name} is your own again`);
   } catch (e) { console.error(e); toast(friendlyError(e), true); detached.delete(sid); }
 }

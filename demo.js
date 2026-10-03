@@ -2,19 +2,20 @@
    as store.js, but everything lives in memory and disappears on reload.
    Photos you add stay on this phone only (never uploaded). */
 const DemoStore = (() => {
-  let worlds = [], items = [], settings = {};
+  let worlds = [], items = [], books = [], settings = {};
   const shared = {}, sharedNotes = {}, sharedWatchers = {};
   const sharedItems = {};
   const sharedView = sid => ({ doc: shared[sid] ? clone(shared[sid]) : { id: sid, gone: true }, notes: clone(sharedNotes[sid] || []), items: clone(sharedItems[sid] || []) });
   const emitShared = sid => setTimeout(() => (sharedWatchers[sid] || []).forEach(cb => cb(sharedView(sid))));
   let n = 0;
   const id = () => `d${++n}`;
-  const listeners = { worlds: [], items: [] };
+  const listeners = { worlds: [], items: [], books: [] };
   const clone = x => JSON.parse(JSON.stringify(x));
   const emit = () => {
     setTimeout(() => {
       listeners.worlds.forEach(cb => cb(clone(worlds)));
       listeners.items.forEach(cb => cb(clone(items)));
+      listeners.books.forEach(cb => cb(clone(books)));
     });
   };
   const localPhoto = p => {
@@ -71,6 +72,29 @@ const DemoStore = (() => {
       items = items.filter(i => i.world !== world.id); emit();
     },
 
+    watchBooks(cb) { listeners.books.push(cb); emit(); return () => {}; },
+    async addBook(data, prepared) {
+      const b = { ...clone(data), id: id(), t: Date.now() };
+      if (prepared) b.cover = localPhoto(prepared);
+      books.push(b); emit();
+      return b.id;
+    },
+    async updateBook(book, patch, prepared, dropPhoto) {
+      patch = clone(patch);
+      if (prepared) patch.look = { ...patch.look, photo: localPhoto(prepared) };
+      else if (dropPhoto && patch.look) patch.look.photo = null;
+      books = books.map(b => (b.id === book.id ? { ...b, ...patch } : b)); emit();
+    },
+    async setBookPhoto(book, key, prepared) {
+      books = books.map(b => (b.id === book.id ? { ...b, [key]: prepared ? localPhoto(prepared) : null } : b)); emit();
+    },
+    uploadBookPhoto: async (bid, prepared) => localPhoto(prepared),
+    removePhoto: async () => {},
+    async deleteBook(book) {
+      books = books.filter(b => b.id !== book.id);
+      items = items.filter(i => i.world !== book.id); emit();
+    },
+
     async addItem(data, prepared) {
       const it = { ...clone(data), id: id(), t: Date.now() + n };
       if (prepared) it.photo = localPhoto(prepared);
@@ -124,6 +148,7 @@ const DemoStore = (() => {
     async deleteItemOnly(item) { items = items.filter(i => i.id !== item.id); emit(); },
     async inviteToShared(sid, email) { shared[sid].invited = [...new Set([...(shared[sid].invited || []), email])]; emitShared(sid); },
     pendingShares: async () => [],
+    copyPhoto: async (folder, cid, photo) => photo,
     joinShared: async () => {},
     declineShared: async () => {},
     async leaveShared(sid) { shared[sid].members = shared[sid].members.filter(m => m !== 'sample'); emitShared(sid); },

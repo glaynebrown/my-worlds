@@ -14,7 +14,8 @@ const isOwner = () => !!(state.settings && state.settings.seeded && !state.setti
 function photoCount() {
   return state.items.filter(i => i.photo).length
     + state.worlds.filter(w => w.cardPhoto).length
-    + state.worlds.filter(w => w.look && w.look.photo).length;
+    + state.worlds.filter(w => w.look && w.look.photo).length
+    + state.books.reduce((n, b) => n + (b.cover ? 1 : 0) + (b.map ? 1 : 0) + (b.look && b.look.photo ? 1 : 0), 0);
 }
 // Throws a friendly message when adding n photos would pass the limit.
 function checkPhotoRoom(n = 1) {

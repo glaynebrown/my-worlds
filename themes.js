@@ -101,7 +101,21 @@ const Themes = (() => {
     { name: 'Overgrown city', bg: '#2c3226', card: '#dcd6c4', ink: '#2a2a22', accent: '#7b8f4a', font: 'Special Elite' },
     { name: 'Sunset', bg: '#f6e3d3', card: '#fffaf5', ink: '#4a2c2a', accent: '#d0694c', font: 'Great Vibes' },
   ];
-  const FONTS = ['Cormorant Garamond', 'Playfair Display', 'Cinzel', 'DM Serif Display', 'Great Vibes', 'Caveat', 'Special Elite', 'Orbitron', 'Stardos Stencil', 'Ma Shan Zheng', 'IM Fell English SC'];
+  // Books: starting looks for a book's pages (and its spine on the bookcase).
+  const BOOK_PRESETS = [
+    { name: 'Cozy library', bg: '#2b1d15', card: '#f6efe2', ink: '#2b211a', accent: '#b07a35', font: 'Cormorant Garamond' },
+    { name: 'Dark academia', bg: '#1c1a17', card: '#ebe3d3', ink: '#231e18', accent: '#7a2e2e', font: 'IM Fell English SC' },
+    { name: 'Fantasy map', bg: '#e6d7b5', card: '#fbf4e2', ink: '#3a2c1b', accent: '#8c5a2b', font: 'Uncial Antiqua' },
+    { name: 'Romance', bg: '#f4dfe0', card: '#fffafa', ink: '#4a2a33', accent: '#c4677d', font: 'Great Vibes' },
+    { name: 'Thriller', bg: '#141414', card: '#efefec', ink: '#161616', accent: '#b3201c', font: 'Oswald' },
+    { name: 'Sci-fi', bg: '#0b0d17', card: '#1a1d30', ink: '#e7e9f3', accent: '#5fc4e8', font: 'Orbitron' },
+    { name: 'Fairy tale', bg: '#e4dcf2', card: '#fffdf8', ink: '#352c4a', accent: '#9a7bc8', font: 'Cinzel' },
+    { name: 'Seaside', bg: '#d9e8ee', card: '#fbfdfd', ink: '#1f3a48', accent: '#3d7f99', font: 'Playfair Display' },
+    { name: 'Forest', bg: '#1f2a22', card: '#eef0e2', ink: '#1f2a1f', accent: '#6f9a5b', font: 'Cormorant Garamond' },
+    { name: 'Western', bg: '#3a2618', card: '#f2e6d0', ink: '#3a2618', accent: '#b5562a', font: 'Rye' },
+  ];
+  const FONTS = ['Cormorant Garamond', 'Playfair Display', 'Cinzel', 'DM Serif Display', 'Great Vibes', 'Caveat', 'Special Elite', 'Orbitron', 'Stardos Stencil', 'Ma Shan Zheng', 'IM Fell English SC',
+    'Uncial Antiqua', 'Oswald', 'Rye', 'Pirata One', 'Abril Fatface', 'Libre Baskerville', 'Dancing Script'];
   const BODY_FONT = 'Lora:ital,wght@0,400;0,600;1,400';
 
   // Episode titles for the built-in shows (only used while the season sizes match).
@@ -201,6 +215,13 @@ const Themes = (() => {
     el.dataset.theme = world.theme;
     if (world.theme === 'custom') el.setAttribute('style', customVars(world.look || PRESETS[0], world.look && world.look.photo && world.look.photo.url));
     else el.removeAttribute('style');
+  }
+
+  // A look's title font by name (a built-in world's first font, or the custom look's).
+  function headFont(world) {
+    if (world.theme === 'custom') return (world.look && world.look.font) || 'Cormorant Garamond';
+    const spec = ((BUILT_IN[world.theme] || {}).fonts || [])[0];
+    return spec ? spec.split(':')[0] : 'Cormorant Garamond';
   }
 
   const info = world => BUILT_IN[world.theme] || { label: world.name, empty: 'Nothing here yet.', theEnd: 'The end.' };
@@ -382,5 +403,5 @@ const Themes = (() => {
     { world: 1, kind: 'fav', name: 'Maggie Greene', order: 3 },
   ];
 
-  return { parseEntry, BUILT_IN, PRESETS, FONTS, apply, info, palette, steps, groupName, loadFont, isDark, STARTERS, STARTER_ITEMS };
+  return { parseEntry, BUILT_IN, PRESETS, BOOK_PRESETS, headFont, FONTS, apply, info, palette, steps, groupName, loadFont, isDark, STARTERS, STARTER_ITEMS };
 })();

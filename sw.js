@@ -5,12 +5,13 @@
    - Firebase SDK and Google Fonts: saved copy first -- those never change.
    - Photos: saved copy first (a photo's address never changes once uploaded),
      so boards load fast and work with no signal. Cleared on sign-out.
-   - Everything else (database, login) goes straight to the network.
+   - Book covers from the book search: saved copy first, like photos.
+   - Everything else (database, login, book search) goes straight to the network.
      Firestore keeps its own offline copy of your worlds. */
-const APP_CACHE = 'fw-app-v4';
+const APP_CACHE = 'fw-app-v5';
 const PHOTO_CACHE = 'fw-photos-v1';
 const APP_FILES = [
-  './', 'index.html', 'styles.css', 'themes.css', 'themes.js', 'app.js', 'world.js', 'share.js', 'library.js', 'together.js', 'store.js', 'demo.js', 'photos.js',
+  './', 'index.html', 'styles.css', 'themes.css', 'books.css', 'themes.js', 'app.js', 'world.js', 'share.js', 'library.js', 'together.js', 'books.js', 'store.js', 'demo.js', 'photos.js',
   'firebase-config.js', 'manifest.json', 'icon-192.png', 'apple-touch-icon.png',
 ];
 const SDK = ['app', 'auth', 'firestore', 'storage']
@@ -85,6 +86,9 @@ self.addEventListener('fetch', event => {
   } else if ((url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/'))
     || url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {
     event.respondWith(cacheFirst(request, APP_CACHE));
+  } else if ((url.hostname === 'books.google.com' && url.pathname.startsWith('/books/')) || url.hostname === 'covers.openlibrary.org') {
+    // Book covers found by the search: saved on the phone like photos.
+    event.respondWith(cacheFirst(request, PHOTO_CACHE));
   } else if (url.hostname === 'firebasestorage.googleapis.com' && url.searchParams.get('alt') === 'media') {
     // Only photo downloads. Uploads and the app's own Storage requests carry
     // your sign-in and must go straight through.
