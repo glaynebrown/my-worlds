@@ -1907,7 +1907,8 @@ function paintLibCovers(root, entries) {
 }
 
 // Puts a library book on this person's shelf (their own copy of every picture).
-async function addFromLibrary(e, shelf) {
+// worldIds: { theme: id } for worlds added a moment ago (sign-up), to link the book to.
+async function addFromLibrary(e, shelf, worldIds = {}) {
   const onShelf = state.books.filter(x => shelfOf(x) === shelf);
   const data = {
     title: e.title, author: e.author, series: e.series, seriesNo: e.seriesNo, pages: e.pages || null, totalChapters: e.totalChapters || null,
@@ -1917,7 +1918,7 @@ async function addFromLibrary(e, shelf) {
     // Canon and Fics always start off (there's nothing in them yet); they can turn them on in the book's settings.
     mapOn: !!e.mapOn, canonOn: false, canonParts: e.canonParts || { ending: true, ships: true, headcanons: true },
     reviewsOn: e.reviewsOn !== false, ficsOn: false, fromLib: e.id,
-    worldId: (e.worldTheme && (state.worlds.find(w => w.theme === e.worldTheme) || {}).id) || null,
+    worldId: (e.worldTheme && (worldIds[e.worldTheme] || (state.worlds.find(w => w.theme === e.worldTheme) || {}).id)) || null,
     shelf, order: Math.max(-1, ...onShelf.map(x => x.order ?? 0)) + 1, rating: 0, page: 0, chapter: '', review: '', reviewSafe: '', ending: '',
     reads: [{ start: shelf === 'reading' ? today() : '', end: shelf === 'read' ? today() : '', physical: true, audio: false }],
   };
@@ -1945,27 +1946,32 @@ function renderBookPick() {
 }
 
 function drawBookPick(lib) {
+  // Step 2 of signing up (library.js): picks are kept for the last step, not saved yet.
+  const wizard = isOnboarding();
+  if (wizard) onboardPicks().hadBooks = true;
   const firstTime = !state.settings.booksPicked;
   const choices = libChoices(lib);
   const def = hasShelf('want') ? 'want' : shelvesOf()[0].id;
-  const picked = new Map();
-  const shelfSelect = `${shelvesOf().map(s => `<option value="${esc(s.id)}" ${s.id === def ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}`;
+  const picked = wizard ? onboardPicks().books : new Map();
+  const shelfSelect = sel => `${shelvesOf().map(s => `<option value="${esc(s.id)}" ${s.id === sel ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}`;
   view.innerHTML = `<div class="library books-pick">
-    <header class="w-head"><a class="back" href="#/books">‹ Books</a></header>
+    ${wizard ? `${stepDots(2)}<header class="w-head"><a class="back" href="#/library">‹ Back to worlds</a></header>` : '<header class="w-head"><a class="back" href="#/books">‹ Books</a></header>'}
     <header class="lib-head"><div class="lib-crest" aria-hidden="true">${BOOK_CREST}</div>
       <h1 class="lib-title">Pick your books</h1>
       <p class="lib-sub">${firstTime ? 'Tap the ones you want on your shelves. You can add more anytime, and your own too.' : 'Tap the ones you want on your shelves.'}</p></header>
-    ${choices.length ? `<div class="pick-books">${choices.map(e => `<div class="pick-book" data-lib="${esc(e.id)}">
-        <button type="button" class="pick-cover" aria-pressed="false" aria-label="${esc(e.title)}">${libCoverHtml(e)}<span class="pick-check" aria-hidden="true">✓</span></button>
+    ${choices.length ? `<div class="pick-books">${choices.map(e => `<div class="pick-book${picked.has(e.id) ? ' picked' : ''}" data-lib="${esc(e.id)}">
+        <button type="button" class="pick-cover" aria-pressed="${picked.has(e.id)}" aria-label="${esc(e.title)}">${libCoverHtml(e)}<span class="pick-check" aria-hidden="true">✓</span></button>
         <span class="pick-title">${esc(e.title)}</span>${e.author ? `<span class="pick-author">${esc(e.author)}</span>` : ''}
-        <label class="mini-field pick-shelf" hidden><span>Shelf</span><select>${shelfSelect}</select></label></div>`).join('')}</div>`
+        <label class="mini-field pick-shelf" ${picked.has(e.id) ? '' : 'hidden'}><span>Shelf</span><select>${shelfSelect(picked.get(e.id) || def)}</select></label></div>`).join('')}</div>`
       : '<p class="empty">You already have every book in the library.</p>'}
-    <div class="pick-bar">${choices.length ? '<button class="btn primary block" id="go" disabled>Pick a book</button>' : ''}
-      <button class="linkish skip-link" id="skip">${firstTime ? 'Skip for now' : 'Back to my books'}</button></div>
+    <div class="pick-bar">${wizard ? '<button class="btn primary block" id="next">Next ›</button>'
+      : `${choices.length ? '<button class="btn primary block" id="go" disabled>Pick a book</button>' : ''}
+      <button class="linkish skip-link" id="skip">${firstTime ? 'Skip for now' : 'Back to my books'}</button>`}</div>
   </div>`;
   paintLibCovers(view, choices);
+  if (wizard) $('#next').onclick = () => { location.hash = '#/start'; };
   const go = $('#go');
-  const label = () => { go.disabled = !picked.size; go.textContent = picked.size ? `Put ${picked.size === 1 ? 'it' : `these ${picked.size}`} on my shelves` : 'Pick a book'; };
+  const label = () => { if (!go) return; go.disabled = !picked.size; go.textContent = picked.size ? `Put ${picked.size === 1 ? 'it' : `these ${picked.size}`} on my shelves` : 'Pick a book'; };
   $$('.pick-book').forEach(el => {
     const e = choices.find(x => x.id === el.dataset.lib);
     const btn = $('.pick-cover', el), sel = $('select', el);
@@ -1982,6 +1988,7 @@ function drawBookPick(lib) {
   const finish = async () => {
     if (!state.settings.booksPicked) { await DB.saveSettings({ booksPicked: true }); state.settings.booksPicked = true; }
   };
+  if (wizard) return;
   $('#skip').onclick = () => busy($('#skip'), async () => { await finish(); location.hash = !picked.size && state.worlds.length && firstTime ? '#/' : '#/books'; }, '…');
   if (go) {
     go.onclick = () => busy(go, async () => {

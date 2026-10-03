@@ -270,6 +270,7 @@ function route() {
   if (page === 'wishlist') return renderWishlist();
   if (page === 'share') return renderShare();
   if (page === 'library') return renderLibraryPick();
+  if (page === 'start') return renderStart();
   renderLibrary();
 }
 
@@ -277,7 +278,7 @@ function route() {
 function refresh() {
   const [page, id, sub] = parseHash();
   if (modalOpen || tileSorting || spineSorting) { missedRefresh = true; return; }
-  if (page === 'new' || sub === 'settings' || (page === 'books' && (id === 'new' || id === 'pick')) || mapBusy()) return;
+  if (page === 'new' || page === 'start' || sub === 'settings' || (page === 'books' && (id === 'new' || id === 'pick')) || mapBusy()) return;
   const y = window.scrollY;
   route();
   window.scrollTo(0, y);

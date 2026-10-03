@@ -1,6 +1,8 @@
 /* The Library: the built-in worlds anyone can add, plus "Build your own".
-   - Someone who joined with the invite code picks their doors here the first
-     time they sign in (#/library), and "+ Add a world" opens it after that.
+   - Someone who joined with the invite code is walked through three steps the
+     first time they sign in: their worlds (#/library), their books
+     (#/books/pick), then Step inside (#/start). "+ Add a world" opens the
+     Library after that.
    - Their worlds start neutral (real endings, no favorites or ships, every
      section on) but wear your home-card photos and name colors, which your
      account publishes to library/wallpapers (publishWallpapers below).
@@ -53,24 +55,61 @@ function neutralWorld(starter, order) {
   };
 }
 
+// ---------- first sign-in: three steps ----------
+// 1 Pick your worlds (#/library)  2 Pick your books (#/books/pick)
+// 3 Step inside your worlds (#/start): worlds or books first?
+// Nothing is saved until step 3; closing the app part way starts over.
+let onboard = null; // { worlds: Set of themes, books: Map of library id -> shelf }
+const isOnboarding = () => !!(state.settings && state.settings.libraryMode && !state.settings.seeded);
+function onboardPicks() {
+  if (!onboard) onboard = { worlds: new Set(), books: new Map() };
+  return onboard;
+}
+const stepDots = n => `<div class="step-dots" aria-label="Step ${n} of 3">${[1, 2, 3].map(i => `<span${i === n ? ' class="on"' : ''}></span>`).join('')}</div>`;
+
+// Built-in worlds onto this person's shelf, wearing your card photos and name colors.
+// Returns { theme: new world id }.
+async function addLibraryWorlds(themes) {
+  const walls = state.wallpapers || {};
+  const ids = {};
+  let order = Math.max(-1, ...state.worlds.map(w => w.order ?? 0)) + 1;
+  for (const s of Themes.STARTERS.filter(x => themes.has(x.theme))) {
+    const data = neutralWorld(s, order++);
+    const wall = walls[s.theme];
+    if (wall && wall.ink) data.cardInk = wall.ink;
+    if (wall && wall.pos) data.cardPos = wall.pos;
+    if (wall && wall.shade === false) data.cardShade = false;
+    const id = ids[s.theme] = await DB.addWorld(data);
+    // Their own copy of your card photo, so it never depends on your account.
+    if (wall && wall.photo && DB.copyPhoto) {
+      try {
+        const photo = await DB.copyPhoto('worlds', id, wall.photo);
+        await DB.updateWorld({ id }, { cardPhoto: photo });
+      } catch (e) { console.warn('Card photo not copied', e); }
+    }
+  }
+  return ids;
+}
+
 function renderLibraryPick() {
-  const firstTime = !state.worlds.length;
+  const wizard = isOnboarding();
   const have = new Set(state.worlds.map(w => w.theme));
   const choices = Themes.STARTERS.filter(s => !have.has(s.theme));
   const walls = state.wallpapers || {};
-  const picked = new Set();
+  // During sign-up the picks live in onboard, so going Back (or a redraw) keeps them.
+  const picked = wizard ? onboardPicks().worlds : new Set();
 
   view.innerHTML = `<div class="library">
-    ${firstTime ? '' : '<header class="w-head"><a class="back" href="#/">‹ Worlds</a></header>'}
+    ${wizard ? stepDots(1) : '<header class="w-head"><a class="back" href="#/">‹ Worlds</a></header>'}
     <header class="lib-head"><div class="lib-crest" aria-hidden="true">${CREST}</div>
-      <h1 class="lib-title">The Library</h1>
-      <p class="lib-sub">${firstTime ? 'Pick the doors you want. You can add more anytime.' : 'Pick a door to add, or build your own.'}</p></header>
-    <div class="shelf"><a class="tile add-tile" href="#/new"><span class="plus" aria-hidden="true">+</span><span class="tile-name">Build your own</span></a>
-      ${choices.map(s => `<div class="tile pickable" role="button" tabindex="0" aria-pressed="false" data-theme-pick="${s.theme}">
+      <h1 class="lib-title">${wizard ? 'Pick your worlds' : 'The Library'}</h1>
+      <p class="lib-sub">${wizard ? 'Movies &amp; shows. Tap the doors you want. You can add more anytime.' : 'Pick a door to add, or build your own.'}</p></header>
+    <div class="shelf">${wizard ? '' : '<a class="tile add-tile" href="#/new"><span class="plus" aria-hidden="true">+</span><span class="tile-name">Build your own</span></a>'}
+      ${choices.map(s => `<div class="tile pickable${picked.has(s.theme) ? ' picked' : ''}" role="button" tabindex="0" aria-pressed="${picked.has(s.theme)}" data-theme-pick="${s.theme}">
         <span class="tile-art" aria-hidden="true"></span><span class="pick-check" aria-hidden="true">✓</span>
         <span class="tile-name">${esc(s.name)}</span></div>`).join('')}</div>
-    ${choices.length || firstTime ? `<div class="pick-bar">${choices.length ? '<button class="btn primary block" id="go" disabled>Pick a door</button>' : ''}
-      ${firstTime ? '<button class="linkish skip-link" id="skipw">No worlds for now</button>' : ''}</div>` : ''}
+    ${wizard ? '<div class="pick-bar"><button class="btn primary block" id="next">Next: pick your books ›</button></div>'
+      : choices.length ? '<div class="pick-bar"><button class="btn primary block" id="go" disabled>Pick a door</button></div>' : ''}
   </div>`;
 
   $$('[data-theme-pick]').forEach(el => {
@@ -84,49 +123,76 @@ function renderLibraryPick() {
       el.classList.toggle('picked', picked.has(theme));
       el.setAttribute('aria-pressed', picked.has(theme));
       const go = $('#go');
+      if (!go) return;
       go.disabled = !picked.size;
-      go.textContent = !picked.size ? 'Pick a door' : firstTime ? `Step inside (${picked.size})` : `Add ${picked.size === 1 ? 'this door' : `${picked.size} doors`}`;
+      go.textContent = !picked.size ? 'Pick a door' : `Add ${picked.size === 1 ? 'this door' : `${picked.size} doors`}`;
     };
     el.onclick = toggle;
     el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } };
   });
 
+  // Sign-up: on to the books (if the library has any to pick), else the last step.
+  const next = $('#next');
+  if (next) next.onclick = () => busy(next, async () => { location.hash = (await afterWorldsPick()) || '#/start'; }, '…');
+
   const go = $('#go');
   if (go) {
     go.onclick = () => busy(go, async () => {
-      let order = Math.max(-1, ...state.worlds.map(w => w.order ?? 0)) + 1;
-      for (const s of Themes.STARTERS.filter(x => picked.has(x.theme))) {
-        const data = neutralWorld(s, order++);
-        const wall = walls[s.theme];
-        if (wall && wall.ink) data.cardInk = wall.ink;
-        if (wall && wall.pos) data.cardPos = wall.pos;
-        if (wall && wall.shade === false) data.cardShade = false;
-        const id = await DB.addWorld(data);
-        // Their own copy of your card photo, so it never depends on your account.
-        if (wall && wall.photo && DB.copyPhoto) {
-          try {
-            const photo = await DB.copyPhoto('worlds', id, wall.photo);
-            await DB.updateWorld({ id }, { cardPhoto: photo });
-          } catch (e) { console.warn('Card photo not copied', e); }
-        }
-      }
-      if (!state.settings.seeded) {
-        await DB.saveSettings({ seeded: true });
-        state.settings.seeded = true;
-      }
+      await addLibraryWorlds(picked);
       toast(picked.size === 1 ? 'Door added' : `${picked.size} doors added`);
-      // First time: on to picking books (books.js), if there are any to pick.
-      location.hash = (firstTime && await afterWorldsPick()) || '#/';
+      location.hash = '#/';
     }, 'Opening doors…');
   }
-  // Books only: no worlds is fine.
-  const skipw = $('#skipw');
-  if (skipw) {
-    skipw.onclick = () => busy(skipw, async () => {
-      if (!state.settings.seeded) { await DB.saveSettings({ seeded: true }); state.settings.seeded = true; }
-      location.hash = (await afterWorldsPick()) || '#/books';
-    }, '…');
-  }
+}
+
+// Step 3: everything picked goes on the shelves, then in through the chosen side.
+function renderStart() {
+  if (!isOnboarding()) { location.replace('#/'); return; }
+  const o = onboardPicks();
+  view.innerHTML = `<div class="library start-page">
+    ${stepDots(3)}
+    <header class="w-head"><a class="back" href="${o.hadBooks ? '#/books/pick' : '#/library'}">‹ Back</a></header>
+    <header class="lib-head"><h1 class="lib-title">Step inside your worlds</h1>
+      <p class="lib-sub">Where to first? You can flip between them anytime from the icon at the top.</p></header>
+    <div class="start-doors">
+      <button class="start-door" data-side="worlds"><span class="lib-crest">${CREST}</span><span class="start-name">My Worlds</span><span class="start-sub">Movies &amp; shows</span></button>
+      <button class="start-door" data-side="books"><span class="lib-crest">${BOOK_CREST}</span><span class="start-name">My Books</span><span class="start-sub">Reading</span></button>
+    </div>
+    <p class="muted small center start-note" id="startnote"></p>
+  </div>`;
+  $$('.start-door').forEach(btn => {
+    btn.onclick = async () => {
+      if (view.dataset.starting) return;
+      view.dataset.starting = '1';
+      $$('.start-door').forEach(b => { b.disabled = true; });
+      const note = $('#startnote');
+      try {
+        note.textContent = o.worlds.size ? 'Opening your doors…' : 'Getting things ready…';
+        const ids = await addLibraryWorlds(o.worlds);
+        if (o.books.size) {
+          const lib = await bookLibrary();
+          const choices = libChoices(lib);
+          let n = 0;
+          for (const [id, shelf] of o.books) {
+            const e = choices.find(x => x.id === id);
+            note.textContent = `Shelving ${++n} of ${o.books.size}…`;
+            if (e) await addFromLibrary(e, shelf, ids);
+          }
+        }
+        await DB.saveSettings({ seeded: true, booksPicked: true });
+        Object.assign(state.settings, { seeded: true, booksPicked: true });
+        onboard = null;
+        rememberSide(btn.dataset.side);
+        location.hash = btn.dataset.side === 'books' ? '#/books' : '#/';
+      } catch (e) {
+        console.error(e);
+        note.textContent = e.message || 'Something went wrong. Try again.';
+        $$('.start-door').forEach(b => { b.disabled = false; });
+      } finally {
+        delete view.dataset.starting;
+      }
+    };
+  });
 }
 
 // ---------- deleting an account ----------
