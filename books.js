@@ -574,7 +574,11 @@ function drawAbout(book, body) {
       title: audio ? 'Where am I?' : 'What page am I on?',
       values: audio ? { chapter: book.chapter || '' } : { page: book.page || '' },
       fields: [audio ? { key: 'chapter', label: 'Chapter' } : { key: 'page', label: `Page${book.pages ? ` (of ${book.pages})` : ''}`, type: 'number' }],
-      onSave: v => DB.updateBook(book, audio ? { chapter: v.chapter } : { page: Number(v.page) || 0 }),
+      onSave: async v => {
+        const { patch, moved } = startedPatch(book, audio ? { chapter: v.chapter } : { page: Number(v.page) || 0 });
+        await DB.updateBook(book, patch);
+        if (moved) toast('Moved to Currently reading');
+      },
     });
   }
   // Dates and format save as soon as they change. Finishing moves it to Read;
@@ -614,6 +618,13 @@ function drawAbout(book, body) {
   }
 }
 
+// Starting to read (a first note, or your page) takes a Want to read book to
+// Currently reading, with today as its start date if it has none.
+function startedPatch(book, patch) {
+  if (shelfOf(book) !== 'want' || !hasShelf('reading')) return { patch, moved: false };
+  return { patch: { ...patch, ...shelfMovePatch(book, 'reading') }, moved: true };
+}
+
 // ----- Notes: thoughts while reading, each with the date and page -----
 const notePos = n => (n.page ? Number(n.page) : n.chapter ? parseFloat(n.chapter) || 0 : 0);
 function bookNoteForm(book, n) {
@@ -637,8 +648,9 @@ function bookNoteForm(book, n) {
       else await addItemFor(book, { world: book.id, kind: 'bnote', read: ri, ...data });
       // Your place in the book follows your newest note.
       if (!n && ri === curReadIdx(book)) {
-        if (data.page) await DB.updateBook(book, { page: data.page });
-        else if (data.chapter) await DB.updateBook(book, { chapter: data.chapter });
+        const { patch, moved } = startedPatch(book, data.page ? { page: data.page } : data.chapter ? { chapter: data.chapter } : {});
+        if (Object.keys(patch).length) await DB.updateBook(book, patch);
+        if (moved) toast('Moved to Currently reading');
       }
     },
     onDelete: n && (() => confirmBox('Delete this note?', '', 'Delete', () => deleteItemFor(n))),
