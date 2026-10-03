@@ -35,6 +35,7 @@ const BOOK_SHARE = [['notes', 'Notes'], ['quotes', 'Quotes'], ['board', 'Board']
 // Which tabs a book shows: Reviews unless turned off; Map, Canon and Fics only when turned on.
 const bookTabs = b => BOOK_TABS.filter(([k]) => (k !== 'reviews' || b.reviewsOn !== false) && (k !== 'map' || b.mapOn)
   && (k !== 'canon' || b.canonOn) && (k !== 'fics' || b.ficsOn === true));
+const RIBBON_COLORS = [['#b3261e', 'Red'], ['#c9a35a', 'Gold'], ['#1f3a5b', 'Navy'], ['#2f6b45', 'Green'], ['#7b4fa0', 'Plum'], ['#d98aa6', 'Rose'], ['#1c1814', 'Black']];
 const SPINE_COLORS = [['#5b1f1f', 'Oxblood'], ['#1f3a5b', 'Navy'], ['#24452f', 'Forest'], ['#4a3222', 'Leather'], ['#c9a35a', 'Gold'], ['#ece2cb', 'Cream'], ['#1c1814', 'Black']];
 
 const GEAR = '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.8v2.4M12 18.8v2.4M21.2 12h-2.4M5.2 12H2.8M18.5 5.5l-1.7 1.7M7.2 16.8l-1.7 1.7M18.5 18.5l-1.7-1.7M7.2 7.2 5.5 5.5"/></svg>';
@@ -151,12 +152,30 @@ function ribbonFor(b) {
   return Math.round((progressOf(b) || 0) * 100); // how much of the ribbon is filled in
 }
 
-function spineHtml(b) {
+// The ribbon's color: the one picked in the book's settings, or the book's
+// accent. If that would disappear against the spine, gold (or the spine's
+// title color) instead.
+function lum(hex) {
+  const h = (hex || '').replace('#', '');
+  if (!/^[0-9a-f]{3}([0-9a-f]{3})?$/i.test(h)) return 0.2;
+  const n = parseInt(h.length === 3 ? h.replace(/./g, c => c + c) : h, 16);
+  return [(n >> 16) & 255, (n >> 8) & 255, n & 255].map(v => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; })
+    .reduce((a, v, i) => a + v * [0.2126, 0.7152, 0.0722][i], 0);
+}
+const contrast = (a, b) => { const [x, y] = [lum(a), lum(b)].sort((p, q) => q - p); return (x + 0.05) / (y + 0.05); };
+function ribbonColorOf(b, s) {
+  if (b.ribbonColor) return b.ribbonColor;
+  const accent = b.theme === 'custom' || !b.theme ? lookOf(b).accent : ((Themes.palette(b)[0] || [])[1] || '#b3261e');
+  return [accent, '#c9a35a', s.ink, '#b3261e'].find(c => contrast(c, s.bg) >= 1.8) || accent;
+}
+
+// opts.ribbon: show a ribbon this full (%) no matter what (the preview in book settings).
+function spineHtml(b, opts = {}) {
   const s = spineStyle(b);
   Themes.loadFont(s.font);
-  const ribbon = ribbonFor(b);
+  const ribbon = opts.ribbon != null ? opts.ribbon : ribbonFor(b);
   const fit = spineFit(b, s);
-  return `<div class="slot${fit.lines > 1 ? ' two-line' : ''}" style="--w:${s.w}px;--h:${s.h}px;--fs:${fit.fs.toFixed(1)}px;--sb:${cssColor(s.bg)};--si:${cssColor(s.ink)};--sf:'${esc(s.font.replace(/'/g, ''))}'${ribbon != null ? `;--rp:${ribbon}%` : ''}">
+  return `<div class="slot${fit.lines > 1 ? ' two-line' : ''}" style="--w:${s.w}px;--h:${s.h}px;--fs:${fit.fs.toFixed(1)}px;--sb:${cssColor(s.bg)};--si:${cssColor(s.ink)};--sf:'${esc(s.font.replace(/'/g, ''))}'${ribbon != null ? `;--rp:${ribbon}%;--rc:${cssColor(ribbonColorOf(b, s))}` : ''}">
     ${ribbon != null ? '<span class="ribbon" aria-hidden="true"></span>' : ''}
     <button class="spine" data-book="${esc(b.id)}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}">
       ${b.series && b.seriesNo ? `<span class="spine-no">${esc(b.seriesNo)}</span>` : ''}<span class="spine-title">${esc(b.title)}</span></button></div>`;
@@ -1061,7 +1080,7 @@ function renderBookForm(book) {
   let lookPrepared = null, lookDrop = false, lookTouched = !isNew;
   // The cover: keep it, a photo you chose, one the search found, or none.
   let coverMode = 'keep', coverPrepared = null, found = { url: b.coverUrl || '', thumb: b.coverThumb || '' };
-  let sInk = b.spineInk || '', sBg = b.spineBg || '';
+  let sInk = b.spineInk || '', sBg = b.spineBg || '', rCol = b.ribbonColor || '';
   const parts = { ending: true, ships: true, headcanons: true, ...(b.canonParts || {}) };
   const worldKeys = Object.keys(Themes.BUILT_IN);
   const swatchRow = (id, list, cur) => `<div class="swatches ink-swatches" id="${id}">
@@ -1119,6 +1138,7 @@ function renderBookForm(book) {
           <label class="field"><span class="field-label">Title font</span><select id="sfont"><option value="">Same as the look</option>${Themes.FONTS.map(f => `<option ${f === b.spineFont ? 'selected' : ''}>${esc(f)}</option>`).join('')}</select></label>
           <div class="field"><span class="field-label">Title color</span>${swatchRow('sinks', CARD_INKS, sInk)}</div>
           <div class="field"><span class="field-label">Spine color</span>${swatchRow('sbgs', SPINE_COLORS, sBg)}</div>
+          <div class="field"><span class="field-label">Bookmark ribbon</span>${swatchRow('rcols', RIBBON_COLORS, rCol)}</div>
         </div></div>
       <label class="switch" id="serieswrap" hidden><input type="checkbox" id="allseries"><span class="track"></span><span id="serieslabel"></span></label>
 
@@ -1155,7 +1175,7 @@ function renderBookForm(book) {
   const current = () => ({
     id: b.id || 'new', title: $('#title').value.trim() || 'Your book', author: $('#author').value.trim(),
     pages: Number($('#pages').value) || 0, theme, look: theme === 'custom' ? readLook() : null,
-    spineFont: $('#sfont').value, spineInk: sInk, spineBg: sBg, shelf: $('#shelf').value,
+    spineFont: $('#sfont').value, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, shelf: $('#shelf').value,
     series: $('#series').value.trim(), seriesNo: $('#seriesNo').value.trim(),
   });
   const coverSrcNow = () => (coverMode === 'upload' ? URL.createObjectURL(coverPrepared.thumb.blob)
@@ -1173,7 +1193,7 @@ function renderBookForm(book) {
     $('#wlooknote').textContent = theme === 'custom' ? '' : `Using the ${Themes.BUILT_IN[theme].label} look. Pick a book look to choose your own colors.`;
     $$('.wlook').forEach(el => el.classList.toggle('on', el.dataset.wtheme === theme));
     // spine + cover
-    $('#sdemo').innerHTML = `<div class="case-row demo-row">${spineHtml(c)}</div>`;
+    $('#sdemo').innerHTML = `<div class="case-row demo-row">${spineHtml(c, { ribbon: 50 })}</div>`;
     fitSpines($('#sdemo'));
     const src = coverSrcNow();
     $('#cprev').innerHTML = src ? `<img src="${esc(src)}" alt="">` : `<span class="gen-cover" id="gc"><span class="gc-title">${esc(c.title)}</span>${c.author ? `<span class="gc-author">${esc(c.author)}</span>` : ''}</span>`;
@@ -1219,7 +1239,8 @@ function renderBookForm(book) {
       theme = mate.theme || 'custom';
       if (theme === 'custom') { const l = lookOf(mate); ['bg', 'card', 'ink', 'accent'].forEach(k => { $(`#c-${k}`).value = l[k]; }); $('#font').value = l.font; }
       $('#sfont').value = mate.spineFont || '';
-      sInk = mate.spineInk || ''; sBg = mate.spineBg || '';
+      sInk = mate.spineInk || ''; sBg = mate.spineBg || ''; rCol = mate.ribbonColor || '';
+      $$('#rcols .swatch').forEach(s => s.classList.toggle('on', (s.dataset.c ?? null) === rCol));
       $$('#sinks .swatch').forEach(s => s.classList.toggle('on', (s.dataset.c ?? null) === sInk));
       $$('#sbgs .swatch').forEach(s => s.classList.toggle('on', (s.dataset.c ?? null) === sBg));
       if (!$('#world').value && mate.worldId) $('#world').value = mate.worldId;
@@ -1233,6 +1254,7 @@ function renderBookForm(book) {
   };
   swatches('sinks', v => { sInk = v; });
   swatches('sbgs', v => { sBg = v; });
+  swatches('rcols', v => { rCol = v; });
   $('#bgfile').onchange = async e => {
     const f = e.target.files[0];
     if (!f) return;
@@ -1297,7 +1319,7 @@ function renderBookForm(book) {
         totalChapters: Number($('#chapters').value) || null,
         blurb: $('#blurb').value.trim(), shelf: c.shelf, theme,
         look: theme === 'custom' ? { ...readLook(), photo: lookDrop ? null : (look.photo || null) } : (b.look || null),
-        spineFont: c.spineFont, spineInk: sInk, spineBg: sBg, worldId: $('#world').value || null,
+        spineFont: c.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, worldId: $('#world').value || null,
         mapOn: $('#mapon').checked, canonOn: $('#canon').checked, canonParts: canonPicked,
         reviewsOn: $('#reviewson').checked, ficsOn: $('#ficson').checked,
       };
@@ -1325,7 +1347,7 @@ function renderBookForm(book) {
         const key = c.series.toLowerCase();
         const look2 = data.look ? { ...data.look, photo: null } : null;
         await Promise.all(state.books.filter(x => x.id !== b.id && seriesKey(x) === key)
-          .map(x => DB.updateBook(x, { theme, look: look2, spineFont: data.spineFont, spineInk: sInk, spineBg: sBg })));
+          .map(x => DB.updateBook(x, { theme, look: look2, spineFont: data.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol })));
       }
       toast('Saved');
       location.hash = `#/b/${b.id}`;
@@ -1429,7 +1451,7 @@ async function startBuddyRead(book, me, email, secs) {
     book: {
       title: book.title, author: book.author || '', series: book.series || '', seriesNo: book.seriesNo || '', pages: book.pages || null,
       coverUrl: book.coverUrl || '', coverThumb: book.coverThumb || '', cover: book.cover || null, blurb: book.blurb || '',
-      theme: book.theme || 'custom', look: book.look || null, spineFont: book.spineFont || '', spineInk: book.spineInk || '', spineBg: book.spineBg || '',
+      theme: book.theme || 'custom', look: book.look || null, spineFont: book.spineFont || '', spineInk: book.spineInk || '', spineBg: book.spineBg || '', ribbonColor: book.ribbonColor || '',
     },
   });
   await moveIntoShared(book, sid, secs, me);
@@ -1467,7 +1489,7 @@ async function joinBuddyRead(d, me, shelf) {
     title: B.title || d.name, author: B.author || '', series: B.series || '', seriesNo: B.seriesNo || '', pages: B.pages || null,
     coverUrl: B.coverUrl || '', coverThumb: B.coverThumb || '', blurb: B.blurb || '',
     theme: B.theme || 'custom', look: B.look ? { ...B.look, photo: null } : null,
-    spineFont: B.spineFont || '', spineInk: B.spineInk || '', spineBg: B.spineBg || '',
+    spineFont: B.spineFont || '', spineInk: B.spineInk || '', spineBg: B.spineBg || '', ribbonColor: B.ribbonColor || '',
     shelf, order: Math.max(-1, ...onShelf.map(x => x.order ?? 0)) + 1, rating: 0, page: 0, chapter: '', review: '', reviewSafe: '', ending: '',
     reads: [{ start: shelf === 'reading' ? today() : '', end: '', physical: true, audio: false }],
     sharedId: d.id, mapOn: !!sec.map, canonOn: !!sec.canon, ficsOn: !!sec.fics,
@@ -1544,7 +1566,7 @@ function publishBookLibrary() {
     id: b.id, title: b.title || '', author: b.author || '', series: b.series || '', seriesNo: b.seriesNo || '', pages: b.pages || null,
     coverUrl: b.coverUrl || '', coverThumb: b.coverThumb || '', cover: photoLink(b.cover), blurb: b.blurb || '',
     theme: b.theme || 'custom', look: b.look ? { ...b.look, photo: photoLink(b.look.photo) } : null,
-    spineFont: b.spineFont || '', spineInk: b.spineInk || '', spineBg: b.spineBg || '',
+    spineFont: b.spineFont || '', spineInk: b.spineInk || '', spineBg: b.spineBg || '', ribbonColor: b.ribbonColor || '',
     map: photoLink(b.map), mapOn: !!b.mapOn || !!b.map, canonOn: !!b.canonOn,
     canonParts: b.canonParts || { ending: true, ships: true, headcanons: true }, reviewsOn: b.reviewsOn !== false, ficsOn: b.ficsOn === true,
   })).sort((a, b) => titleKey(a.title).localeCompare(titleKey(b.title)));
@@ -1578,7 +1600,7 @@ async function addFromLibrary(e, shelf) {
     title: e.title, author: e.author, series: e.series, seriesNo: e.seriesNo, pages: e.pages || null,
     coverUrl: e.coverUrl || '', coverThumb: e.coverThumb || '', blurb: e.blurb || '',
     theme: e.theme || 'custom', look: e.look ? { ...e.look, photo: null } : null,
-    spineFont: e.spineFont || '', spineInk: e.spineInk || '', spineBg: e.spineBg || '',
+    spineFont: e.spineFont || '', spineInk: e.spineInk || '', spineBg: e.spineBg || '', ribbonColor: e.ribbonColor || '',
     // Canon and Fics always start off (there's nothing in them yet); they can turn them on in the book's settings.
     mapOn: !!e.mapOn, canonOn: false, canonParts: e.canonParts || { ending: true, ships: true, headcanons: true },
     reviewsOn: e.reviewsOn !== false, ficsOn: false, worldId: null, fromLib: e.id,

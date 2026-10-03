@@ -66,9 +66,13 @@
 .ribbon {
   position: absolute; z-index: 1; pointer-events: none; left: calc(50% + var(--w) / 2 - 14px);
   bottom: calc(var(--plank) + var(--h) - 48px); width: 9px; height: 52px;
-  background:
-    linear-gradient(to bottom, transparent var(--rp, 0%), #f2dcd8 var(--rp, 0%)),
-    linear-gradient(90deg, #8f1d1d, #c8312b 45%, #9c2020);
+  /* Read part: the ribbon color (--rc), shaded like satin. Unread part: the same
+     color, see-through, so it reads as "not yet" on light and dark spines alike. */
+  background: linear-gradient(to bottom,
+      transparent var(--rp, 0%), rgba(255,255,255,.08) var(--rp, 0%)),
+    linear-gradient(90deg, color-mix(in srgb, var(--rc, #b3261e) 75%, #000), var(--rc, #b3261e) 45%, color-mix(in srgb, var(--rc, #b3261e) 82%, #000));
+  -webkit-mask: linear-gradient(to bottom, #000 var(--rp, 0%), rgba(0,0,0,.32) var(--rp, 0%));
+  mask: linear-gradient(to bottom, #000 var(--rp, 0%), rgba(0,0,0,.32) var(--rp, 0%));
   clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 7px), 0 100%);
   filter: drop-shadow(0 1px 1px rgba(0,0,0,.4));
 }
