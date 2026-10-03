@@ -276,6 +276,20 @@ async function assignOrnaments() {
   }
 }
 
+// After drawing: a plate only stays within its own books when the next series really
+// sits beside it on the same row; a name that still doesn't fit gets smaller lettering.
+function fitPlates(root = document) {
+  $$('.ser-grp.before-set', root).forEach(g => {
+    const next = g.nextElementSibling;
+    if (!next || Math.abs(next.offsetTop + next.offsetHeight - (g.offsetTop + g.offsetHeight)) > 4) g.classList.remove('before-set');
+  });
+  $$('.ser-plate', root).forEach(p => {
+    p.style.fontSize = ''; p.style.letterSpacing = '';
+    let fs = 8;
+    while (p.scrollWidth > p.clientWidth + 1 && fs > 6) { fs -= 0.5; p.style.fontSize = `${fs}px`; p.style.letterSpacing = '.03em'; }
+  });
+}
+
 // opts.ribbon: show a ribbon this full (%) no matter what (the preview in book settings).
 function spineHtml(b, opts = {}) {
   const s = spineStyle(b);
@@ -310,7 +324,10 @@ function shelfRowHtml(list) {
     while (key && j < list.length && seriesKey(list[j]) === key) j++;
     const h = nudge(spineStyle(list[i]).h);
     if (j - i >= 2) {
-      html += `<div class="ser-grp">${list.slice(i, j).map(b => spineHtml(b, { h })).join('')}
+      // Another series right after this one: this plate stays within its own books.
+      const k = list[j] && seriesKey(list[j]);
+      const nextIsSet = !!(k && list.slice(j, j + 2).length === 2 && seriesKey(list[j + 1]) === k);
+      html += `<div class="ser-grp${nextIsSet ? ' before-set' : ''}">${list.slice(i, j).map(b => spineHtml(b, { h })).join('')}
         <a class="ser-plate" href="${seriesHref(list[i].series)}" title="${esc(list[i].series)}">${esc(list[i].series)}</a></div>`;
     } else html += spineHtml(list[i], { h });
     prevH = h;
@@ -401,6 +418,7 @@ function renderBooks() {
     $('#out', root).onclick = () => { close(); confirmBox('Sign out?', 'Your books stay saved in your account.', 'Sign out', () => DB.signOut()); };
   }, 'small-modal');
   fitSpines(view);
+  fitPlates(view);
   enableSpineDrag($('#case'));
 }
 
