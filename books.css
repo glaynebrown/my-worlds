@@ -58,6 +58,22 @@
 }
 .two-line .spine-title { white-space: normal; text-align: center; max-width: calc(var(--w) - 6px); max-inline-size: calc(var(--h) - 46px); line-height: 1.1; }
 .spine-no { position: absolute; top: 22px; font: 700 9px/1 system-ui, sans-serif; opacity: .8; }
+/* Spine designs (books.js ORNAMENTS): lines and bands in CSS, pictures as masks in the title color. */
+.spine[data-orn="band"]::before, .spine[data-orn="band"]::after { height: 4px; box-shadow: none; }
+.spine[data-orn="band"]::before { top: 12px; } .spine[data-orn="band"]::after { bottom: 12px; }
+.spine[data-orn="triple"]::before { top: 9px; height: 1.2px; box-shadow: 0 3.5px 0 currentColor, 0 7px 0 currentColor; }
+.spine[data-orn="triple"]::after { bottom: 9px; height: 1.2px; box-shadow: 0 -3.5px 0 currentColor, 0 -7px 0 currentColor; }
+.spine.pic::before, .spine.pic::after { display: none; }
+.orn {
+  position: absolute; left: 50%; width: min(calc(var(--w) - 6px), 26px); height: 20px; transform: translateX(-50%);
+  background: currentColor; opacity: .85;
+  -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center;
+}
+.orn.top { top: 6px; }
+.orn.bot { bottom: 6px; transform: translateX(-50%) scaleY(-1); }
+.spine.pic .spine-no { top: 30px; }
+.spine.pic .spine-title { max-height: calc(var(--h) - 66px); }
+.spine.pic .spine-no + .spine-title { margin-top: 16px; max-height: calc(var(--h) - 82px); }
 .spine-no + .spine-title { margin-top: 12px; max-height: calc(var(--h) - 62px); }
 @media (hover: hover) { .spine[data-book]:hover { transform: translateY(-5px); } }
 .spine[data-book]:active { transform: translateY(-8px); }
@@ -132,6 +148,9 @@
 .mini-case .spine::before { top: 6px; box-shadow: none; }
 .mini-case .spine::after { bottom: 6px; box-shadow: none; }
 .mini-case .spine-no, .mini-case .ribbon { display: none; }
+.mini-case .orn { height: 8px; }
+.mini-case .orn.top { top: 3px; } .mini-case .orn.bot { bottom: 3px; }
+.mini-case .spine.pic .spine-title { max-height: calc(var(--h) * .6 - 26px); }
 .mini-case .spine-no + .spine-title { margin-top: 0; }
 
 /* ---------- inside a book ---------- */
@@ -324,3 +343,12 @@
 .lib-detail h2 { font-size: 1.4rem; line-height: 1.15; }
 .lib-detail p { margin: 4px 0 0; }
 .lib-blurb { margin-top: 12px; line-height: 1.5; font-size: .95rem; display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; }
+
+/* Spine design picker (book settings) */
+.orn-head { display: flex; align-items: center; justify-content: space-between; }
+.orn-head .btn { min-height: 30px; padding: 4px 10px; font-size: .8rem; text-transform: none; letter-spacing: 0; }
+.orn-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(58px, 1fr)); gap: 10px 6px; margin-top: 6px; }
+.orn-pick { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 6px 2px; border: 0; border-radius: 10px; background: transparent; color: var(--ink); }
+.orn-pick.on { background: color-mix(in srgb, var(--accent) 16%, transparent); box-shadow: inset 0 0 0 2px var(--accent); }
+.orn-demo { cursor: inherit; transition: none; }
+.orn-name { font-size: .68rem; line-height: 1.1; color: var(--muted); }

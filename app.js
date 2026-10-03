@@ -321,6 +321,7 @@ async function openAccount(user) {
         state.loaded = true;
         firstRun();
         route();
+        setTimeout(assignOrnaments, 2500); // books.js: save a spine design on older books
         setTimeout(offerJoins, 1500);
       }
       publishWallpapers();

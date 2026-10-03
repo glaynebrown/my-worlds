@@ -106,7 +106,7 @@ const cssColor = c => (/^#[0-9a-f]{3,8}$/i.test(c || '') ? c : '#4a3222');
 // The title's size: as big as the spine allows, smaller for long titles, and
 // on a thick book a long title wraps onto a second line instead.
 function spineFit(b, s) {
-  const room = s.h - (b.series && b.seriesNo ? 62 : 46);
+  const room = s.h - (b.series && b.seriesNo ? 62 : 46) - (ornPicture(ornOf(b)) ? 20 : 0);
   const n = Math.max(4, (b.title || '').length);
   const one = Math.min(s.w * 0.44, 18, room / (n * 0.56));
   if (one >= 10.5 || s.w < 30) return { fs: Math.max(8.5, one), lines: 1 };
@@ -169,15 +169,96 @@ function ribbonColorOf(b, s) {
   return [accent, '#c9a35a', s.ink, '#b3261e'].find(c => contrast(c, s.bg) >= 1.8) || accent;
 }
 
+// ---------- spine designs (an ornament at the top and bottom of each spine) ----------
+// Lines and bands are drawn with CSS; the pictures are little 24x24 shapes used
+// as masks, so they take the spine's title color. The bottom one is flipped.
+const ORN_STROKE = (d, w = 1.8) => `<path d='${d}' stroke='black' stroke-width='${w}' fill='none' stroke-linecap='round' stroke-linejoin='round'/>`;
+const ORNAMENTS = [
+  ['lines', 'Two lines'], ['band', 'Thick line'], ['triple', 'Three lines'],
+  ['dots', 'Dots', "<circle cx='5' cy='12' r='2.2'/><circle cx='12' cy='12' r='2.2'/><circle cx='19' cy='12' r='2.2'/>"],
+  ['diamond', 'Diamond', "<path d='M12 4l6 8-6 8-6-8z'/><path d='M0 11.1h4.5v1.8H0zM19.5 11.1H24v1.8h-4.5z'/>"],
+  ['circles', 'Circles', "<circle cx='12' cy='4.5' r='3.4'/><circle cx='12' cy='12' r='2.6'/><circle cx='12' cy='18.4' r='1.9'/>"],
+  ['moon', 'Moon', "<path d='M14.5 2.5a9.5 9.5 0 1 0 7 15.8A8 8 0 0 1 14.5 2.5z'/>"],
+  ['sun', 'Sun', "<circle cx='12' cy='12' r='4.6'/>" + ORN_STROKE('M12 1.5v3.2M12 19.3v3.2M1.5 12h3.2M19.3 12h3.2M4.6 4.6l2.2 2.2M17.2 17.2l2.2 2.2M4.6 19.4l2.2-2.2M17.2 6.8l2.2-2.2', 2.2)],
+  ['star', 'Star', "<path d='M12 1.5l3 6.9 7.5.7-5.7 5 1.7 7.4L12 17.6l-6.5 3.9 1.7-7.4-5.7-5 7.5-.7z'/>"],
+  ['snowflake', 'Snowflake', ORN_STROKE('M12 1.5v21M2.9 6.8l18.2 10.4M2.9 17.2l18.2-10.4M9.2 2.9L12 5.6l2.8-2.7M9.2 21.1l2.8-2.7 2.8 2.7M3.4 10.4l3.8-1-1-3.8M20.6 13.6l-3.8 1 1 3.8M3.4 13.6l3.8 1-1 3.8M20.6 10.4l-3.8-1 1-3.8', 1.7)],
+  ['crown', 'Crown', "<path d='M2 6.5l5 5L12 3.5l5 8 5-5-2 11H4z'/><path d='M4 19h16v2.6H4z'/>"],
+  ['wings', 'Wings', "<path d='M11.4 16C9.2 10.4 6 7.2.5 6.4c1.3 3.6 3.4 5.8 6.4 7.3-2.6.1-4.1 1.4-4.6 3 3.6 1.1 6.6.7 9.1-.7zM12.6 16c2.2-5.6 5.4-8.8 10.9-9.6-1.3 3.6-3.4 5.8-6.4 7.3 2.6.1 4.1 1.4 4.6 3-3.6 1.1-6.6.7-9.1-.7z'/>"],
+  // Traced from the dragon silhouette picture we were given (wings spread, long tail).
+  ['dragon', 'Dragon', "<path d='M12.12 0.38L11.94 0.49L11.88 0.84L11.48 1.30L11.54 1.70L11.37 1.93L11.25 2.62L11.13 2.74L11.37 2.45L11.65 2.51L11.71 3.49L11.54 4.24L11.37 4.59L11.08 4.82L10.73 4.82L10.21 5.11L9.58 5.11L8.83 4.82L7.50 3.89L6.58 3.55L5.94 3.49L6.23 3.61L6.17 3.89L4.56 3.89L2.65 4.30L0.98 5.05L0.00 5.86L0.35 5.68L1.15 5.68L1.33 5.86L1.56 6.32L1.56 6.89L0.75 8.16L1.27 7.76L1.73 7.76L2.54 8.39L3.46 9.89L3.58 10.30L3.52 11.28L3.69 10.82L4.10 10.36L4.33 10.30L4.90 9.84L6.40 9.26L7.15 9.26L7.85 9.43L8.60 9.78L9.29 10.41L9.06 9.89L8.94 8.91L9.17 8.28L9.75 7.70L10.21 7.53L10.85 7.59L11.25 7.82L11.37 8.05L11.25 8.62L11.37 10.76L11.88 11.11L12.00 13.07L11.88 14.74L12.00 16.01L12.29 17.11L12.81 18.32L12.69 21.26L12.35 22.93L12.75 21.26L12.92 19.30L13.21 19.24L13.44 19.93L13.73 21.61L13.90 23.57L13.67 20.34L13.33 18.84L12.69 17.16L12.40 15.89L12.40 14.16L12.75 11.91L12.75 11.05L13.10 11.05L13.10 10.24L13.21 9.95L13.21 8.62L13.04 8.34L13.04 8.05L13.44 7.59L14.13 7.53L14.60 7.76L14.94 8.11L15.23 8.74L15.29 9.89L15.06 10.41L15.75 9.84L17.02 9.38L18.40 9.38L19.96 10.18L20.65 10.82L20.77 11.05L20.65 10.07L21.75 8.45L22.56 7.82L23.08 7.82L23.42 8.11L22.73 6.89L22.73 6.43L23.19 5.68L23.94 5.68L23.02 4.93L21.06 4.18L20.13 3.95L18.23 3.89L18.17 3.61L18.46 3.55L17.94 3.49L16.79 3.89L15.12 5.05L14.31 5.16L13.50 4.82L13.27 4.82L13.04 4.70L12.75 4.30L12.58 3.43L12.63 2.51L12.92 2.45L13.21 2.80L12.98 2.05L12.75 1.70L12.81 1.36L12.46 0.89L12.35 0.49Z'/>"],
+  // The rose from Bloom Together (bloom with its petal lines, stem and leaves), in a 120x130 box.
+  ['rose', 'Rose', "<defs><mask id='rh' maskUnits='userSpaceOnUse' x='-20' y='-20' width='160' height='120'><rect x='-20' y='-20' width='160' height='120' fill='white'/><path d='M40 12 C47 7 58 7 66 10 C75 8 83 13 84 21 M40 12 C35 19 34 28 38 36 M50 17 C56 12 66 13 68 20 C70 27 62 31 56 28 C51 26 52 20 57 19 C61 18 63 22 61 24 M38 36 C44 46 56 50 70 48 C79 46 85 42 88 36 M44 44 C52 37 64 33 80 33 M54 51 C63 46 74 44 88 44 M21 30 C28 30 32 34 34 40 M99 31 C93 30 89 32 86 36 M27 16 C31 20 34 24 35 28 M92 20 C88 22 86 25 85 28' fill='none' stroke='black' stroke-width='3.4' stroke-linecap='round'/></mask></defs><path d='M60 60 C61 80 58 100 59 128' stroke='black' stroke-width='6' fill='none' stroke-linecap='round'/><path d='M59 110 C54 104 48 99 42 96 M59 116 C65 108 71 102 78 98' stroke='black' stroke-width='3.5' fill='none' stroke-linecap='round'/><path d='M43 96 C30 97 18 88 12 70 C17 72 22 71 26 73 C33 76 40 83 43 96Z M77 98 C90 99 102 90 108 72 C103 74 98 73 94 75 C87 78 80 85 77 98Z M60 75 L65 71 L61 79Z M59 101 L54 98 L58 106Z'/><path transform='translate(60 60)' d='M-2 0 C6 -3 16 -2 24 4 C16 5 8 4 0 3Z M2 0 C-6 -3 -16 -2 -20 3 C-13 4 -6 3 0 3Z'/><g transform='translate(60 61.4) scale(1) translate(-60 -61.4) translate(60 30) scale(0.95 1.12) translate(-60 -30)'><path d='M60 5 C52 1 44 3 40 8 C34 6 28 10 27 16 C20 18 16 24 19 30 C13 34 14 42 20 47 C27 53 37 55 46 55 C52 57 56 58 60 58 C66 58 73 57 79 55 C89 52 98 46 100 38 C102 30 98 22 92 20 C92 13 86 8 80 8 C76 3 68 1 60 5Z' mask='url(#rh)'/></g>", '0 0 120 130'],
+  ['flower', 'Flower', "<circle cx='12' cy='5.6' r='3.4'/><circle cx='18.1' cy='10' r='3.4'/><circle cx='15.8' cy='17.2' r='3.4'/><circle cx='8.2' cy='17.2' r='3.4'/><circle cx='5.9' cy='10' r='3.4'/>"],
+  ['heart', 'Heart', "<path d='M12 21.5S2 15.2 2 8.6A5 5 0 0 1 12 6a5 5 0 0 1 10 2.6c0 6.6-10 12.9-10 12.9z'/>"],
+  ['leaf', 'Leaf', "<path d='M12 1.5C5.6 7.8 5.6 16 12 22.5 18.4 16 18.4 7.8 12 1.5z'/>"],
+  ['feather', 'Feather', "<path d='M18 1.8C10.2 3.4 6.6 9.6 7.2 17.6L5 21.6l1.4.8 2.3-4.1C16.8 17.8 21 10.6 18 1.8z'/>"],
+  ['key', 'Key', "<circle cx='12' cy='5.5' r='3.5' stroke='black' stroke-width='2.2' fill='none'/><path d='M10.9 8.8h2.2v13.7h-2.2zM13.1 15.4h3.2v2.1h-3.2zM13.1 19.4h2.6v2.1h-2.6z'/>"],
+  ['sword', 'Sword', "<path d='M12 .5l1.4 2.4v12.4h-2.8V2.9z'/><path d='M6.2 14.6h11.6v2.2H6.2zM10.9 16.8h2.2v4.2h-2.2z'/><circle cx='12' cy='22' r='1.7'/>"],
+  ['compass', 'Compass', "<path d='M12 .8l2.7 8.5 8.5 2.7-8.5 2.7L12 23.2l-2.7-8.5L.8 12l8.5-2.7z'/>"],
+];
+const ORN_IDS = ORNAMENTS.map(o => o[0]);
+const ornPicture = id => !!(ORNAMENTS.find(o => o[0] === id) || [])[2];
+// The pictures, as CSS (added to the page once).
+(function addOrnamentStyles() {
+  const css = ORNAMENTS.filter(o => o[2]).map(([id, , svg, box = '0 0 24 24']) => {
+    const url = `url("data:image/svg+xml,${encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' viewBox='${box}'>${svg}</svg>`)}")`;
+    return `[data-orn="${id}"] > .orn { -webkit-mask-image: ${url}; mask-image: ${url}; }`;
+  }).join('\n');
+  const el = document.createElement('style');
+  el.id = 'orn-css';
+  el.textContent = css;
+  document.head.appendChild(el);
+})();
+
+// Designs that fit each look (book looks by name, world looks by theme).
+const ORN_FIT = {
+  'Cozy library': ['lines', 'band', 'diamond', 'feather', 'key', 'leaf'],
+  'Dark academia': ['key', 'feather', 'crown', 'diamond', 'band', 'triple'],
+  'Fantasy map': ['dragon', 'compass', 'sword', 'crown', 'wings', 'key', 'star'],
+  'Romance': ['rose', 'flower', 'heart', 'feather'],
+  'Thriller': ['band', 'triple', 'diamond', 'key', 'sword'],
+  'Sci-fi': ['star', 'moon', 'sun', 'circles'],
+  'Fairy tale': ['crown', 'star', 'flower', 'wings', 'heart'],
+  'Seaside': ['compass', 'sun', 'star', 'circles'],
+  'Forest': ['leaf', 'flower', 'sun', 'feather'],
+  'Western': ['star', 'sun', 'compass', 'band'],
+  avatar: ['sun', 'moon', 'leaf', 'snowflake'], twd: ['band', 'triple', 'lines'], hp: ['star', 'key', 'crown', 'wings'],
+  lotr: ['crown', 'sword', 'leaf', 'star'], got: ['crown', 'sword', 'dragon', 'snowflake'], firefly: ['star', 'moon', 'band'],
+  tlou: ['leaf', 'moon', 'circles'], potc: ['compass', 'sword', 'key', 'star'], disney: ['star', 'crown', 'heart', 'flower'],
+  narnia: ['snowflake', 'crown', 'star', 'sun'],
+};
+function ornsThatFit(b) {
+  if (b.theme && b.theme !== 'custom') return ORN_FIT[b.theme] || ['lines', 'band', 'diamond'];
+  const l = lookOf(b);
+  const p = Themes.BOOK_PRESETS.find(x => x.bg === l.bg && x.accent === l.accent && x.font === l.font);
+  if (p && ORN_FIT[p.name]) return ORN_FIT[p.name];
+  return Themes.isDark(l.bg) ? ['lines', 'band', 'diamond', 'star', 'moon'] : ['lines', 'band', 'diamond', 'flower', 'leaf'];
+}
+// A book's design: the one picked, or (until it has one saved) a steady pick that fits its look.
+const ornOf = b => (ORN_IDS.includes(b.spineOrn) ? b.spineOrn : (list => list[hashOf(b.title || b.id || '') % list.length])(ornsThatFit(b)));
+const shuffleOrn = (b, not) => { const list = ornsThatFit(b).filter(o => o !== not); return list[Math.floor(Math.random() * list.length)] || 'lines'; };
+
+// Books from before spine designs get the one they've been showing, saved.
+let ornamentsAssigned = false;
+async function assignOrnaments() {
+  if (ornamentsAssigned || !state.books.length) return;
+  ornamentsAssigned = true;
+  for (const b of state.books.filter(x => !ORN_IDS.includes(x.spineOrn))) await DB.updateBook(b, { spineOrn: ornOf(b) }).catch(() => {});
+}
+
 // opts.ribbon: show a ribbon this full (%) no matter what (the preview in book settings).
 function spineHtml(b, opts = {}) {
   const s = spineStyle(b);
   Themes.loadFont(s.font);
   const ribbon = opts.ribbon != null ? opts.ribbon : ribbonFor(b);
+  // Very thin books get the simple diamond instead of a picture too small to make out.
+  let orn = ornOf(b);
+  if (ornPicture(orn) && s.w < 22) orn = 'diamond';
+  const pic = ornPicture(orn);
   const fit = spineFit(b, s);
   return `<div class="slot${fit.lines > 1 ? ' two-line' : ''}" style="--w:${s.w}px;--h:${s.h}px;--fs:${fit.fs.toFixed(1)}px;--sb:${cssColor(s.bg)};--si:${cssColor(s.ink)};--sf:'${esc(s.font.replace(/'/g, ''))}'${ribbon != null ? `;--rp:${ribbon}%;--rc:${cssColor(ribbonColorOf(b, s))}` : ''}">
     ${ribbon != null ? '<span class="ribbon" aria-hidden="true"></span>' : ''}
-    <button class="spine" data-book="${esc(b.id)}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}">
+    <button class="spine${pic ? ' pic' : ''}" data-book="${esc(b.id)}" data-orn="${orn}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}">${pic ? '<span class="orn top"></span><span class="orn bot"></span>' : ''}
       ${b.series && b.seriesNo ? `<span class="spine-no">${esc(b.seriesNo)}</span>` : ''}<span class="spine-title">${esc(b.title)}</span></button></div>`;
 }
 
@@ -1081,6 +1162,9 @@ function renderBookForm(book) {
   // The cover: keep it, a photo you chose, one the search found, or none.
   let coverMode = 'keep', coverPrepared = null, found = { url: b.coverUrl || '', thumb: b.coverThumb || '' };
   let sInk = b.spineInk || '', sBg = b.spineBg || '', rCol = b.ribbonColor || '';
+  // The spine design: a new book gets one that fits its look (and a new one when the look
+  // changes), until one is picked or shuffled by hand.
+  let orn = isNew ? shuffleOrn(b) : ornOf(b), ornTouched = !isNew;
   const parts = { ending: true, ships: true, headcanons: true, ...(b.canonParts || {}) };
   const worldKeys = Object.keys(Themes.BUILT_IN);
   const swatchRow = (id, list, cur) => `<div class="swatches ink-swatches" id="${id}">
@@ -1140,6 +1224,8 @@ function renderBookForm(book) {
           <div class="field"><span class="field-label">Spine color</span>${swatchRow('sbgs', SPINE_COLORS, sBg)}</div>
           <div class="field"><span class="field-label">Bookmark ribbon</span>${swatchRow('rcols', RIBBON_COLORS, rCol)}</div>
         </div></div>
+      <div class="field"><span class="field-label orn-head">Spine design <button type="button" class="btn small ghost" id="ornshuffle">Shuffle</button></span>
+        <div class="orn-grid" id="orngrid"></div></div>
       <label class="switch" id="serieswrap" hidden><input type="checkbox" id="allseries"><span class="track"></span><span id="serieslabel"></span></label>
 
       <h2 class="form-h">Linked world</h2>
@@ -1175,7 +1261,7 @@ function renderBookForm(book) {
   const current = () => ({
     id: b.id || 'new', title: $('#title').value.trim() || 'Your book', author: $('#author').value.trim(),
     pages: Number($('#pages').value) || 0, theme, look: theme === 'custom' ? readLook() : null,
-    spineFont: $('#sfont').value, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, shelf: $('#shelf').value,
+    spineFont: $('#sfont').value, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, spineOrn: orn, shelf: $('#shelf').value,
     series: $('#series').value.trim(), seriesNo: $('#seriesNo').value.trim(),
   });
   const coverSrcNow = () => (coverMode === 'upload' ? URL.createObjectURL(coverPrepared.thumb.blob)
@@ -1194,6 +1280,12 @@ function renderBookForm(book) {
     $$('.wlook').forEach(el => el.classList.toggle('on', el.dataset.wtheme === theme));
     // spine + cover
     $('#sdemo').innerHTML = `<div class="case-row demo-row">${spineHtml(c, { ribbon: 50 })}</div>`;
+    // Every design, on a little spine in this book's colors.
+    const st = spineStyle(c);
+    $('#orngrid').innerHTML = ORNAMENTS.map(([id, name, svg]) => `<button type="button" class="orn-pick${id === orn ? ' on' : ''}" data-o="${id}" aria-label="${name}" aria-pressed="${id === orn}">
+        <span class="spine orn-demo${svg ? ' pic' : ''}" data-orn="${id}" style="--w:30px;--h:64px;--sb:${cssColor(st.bg)};--si:${cssColor(st.ink)}">${svg ? '<span class="orn top"></span><span class="orn bot"></span>' : ''}</span>
+        <span class="orn-name">${name}</span></button>`).join('');
+    $$('#orngrid .orn-pick').forEach(btn => { btn.onclick = () => { orn = btn.dataset.o; ornTouched = true; draw(); }; });
     fitSpines($('#sdemo'));
     const src = coverSrcNow();
     $('#cprev').innerHTML = src ? `<img src="${esc(src)}" alt="">` : `<span class="gen-cover" id="gc"><span class="gc-title">${esc(c.title)}</span>${c.author ? `<span class="gc-author">${esc(c.author)}</span>` : ''}</span>`;
@@ -1206,7 +1298,11 @@ function renderBookForm(book) {
     $('#serieswrap').hidden = isNew || !others.length;
     $('#serieslabel').textContent = `Also use this look for the other ${others.length === 1 ? 'book' : `${others.length} books`} in ${c.series}`;
   };
-  const touched = () => { lookTouched = true; draw(); };
+  const touched = () => {
+    lookTouched = true;
+    if (!ornTouched) { const c = current(); if (!ornsThatFit(c).includes(orn)) orn = shuffleOrn(c); }
+    draw();
+  };
 
   $$('.preset[data-i]').forEach(btn => {
     btn.onclick = () => {
@@ -1240,6 +1336,7 @@ function renderBookForm(book) {
       if (theme === 'custom') { const l = lookOf(mate); ['bg', 'card', 'ink', 'accent'].forEach(k => { $(`#c-${k}`).value = l[k]; }); $('#font').value = l.font; }
       $('#sfont').value = mate.spineFont || '';
       sInk = mate.spineInk || ''; sBg = mate.spineBg || ''; rCol = mate.ribbonColor || '';
+      orn = ornOf(mate);
       $$('#rcols .swatch').forEach(s => s.classList.toggle('on', (s.dataset.c ?? null) === rCol));
       $$('#sinks .swatch').forEach(s => s.classList.toggle('on', (s.dataset.c ?? null) === sInk));
       $$('#sbgs .swatch').forEach(s => s.classList.toggle('on', (s.dataset.c ?? null) === sBg));
@@ -1255,6 +1352,7 @@ function renderBookForm(book) {
   swatches('sinks', v => { sInk = v; });
   swatches('sbgs', v => { sBg = v; });
   swatches('rcols', v => { rCol = v; });
+  $('#ornshuffle').onclick = () => { orn = shuffleOrn(current(), orn); ornTouched = true; draw(); };
   $('#bgfile').onchange = async e => {
     const f = e.target.files[0];
     if (!f) return;
@@ -1319,7 +1417,7 @@ function renderBookForm(book) {
         totalChapters: Number($('#chapters').value) || null,
         blurb: $('#blurb').value.trim(), shelf: c.shelf, theme,
         look: theme === 'custom' ? { ...readLook(), photo: lookDrop ? null : (look.photo || null) } : (b.look || null),
-        spineFont: c.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, worldId: $('#world').value || null,
+        spineFont: c.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, spineOrn: orn, worldId: $('#world').value || null,
         mapOn: $('#mapon').checked, canonOn: $('#canon').checked, canonParts: canonPicked,
         reviewsOn: $('#reviewson').checked, ficsOn: $('#ficson').checked,
       };
@@ -1347,7 +1445,7 @@ function renderBookForm(book) {
         const key = c.series.toLowerCase();
         const look2 = data.look ? { ...data.look, photo: null } : null;
         await Promise.all(state.books.filter(x => x.id !== b.id && seriesKey(x) === key)
-          .map(x => DB.updateBook(x, { theme, look: look2, spineFont: data.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol })));
+          .map(x => DB.updateBook(x, { theme, look: look2, spineFont: data.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, spineOrn: orn })));
       }
       toast('Saved');
       location.hash = `#/b/${b.id}`;
@@ -1451,7 +1549,7 @@ async function startBuddyRead(book, me, email, secs) {
     book: {
       title: book.title, author: book.author || '', series: book.series || '', seriesNo: book.seriesNo || '', pages: book.pages || null,
       coverUrl: book.coverUrl || '', coverThumb: book.coverThumb || '', cover: book.cover || null, blurb: book.blurb || '',
-      theme: book.theme || 'custom', look: book.look || null, spineFont: book.spineFont || '', spineInk: book.spineInk || '', spineBg: book.spineBg || '', ribbonColor: book.ribbonColor || '',
+      theme: book.theme || 'custom', look: book.look || null, spineFont: book.spineFont || '', spineInk: book.spineInk || '', spineBg: book.spineBg || '', ribbonColor: book.ribbonColor || '', spineOrn: ornOf(book),
     },
   });
   await moveIntoShared(book, sid, secs, me);
@@ -1489,7 +1587,7 @@ async function joinBuddyRead(d, me, shelf) {
     title: B.title || d.name, author: B.author || '', series: B.series || '', seriesNo: B.seriesNo || '', pages: B.pages || null,
     coverUrl: B.coverUrl || '', coverThumb: B.coverThumb || '', blurb: B.blurb || '',
     theme: B.theme || 'custom', look: B.look ? { ...B.look, photo: null } : null,
-    spineFont: B.spineFont || '', spineInk: B.spineInk || '', spineBg: B.spineBg || '', ribbonColor: B.ribbonColor || '',
+    spineFont: B.spineFont || '', spineInk: B.spineInk || '', spineBg: B.spineBg || '', ribbonColor: B.ribbonColor || '', spineOrn: B.spineOrn || '',
     shelf, order: Math.max(-1, ...onShelf.map(x => x.order ?? 0)) + 1, rating: 0, page: 0, chapter: '', review: '', reviewSafe: '', ending: '',
     reads: [{ start: shelf === 'reading' ? today() : '', end: '', physical: true, audio: false }],
     sharedId: d.id, mapOn: !!sec.map, canonOn: !!sec.canon, ficsOn: !!sec.fics,
@@ -1516,21 +1614,21 @@ const BOOK_STARTERS = [
     coverUrl: 'https://covers.openlibrary.org/b/id/15102579-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/15102579-M.jpg',
     blurb: 'When nineteen-year-old huntress Feyre kills a wolf in the woods, a beastly creature comes to demand a life for a life and carries her off to Prythian, the land of the faeries. Her captor isn’t what he seems, and the shadow spreading over the faerie lands may soon reach them all.',
     theme: 'custom', look: { bg: '#2a1418', card: '#fbf1ee', ink: '#2e1a1c', accent: '#b3263a', font: 'Cinzel' },
-    spineFont: 'Cinzel', spineInk: '#f3e3c3', spineBg: '#8f1426',
+    spineFont: 'Cinzel', spineInk: '#f3e3c3', spineBg: '#8f1426', spineOrn: 'rose',
   },
   {
     title: 'Fourth Wing', author: 'Rebecca Yarros', series: 'The Empyrean', seriesNo: '1', pages: 518,
     coverUrl: 'https://covers.openlibrary.org/b/id/14407898-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/14407898-M.jpg',
     blurb: 'Violet Sorrengail expected a quiet life as a scribe, until her mother, the commanding general, orders her into Basgiath War College to train as a dragon rider. Smaller and more fragile than the other cadets, Violet has to outthink her rivals, earn a dragon’s bond, and survive Xaden Riorson, a wingleader with every reason to want her dead.',
     theme: 'custom', look: { bg: '#e6d7b5', card: '#fbf4e2', ink: '#3a2c1b', accent: '#8c5a2b', font: 'Uncial Antiqua' },
-    spineFont: 'Uncial Antiqua', spineInk: '#2b2118', spineBg: '#e9dcc0',
+    spineFont: 'Uncial Antiqua', spineInk: '#2b2118', spineBg: '#e9dcc0', spineOrn: 'dragon',
   },
   {
     title: 'House of Earth and Blood', author: 'Sarah J. Maas', series: 'Crescent City', seriesNo: '1', pages: 803,
     coverUrl: 'https://covers.openlibrary.org/b/id/9289603-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/9289603-M.jpg',
     blurb: 'Bryce Quinlan’s life in Crescent City is all late nights and half-Fae charm, until a demon murders her closest friends. Two years later the killings start again, and Bryce is forced to team up with Hunt Athalar, a fallen angel bound to serve the city’s rulers, to find the killer before the whole city burns.',
     theme: 'custom', look: { bg: '#1a1020', card: '#f7f1ee', ink: '#2a1a22', accent: '#c8281e', font: 'Playfair Display' },
-    spineFont: 'Playfair Display', spineInk: '#b5121b', spineBg: '#f2ede6',
+    spineFont: 'Playfair Display', spineInk: '#b5121b', spineBg: '#f2ede6', spineOrn: 'moon',
   },
 ];
 
@@ -1566,7 +1664,7 @@ function publishBookLibrary() {
     id: b.id, title: b.title || '', author: b.author || '', series: b.series || '', seriesNo: b.seriesNo || '', pages: b.pages || null,
     coverUrl: b.coverUrl || '', coverThumb: b.coverThumb || '', cover: photoLink(b.cover), blurb: b.blurb || '',
     theme: b.theme || 'custom', look: b.look ? { ...b.look, photo: photoLink(b.look.photo) } : null,
-    spineFont: b.spineFont || '', spineInk: b.spineInk || '', spineBg: b.spineBg || '', ribbonColor: b.ribbonColor || '',
+    spineFont: b.spineFont || '', spineInk: b.spineInk || '', spineBg: b.spineBg || '', ribbonColor: b.ribbonColor || '', spineOrn: ornOf(b),
     map: photoLink(b.map), mapOn: !!b.mapOn || !!b.map, canonOn: !!b.canonOn,
     canonParts: b.canonParts || { ending: true, ships: true, headcanons: true }, reviewsOn: b.reviewsOn !== false, ficsOn: b.ficsOn === true,
   })).sort((a, b) => titleKey(a.title).localeCompare(titleKey(b.title)));
@@ -1600,7 +1698,7 @@ async function addFromLibrary(e, shelf) {
     title: e.title, author: e.author, series: e.series, seriesNo: e.seriesNo, pages: e.pages || null,
     coverUrl: e.coverUrl || '', coverThumb: e.coverThumb || '', blurb: e.blurb || '',
     theme: e.theme || 'custom', look: e.look ? { ...e.look, photo: null } : null,
-    spineFont: e.spineFont || '', spineInk: e.spineInk || '', spineBg: e.spineBg || '', ribbonColor: e.ribbonColor || '',
+    spineFont: e.spineFont || '', spineInk: e.spineInk || '', spineBg: e.spineBg || '', ribbonColor: e.ribbonColor || '', spineOrn: e.spineOrn || '',
     // Canon and Fics always start off (there's nothing in them yet); they can turn them on in the book's settings.
     mapOn: !!e.mapOn, canonOn: false, canonParts: e.canonParts || { ending: true, ships: true, headcanons: true },
     reviewsOn: e.reviewsOn !== false, ficsOn: false, worldId: null, fromLib: e.id,
