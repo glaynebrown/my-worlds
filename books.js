@@ -2262,13 +2262,6 @@ function renderStats() {
       <span class="month-count">${list.length ? `${list.length} book${list.length === 1 ? '' : 's'}` : '—'}</span></button>`;
   };
   const pct = goal ? Math.min(100, Math.round((fin.length / goal) * 100)) : 0;
-  let pace = '';
-  if (goal && year === now && fin.length < goal) {
-    const start = new Date(now, 0, 1), end = new Date(now + 1, 0, 1);
-    const expected = goal * ((Date.now() - start) / (end - start));
-    const diff = Math.round(fin.length - expected);
-    pace = diff > 0 ? `${diff} book${diff === 1 ? '' : 's'} ahead of schedule` : diff < 0 ? `${-diff} book${diff === -1 ? '' : 's'} behind schedule` : 'Right on track';
-  }
   const fmtTotal = Math.max(1, fmt.physical + fmt.audio + fmt.both);
   // The four tiles, in the order you've dragged them into (settings.statOrder).
   // Five little stars, filled to the rating (halves too).
@@ -2313,7 +2306,7 @@ function renderStats() {
       <span class="goal-big">${fin.length}${goal ? `<span class="goal-of"> of ${goal}</span>` : ''}</span>
       <span class="muted small">book${fin.length === 1 ? '' : 's'} finished in ${year}</span>
       ${goal ? `<div class="rw-bar"><span style="width:${pct}%"></span></div>` : ''}
-      ${goal && fin.length >= goal ? '<p class="goal-done">Goal reached!</p>' : pace ? `<p class="muted small">${pace}</p>` : ''}
+      ${goal && fin.length >= goal ? '<p class="goal-done">Goal reached!</p>' : ''}
       <button class="btn small" id="setgoal">${goal ? 'Change goal' : `Set a ${year} goal`}</button>
     </div>
     <div class="stat-grid" id="statgrid">${order.map(tile).join('')}</div>

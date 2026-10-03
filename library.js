@@ -65,10 +65,10 @@ function renderLibraryPick() {
     <header class="lib-head"><div class="lib-crest" aria-hidden="true">${CREST}</div>
       <h1 class="lib-title">The Library</h1>
       <p class="lib-sub">${firstTime ? 'Pick the doors you want. You can add more anytime.' : 'Pick a door to add, or build your own.'}</p></header>
-    <div class="shelf">${choices.map(s => `<div class="tile pickable" role="button" tabindex="0" aria-pressed="false" data-theme-pick="${s.theme}">
+    <div class="shelf"><a class="tile add-tile" href="#/new"><span class="plus" aria-hidden="true">+</span><span class="tile-name">Build your own</span></a>
+      ${choices.map(s => `<div class="tile pickable" role="button" tabindex="0" aria-pressed="false" data-theme-pick="${s.theme}">
         <span class="tile-art" aria-hidden="true"></span><span class="pick-check" aria-hidden="true">✓</span>
-        <span class="tile-name">${esc(s.name)}</span></div>`).join('')}
-      <a class="tile add-tile" href="#/new"><span class="plus" aria-hidden="true">+</span><span class="tile-name">Build your own</span></a></div>
+        <span class="tile-name">${esc(s.name)}</span></div>`).join('')}</div>
     ${choices.length || firstTime ? `<div class="pick-bar">${choices.length ? '<button class="btn primary block" id="go" disabled>Pick a door</button>' : ''}
       ${firstTime ? '<button class="linkish skip-link" id="skipw">No worlds for now</button>' : ''}</div>` : ''}
   </div>`;

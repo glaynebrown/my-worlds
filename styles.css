@@ -99,7 +99,7 @@ img { display: block; max-width: 100%; }
 .pick-check { position: absolute; top: 10px; right: 10px; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; font: 700 15px/1 system-ui, sans-serif; color: transparent; border: 2px solid rgba(255,255,255,.7); background: rgba(0,0,0,.25); z-index: 1; }
 .tile.picked { outline: 3px solid #e9c97a; outline-offset: 2px; }
 .tile.picked .pick-check { background: #e9c97a; border-color: #e9c97a; color: #1a140f; }
-.pick-bar { position: sticky; bottom: 0; padding: 16px 0 calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(transparent, var(--bg) 35%); margin-top: 10px; }
+.pick-bar { position: sticky; bottom: 0; z-index: 2; padding: 16px 0 calc(env(safe-area-inset-bottom) + 12px); background: linear-gradient(transparent, var(--bg) 35%); margin-top: 10px; }
 .pick-bar .btn:disabled { opacity: .55; }
 .library .empty { margin-top: 20px; }
 .library .add-tile { background: transparent; border: 2px dashed color-mix(in srgb, var(--page-ink) 30%, transparent); box-shadow: none; align-items: center; justify-content: center; text-align: center; gap: 8px; }
