@@ -61,12 +61,15 @@
 .spine-no + .spine-title { margin-top: 12px; max-height: calc(var(--h) - 62px); }
 @media (hover: hover) { .spine[data-book]:hover { transform: translateY(-5px); } }
 .spine[data-book]:active { transform: translateY(-8px); }
-/* The bookmark ribbon on what you're reading: tucked in at the top, draped down the spine. */
+/* The bookmark ribbon on a book you've started: tucked in at the top, draped down
+   the spine, and filled with color (top down) as far as you've read (--rp, from books.js). */
 .ribbon {
-  position: absolute; z-index: 1; pointer-events: none; left: calc(50% + var(--w) / 2 - 12px);
-  bottom: calc(var(--plank) + var(--h) - 34px); width: 7px; height: 48px;
-  background: linear-gradient(90deg, #8f1d1d, #c8312b 45%, #9c2020);
-  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% 84%, 0 100%);
+  position: absolute; z-index: 1; pointer-events: none; left: calc(50% + var(--w) / 2 - 14px);
+  bottom: calc(var(--plank) + var(--h) - 48px); width: 9px; height: 52px;
+  background:
+    linear-gradient(to bottom, transparent var(--rp, 0%), #f2dcd8 var(--rp, 0%)),
+    linear-gradient(90deg, #8f1d1d, #c8312b 45%, #9c2020);
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 50% calc(100% - 7px), 0 100%);
   filter: drop-shadow(0 1px 1px rgba(0,0,0,.4));
 }
 .slot { justify-content: center; }
@@ -244,6 +247,7 @@
 .shelf-edit { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1.5px solid var(--line); border-radius: 12px; }
 .se-top { display: flex; gap: 4px; align-items: center; }
 .se-show { margin-top: 2px; font-size: .88rem; }
+.ribbon-switch { margin: 14px 0 4px; }
 .se-sort { display: flex; align-items: center; gap: 8px; font-size: .78rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
 .se-sort select { flex: 1; min-width: 0; font: 500 .9rem/1.2 var(--font-body); text-transform: none; letter-spacing: 0; color: var(--ink); background: color-mix(in srgb, var(--card) 70%, #fff); border: 1.5px solid var(--line); border-radius: 10px; padding: 7px 8px; }
 .shelf-edit input { flex: 1; min-width: 0; padding: 9px 11px; border-radius: 10px; border: 1.5px solid var(--line); background: color-mix(in srgb, var(--card) 70%, #fff); color: var(--ink); font-size: 16px; }

@@ -2,7 +2,8 @@
 
    - The bookcase (#/books): your shelves, each a row of spines. A spine's
      thickness comes from the book's page count; its title wears the book's
-     font and color. Currently reading books have a bookmark ribbon. Hold a
+     font and color. With bookmark ribbons on (Edit shelves), a book you've
+     started wears a ribbon that fills with color as you read. Hold a
      book to drag it (to another spot, or onto another shelf). Each shelf has
      its own sort; books in a series always stand together, in order.
    - Tapping a book pulls it off the shelf: the cover grows big, swings open,
@@ -131,13 +132,32 @@ function fitSpines(root = document) {
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (root === document || root.isConnected) all(); });
 }
 
+// How far into the current read (0–1): pages, or chapters for an audiobook
+// with its total chapters set. null = can't tell yet.
+function progressOf(b) {
+  const r = readsOf(b)[curReadIdx(b)];
+  if (audioOnly(r)) {
+    const ch = parseFloat(b.chapter), total = Number(b.totalChapters);
+    return ch && total ? Math.min(1, ch / total) : null;
+  }
+  const p = Number(b.page), total = Number(b.pages);
+  return p && total ? Math.min(1, p / total) : null;
+}
+// Bookmark ribbons (a bookcase setting): on a book you've started and not finished.
+function ribbonFor(b) {
+  if (!(state.settings && state.settings.ribbons)) return null;
+  const r = readsOf(b)[curReadIdx(b)];
+  if (!r.start || r.end) return null;
+  return Math.round((progressOf(b) || 0) * 100); // how much of the ribbon is filled in
+}
+
 function spineHtml(b) {
   const s = spineStyle(b);
   Themes.loadFont(s.font);
-  const reading = inReading(b);
+  const ribbon = ribbonFor(b);
   const fit = spineFit(b, s);
-  return `<div class="slot${fit.lines > 1 ? ' two-line' : ''}" style="--w:${s.w}px;--h:${s.h}px;--fs:${fit.fs.toFixed(1)}px;--sb:${cssColor(s.bg)};--si:${cssColor(s.ink)};--sf:'${esc(s.font.replace(/'/g, ''))}'">
-    ${reading ? '<span class="ribbon" aria-hidden="true"></span>' : ''}
+  return `<div class="slot${fit.lines > 1 ? ' two-line' : ''}" style="--w:${s.w}px;--h:${s.h}px;--fs:${fit.fs.toFixed(1)}px;--sb:${cssColor(s.bg)};--si:${cssColor(s.ink)};--sf:'${esc(s.font.replace(/'/g, ''))}'${ribbon != null ? `;--rp:${ribbon}%` : ''}">
+    ${ribbon != null ? '<span class="ribbon" aria-hidden="true"></span>' : ''}
     <button class="spine" data-book="${esc(b.id)}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}">
       ${b.series && b.seriesNo ? `<span class="spine-no">${esc(b.seriesNo)}</span>` : ''}<span class="spine-title">${esc(b.title)}</span></button></div>`;
 }
@@ -237,6 +257,7 @@ function shelvesForm() {
   let list = before.map(s => ({ ...s }));
   openModal(`<h2>Shelves</h2><div id="slist" class="shelf-edits"></div>
     <button type="button" class="btn small" id="sadd">+ Add a shelf</button>
+    <label class="switch ribbon-switch"><input type="checkbox" id="ribbons" ${state.settings && state.settings.ribbons ? 'checked' : ''}><span class="track"></span><span>Bookmark ribbons show how far I’ve read</span></label>
     <p class="muted small">With My order, hold a book on the shelf to drag it. Books in a series always stand together, in order. A hidden shelf keeps its name and settings for later. Removing a shelf moves its books to the first one showing.</p>
     <div class="actions"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="ssave">Save</button></div>`, (root, close) => {
     const draw = () => {
@@ -275,6 +296,8 @@ function shelvesForm() {
         }
       }
       await saveShelves(list);
+      const ribbons = $('#ribbons', root).checked;
+      if (ribbons !== !!state.settings.ribbons) { await DB.saveSettings({ ribbons }); state.settings.ribbons = ribbons; }
       await Promise.all(moving.map(b => DB.updateBook(b, { shelf: firstOn.id })));
       close();
       toast(moving.length ? `Shelves saved. ${moving.length} book${moving.length === 1 ? '' : 's'} moved to ${firstOn.name}.` : 'Shelves saved');
@@ -509,7 +532,10 @@ function progressHtml(book) {
   const r = readsOf(book)[curReadIdx(book)];
   if (r.end || !(inReading(book) || r.start)) return '';
   if (audioOnly(r)) {
-    return `<div class="progress-box"><span class="pb-now">${book.chapter ? `On chapter ${esc(book.chapter)}` : 'Listening'}</span>
+    const total = Number(book.totalChapters) || 0;
+    const pct = total && book.chapter ? Math.min(100, Math.round((parseFloat(book.chapter) / total) * 100)) : 0;
+    return `<div class="progress-box"><span class="pb-now">${book.chapter ? `On chapter ${esc(book.chapter)}${total ? ` of ${total}` : ''}` : 'Listening'}${pct ? ` <span class="muted small">· ${pct}%</span>` : ''}</span>
+      ${total ? `<div class="rw-bar"><span style="width:${pct}%"></span></div>` : ''}
       <button class="btn small" id="setpos">Update my chapter</button></div>`;
   }
   const p = Number(book.page) || 0, total = Number(book.pages) || 0;
@@ -1065,6 +1091,7 @@ function renderBookForm(book) {
       </div>
       <datalist id="serieslist">${[...new Set(state.books.map(x => x.series).filter(Boolean))].map(s => `<option value="${esc(s)}">`).join('')}</datalist>
       <label class="field"><span class="field-label">Total pages (sets how thick it stands on the shelf)</span><input id="pages" type="number" inputmode="numeric" min="0" value="${esc(b.pages || '')}"></label>
+      <label class="field"><span class="field-label">Total chapters (optional, for audiobooks)</span><input id="chapters" type="number" inputmode="numeric" min="0" value="${esc(b.totalChapters || '')}" placeholder="#"></label>
       <label class="field"><span class="field-label">Shelf</span><select id="shelf">${shelvesOf().map(s => `<option value="${esc(s.id)}" ${shelfOf(b) === s.id ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
       <label class="field"><span class="field-label">What it’s about (optional)</span><textarea id="blurb" rows="5">${esc(b.blurb || '')}</textarea></label>
 
@@ -1267,6 +1294,7 @@ function renderBookForm(book) {
       if ($('#canon').checked && !Object.values(canonPicked).some(Boolean)) throw new Error('Pick at least one thing to show on My Canon, or turn it off.');
       const data = {
         title: c.title, author: c.author, series: c.series, seriesNo: c.seriesNo, pages: c.pages || null,
+        totalChapters: Number($('#chapters').value) || null,
         blurb: $('#blurb').value.trim(), shelf: c.shelf, theme,
         look: theme === 'custom' ? { ...readLook(), photo: lookDrop ? null : (look.photo || null) } : (b.look || null),
         spineFont: c.spineFont, spineInk: sInk, spineBg: sBg, worldId: $('#world').value || null,
