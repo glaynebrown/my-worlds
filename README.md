@@ -28,8 +28,9 @@ uses Open Library (free, no key), with Google Books as a backup.
 `library/books` (details, cover, look, spine, map; never stars, dates, notes or
 reviews). Everyone who joins picks from it the first time (after picking worlds,
 or "No worlds for now") at #/books/pick, and later from "From the library" on
-Add a book. Your bookcase starts with A Court of Thorns and Roses, Fourth Wing
-and House of Earth and Blood (added once; settings.bookStarters).
+Add a book. Your bookcase starts with A Court of Thorns and Roses, Fourth Wing,
+House of Earth and Blood, One Dark Window and The Ever King (each added once;
+settings.bookStarters lists them, so new starters in BOOK_STARTERS arrive later).
 
 Plain HTML/CSS/JS + Firebase (Auth, Firestore, Storage), hosted on GitHub Pages.
 Until `firebase-config.js` is filled in, the app offers **sample mode** (nothing saved).

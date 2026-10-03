@@ -70,19 +70,27 @@
   -webkit-mask-size: contain; mask-size: contain; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; -webkit-mask-position: center; mask-position: center;
 }
 .orn.top { top: 6px; }
+/* The looped swirl is wide and thin, so it gets more of the spine's width. */
+[data-orn="swirls"] > .orn, [data-top="swirls"] > .orn.top, [data-orn="fancy"] > .orn { width: min(calc(var(--w) - 4px), 40px); }
 .orn.bot { bottom: 6px; transform: translateX(-50%) scaleY(-1); }
-.spine.pic .spine-no { top: 30px; }
+.spine.pic .spine-no, .spine[data-top="swirls"] .spine-no { top: 30px; }
 /* A different bottom (book settings "Bottom of the spine"): lines under a picture, or nothing. */
 .spine.pic[data-bot]::after { display: block; }
 .spine[data-bot="lines"]::after { height: 1.5px; bottom: 11px; box-shadow: 0 -4px 0 currentColor; }
 .spine[data-bot="band"]::after { height: 4px; bottom: 12px; box-shadow: none; }
 .spine[data-bot="triple"]::after { height: 1.2px; bottom: 9px; box-shadow: 0 -3.5px 0 currentColor, 0 -7px 0 currentColor; }
 .spine[data-bot="none"]::after { display: none !important; }
+/* A different top (book settings "Top of the spine"): swirls, lines or nothing. */
+.spine[data-top]::before { display: none; }
+.spine[data-top="lines"]::before, .spine[data-top="band"]::before, .spine[data-top="triple"]::before { display: block; }
+.spine[data-top="lines"]::before { height: 1.5px; top: 11px; box-shadow: 0 4px 0 currentColor; }
+.spine[data-top="band"]::before { height: 4px; top: 12px; box-shadow: none; }
+.spine[data-top="triple"]::before { height: 1.2px; top: 9px; box-shadow: 0 3.5px 0 currentColor, 0 7px 0 currentColor; }
 .bot-chips { flex-wrap: wrap; overflow: visible; margin: 4px 0 0; padding: 0; }
 .bot-chips .chip { border-color: var(--line); color: var(--ink); }
 .bot-chips .chip.on { background: var(--ink); color: var(--card); }
-.spine.pic .spine-title { max-height: calc(var(--h) - 66px); }
-.spine.pic .spine-no + .spine-title { margin-top: 16px; max-height: calc(var(--h) - 82px); }
+.spine.pic .spine-title, .spine[data-top="swirls"] .spine-title { max-height: calc(var(--h) - 66px); }
+.spine.pic .spine-no + .spine-title, .spine[data-top="swirls"] .spine-no + .spine-title { margin-top: 16px; max-height: calc(var(--h) - 82px); }
 .spine-no + .spine-title { margin-top: 12px; max-height: calc(var(--h) - 62px); }
 @media (hover: hover) { .spine[data-book]:hover { transform: translateY(-5px); } }
 .spine[data-book]:active { transform: translateY(-8px); }
@@ -383,3 +391,17 @@
 .ser-row.missing .ser-no { color: var(--page-muted); }
 .ser-title { font-family: var(--font-head); font-size: 1.15rem; line-height: 1.15; }
 .series-page .center { margin-top: 16px; }
+
+/* A series on a shelf: its books stand together, with an engraved brass plate
+   for the series name on the shelf's front edge underneath. */
+.ser-grp { position: relative; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 0 3px; max-width: 100%; }
+.ser-plate {
+  /* It spans the whole series, end to end. */
+  position: absolute; left: 0; bottom: 2px; z-index: 1; text-align: center;
+  min-width: 100%; width: max-content; max-width: min(260px, 86vw); padding: 1px 7px; border-radius: 2px;
+  background: linear-gradient(#e2c27a, #b48a3e 55%, #9a7330); color: #3b2a12;
+  font: 700 8px/11px system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; text-decoration: none;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 1px rgba(0,0,0,.45);
+}
+.bookcase.sorting .ser-plate { pointer-events: none; }
