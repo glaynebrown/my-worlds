@@ -8,7 +8,7 @@
    - Book covers from the book search: saved copy first, like photos.
    - Everything else (database, login, book search) goes straight to the network.
      Firestore keeps its own offline copy of your worlds. */
-const APP_CACHE = 'fw-app-v5';
+const APP_CACHE = 'fw-app-v6';
 const PHOTO_CACHE = 'fw-photos-v1';
 const APP_FILES = [
   './', 'index.html', 'styles.css', 'themes.css', 'books.css', 'themes.js', 'app.js', 'world.js', 'share.js', 'library.js', 'together.js', 'books.js', 'store.js', 'demo.js', 'photos.js',

@@ -10,7 +10,7 @@ any you add) has its own look and these sections:
 - **Fics**: saved AO3 links with ship and a note to self
 - **Rewatch**: where you are, and it stops at your canon ending
 
-Plus a **Books** side (the Worlds | Books switch at the top; books.js + books.css):
+Plus a **Books** side (tap the big doorway/book icon at the top to flip sides; settings are under the gear, top right; books.js + books.css):
 a wooden bookcase with your shelves (Currently reading / Read / Want to read /
 DNF, editable, each with its own sort; hold a book to drag it). Spine thickness
 comes from the page count; tap a book and it flies open. Inside: About (cover,
@@ -87,7 +87,7 @@ first three, the theme goes in `themes.css` + `themes.js` as a new built-in.
   neutral but use your home-card photos/name colors (your app publishes them to
   library/wallpapers whenever it opens).
 - Everyone except you has a 500-photo limit. "Delete my account" is in the
-  doorway menu.
+  gear menu (top right of either side).
 
 ## Shared worlds (Step 1: shared Rewatch)
 

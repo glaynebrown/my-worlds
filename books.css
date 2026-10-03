@@ -1,15 +1,33 @@
-/* Books (books.js): the Worlds | Books switch, the wooden bookcase and its
+/* Books (books.js): flipping between sides, the wooden bookcase and its
    spines, a book flying open, and the pages inside a book. Inside a book the
    colors come from its look, like a world (themes.css / themes.js). */
 
-/* ---------- Worlds | Books switch ---------- */
-.side-toggle {
-  position: absolute; top: 10px; right: 0; z-index: 2; display: flex; padding: 3px;
-  border-radius: 999px; background: rgba(255,255,255,.05); border: 1px solid rgba(236,217,174,.28);
-}
-.side-toggle a { padding: 7px 14px; border-radius: 999px; text-decoration: none; font: 600 .82rem/1 system-ui, sans-serif; letter-spacing: .02em; color: #d9c9a8; }
-.side-toggle a[aria-current] { background: #c9a35a; color: #1a140f; }
+/* ---------- flipping between Worlds and Books ---------- */
+/* The icon of the side you're on. */
+.side-flip { position: relative; perspective: 400px; }
+.side-flip .flip-front { position: relative; display: block; }
+.side-flip svg { display: block; }
+/* Like a coin: the icon turns edge-on, the page swaps, and it turns back. */
+.side-flip.flip-out .flip-front { animation: coin-out .2s ease-in forwards; }
+.side-flip.flip-in .flip-front { animation: coin-in .26s ease-out; }
+@keyframes coin-out { to { transform: rotateY(90deg); } }
+@keyframes coin-in { from { transform: rotateY(-90deg); } }
+@keyframes fade-in { from { opacity: 0; } }
+.library.page-out > :not(.lib-head), .library.page-out .lib-head > :not(.side-flip) { transition: opacity .2s; opacity: 0; }
+.library.page-in > :not(.lib-head), .library.page-in .lib-head > :not(.side-flip) { animation: fade-in .3s ease-out; }
+
+/* Settings: a quiet gear, top right of both sides. */
+.home-gear { position: absolute; top: 10px; right: 0; z-index: 2; background: none; border: 0; padding: 6px; cursor: pointer; color: var(--title, #ecd9ae); opacity: .6; -webkit-tap-highlight-color: transparent; }
+.home-gear:hover, .home-gear:focus-visible { opacity: 1; }
+.home-gear svg { display: block; }
+.menu-rule { border: 0; border-top: 1px solid rgba(236,217,174,.16); margin: 4px 0; width: 100%; }
 .library .lib-head { padding-top: 46px; }
+
+/* Nothing on this side yet. */
+.side-empty { text-align: center; }
+.side-empty .empty { padding-bottom: 14px; }
+.side-empty-btns { display: flex; flex-wrap: wrap; justify-content: center; gap: 10px; }
+.side-empty-btns .btn.ghost { color: var(--title, #ecd9ae); border-color: rgba(236,217,174,.35); }
 
 /* ---------- the bookcase ---------- */
 .goal-line { display: inline-flex; flex-direction: column; align-items: center; gap: 6px; margin-top: 8px; font-family: var(--font-head); font-style: italic; font-size: 1.15rem; color: var(--page-muted); text-decoration: none; }
@@ -424,9 +442,9 @@
 .ser-grp.before-set .ser-plate { max-width: calc(100% - 2px); }
 
 /* Opened from the Home Screen: iPhone softly blurs the strip just under the
-   clock, so the Watch | Read switch and your name sit a little lower there. */
+   clock, so the gear and your name sit a little lower there. */
 @media (display-mode: standalone) {
-  .side-toggle { top: 26px; }
+  .home-gear { top: 26px; }
   .library .lib-me { top: 30px; }
   .library .lib-head { padding-top: 62px; }
 }

@@ -1,4 +1,4 @@
-/* Books: the other side of My Worlds (the Worlds | Books switch at the top).
+/* Books: the other side of My Worlds (tap the big icon at the top to flip sides).
 
    - The bookcase (#/books): your shelves, each a row of spines. A spine's
      thickness comes from the book's page count; its title wears the book's
@@ -401,25 +401,28 @@ function renderBooks() {
     </section>`;
   };
   view.innerHTML = `<div class="library books-home">
-    ${nick ? `<p class="lib-me">${esc(nick)}</p>` : ''}${sideToggle('books')}
-    <header class="lib-head"><button class="lib-crest crest-link" id="bcrest" aria-label="Menu">${BOOK_CREST}</button>
+    ${nick ? `<p class="lib-me">${esc(nick)}</p>` : ''}${homeGear('Books settings')}
+    <header class="lib-head">${sideFlip('books')}
       <h1 class="lib-title">My Worlds</h1>
       <a class="goal-line" href="#/books/stats">${goal
         ? `<span>${year} · ${done} of ${goal} books</span><span class="goal-bar"><span style="width:${Math.min(100, Math.round((done / goal) * 100))}%"></span></span>`
         : `<span>${done ? `${done} finished in ${year} · ` : ''}Set a ${year} reading goal ›</span>`}</a></header>
     <div class="bookcase" id="case">${shelvesOf().map(caseHtml).join('')}</div>
-    ${state.books.length ? '' : `<p class="empty">Your bookcase is empty. Tap a + to put your first book on a shelf.</p>
-      ${isOwner() ? '' : '<p class="center"><a class="btn primary" href="#/books/pick">Pick from the library</a></p>'}`}
+    ${state.books.length ? '' : `<div class="side-empty"><p class="empty">No books yet</p>
+      <div class="side-empty-btns">${isOwner() ? '' : '<a class="btn" href="#/books/pick">Browse the library</a>'}<button class="btn ghost" id="e-add">Add a book</button></div></div>`}
   </div>`;
 
-  $('#bcrest').onclick = () => openModal(`<div class="crest-menu">
+  const addBook = () => { newBookShelf = hasShelf('reading') ? 'reading' : shelvesOf()[0].id; location.hash = '#/books/new'; };
+  if ($('#e-add')) $('#e-add').onclick = addBook;
+  wireFlip('#/');
+  $('#hgear').onclick = () => openModal(`<div class="crest-menu">
       <button class="btn block" id="m-add">+ Add a book</button>
-      <a class="btn block" href="#/books/stats" data-close>Reading goal &amp; stats</a>
       <button class="btn block" id="m-shelves">Edit shelves</button>
-      <button class="btn block ghost" id="out">Sign out</button></div>`, (root, close) => {
-    $('#m-add', root).onclick = () => { close(); newBookShelf = hasShelf('reading') ? 'reading' : shelvesOf()[0].id; location.hash = '#/books/new'; };
+      <a class="btn block" href="#/books/stats" data-close>Reading goal &amp; stats</a>
+      <hr class="menu-rule">${accountRows(nick)}</div>`, (root, close) => {
+    $('#m-add', root).onclick = () => { close(); addBook(); };
     $('#m-shelves', root).onclick = () => { close(); shelvesForm(); };
-    $('#out', root).onclick = () => { close(); confirmBox('Sign out?', 'Your books stay saved in your account.', 'Sign out', () => DB.signOut()); };
+    wireAccount(root, close, 'books');
   }, 'small-modal');
   fitSpines(view);
   fitPlates(view);

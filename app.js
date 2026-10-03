@@ -176,13 +176,36 @@ function parseHash() {
   return location.hash.replace(/^#\/?/, '').split('/').filter(Boolean);
 }
 
-// ---------- Worlds | Books switch (top of both home pages) ----------
+// ---------- Worlds <-> Books (top of both home pages) ----------
+// The big icon is the side you're on (doorway or open book). Tap it and it
+// flips like a coin to the other side. Settings live under the small gear, top right.
 let homeChecked = false;
 let waitingFor = null; // a book id route() is giving a moment to arrive
+let flipIn = false;    // the next home page finishes the coin flip
 function lastSide() { try { return localStorage.getItem('fw-side') || 'worlds'; } catch { return 'worlds'; } }
 function rememberSide(side) { try { localStorage.setItem('fw-side', side); } catch {} }
-const sideToggle = on => `<nav class="side-toggle" aria-label="Watch or read">
-  <a href="#/" ${on === 'worlds' ? 'aria-current="page"' : ''}>Watch</a><a href="#/books" ${on === 'books' ? 'aria-current="page"' : ''}>Read</a></nav>`;
+const sideFlip = on => `<button class="lib-crest crest-link side-flip${flipIn ? ' flip-in' : ''}" id="flip" aria-label="${on === 'worlds' ? 'Go to Books' : 'Go to Worlds'}">
+  <span class="flip-front">${on === 'worlds' ? CREST : BOOK_CREST}</span></button>`;
+const homeGear = label => `<button class="home-gear" id="hgear" aria-label="${label}">${GEAR}</button>`;
+function wireFlip(to) {
+  const home = $('.library');
+  if (flipIn) { flipIn = false; home.classList.add('page-in'); }
+  $('#flip').onclick = () => {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) { location.hash = to; return; }
+    $('#flip').classList.add('flip-out');
+    home.classList.add('page-out');
+    setTimeout(() => { flipIn = true; location.hash = to; }, 200);
+  };
+}
+// The bottom of both sides' gear menus: your name, sign out, delete.
+const accountRows = nick => `<button class="btn block ghost name-row" id="nick"><span class="muted small">Your name</span><span>${esc(nick || 'Add your name')}</span></button>
+  <button class="btn block ghost" id="out">Sign out</button>
+  <button class="linkish danger-text" id="gone">Delete my account</button>`;
+function wireAccount(root, close, keeps) {
+  $('#out', root).onclick = () => { close(); confirmBox('Sign out?', `Your ${keeps} stay saved in your account.`, 'Sign out', () => DB.signOut()); };
+  $('#gone', root).onclick = () => { close(); deleteAccountFlow(); };
+  $('#nick', root).onclick = () => { close(); nicknameForm(); };
+}
 
 const THEME_COLOR = { library: '#16110e', avatar: '#efe3c8', twd: '#1f1e1a', hp: '#1a120c', disney: '#171a3d', lotr: '#121812', narnia: '#16222f', got: '#14161a', firefly: '#141a26', tlou: '#1b211c', potc: '#0f1f26' };
 function setPageTheme(world) {
@@ -506,11 +529,12 @@ function renderLibrary() {
   const nick = (state.settings && state.settings.displayName) || '';
   rememberSide('worlds');
   view.innerHTML = `<div class="library">
-    ${nick ? `<p class="lib-me">${esc(nick)}</p>` : ''}${sideToggle('worlds')}
-    <header class="lib-head"><button class="lib-crest crest-link" id="crest" aria-label="Menu">${CREST}</button>
+    ${nick ? `<p class="lib-me">${esc(nick)}</p>` : ''}${homeGear('Worlds settings')}
+    <header class="lib-head">${sideFlip('worlds')}
       <h1 class="lib-title">My Worlds</h1><p class="lib-sub">Pick a door and step inside — there’s no knowing where you might be swept off to.</p></header>
     <div class="shelf">${worlds.map(tileHtml).join('')}</div>
-    ${worlds.length ? '' : '<p class="empty">No doors yet. Tap the doorway above to add one.</p>'}</div>`;
+    ${worlds.length ? '' : `<div class="side-empty"><p class="empty">No worlds yet</p>
+      <div class="side-empty-btns"><a class="btn" href="#/library">Browse the library</a><a class="btn ghost" href="#/new">Build your own</a></div></div>`}</div>`;
   // Each tile wears its own world's look.
   $$('.tile[data-world]').forEach(el => {
     const w = worldById(el.dataset.world);
@@ -520,17 +544,12 @@ function renderLibrary() {
     cardPos(el, w.cardPos);
     el.classList.toggle('no-shade', w.cardShade === false);
   });
-  // The doorway icon hides everything that isn't a door.
-  $('#crest').onclick = () => openModal(`<div class="crest-menu">
-      <button class="btn block ghost name-row" id="nick"><span class="muted small">Your name</span><span>${esc(nick || 'Add your name')}</span></button>
+  wireFlip('#/books');
+  // The gear hides everything that isn't a door.
+  $('#hgear').onclick = () => openModal(`<div class="crest-menu">
       <a class="btn block" href="#/library" data-close>+ Add a world</a>
       <a class="btn block" href="#/wishlist" data-close>Wishlist</a>
-      <button class="btn block ghost" id="out">Sign out</button>
-      <button class="linkish danger-text" id="gone">Delete my account</button></div>`, (root, close) => {
-    $('#out', root).onclick = () => { close(); confirmBox('Sign out?', 'Your worlds stay saved in your account.', 'Sign out', () => DB.signOut()); };
-    $('#gone', root).onclick = () => { close(); deleteAccountFlow(); };
-    $('#nick', root).onclick = () => { close(); nicknameForm(); };
-  }, 'small-modal');
+      <hr class="menu-rule">${accountRows(nick)}</div>`, (root, close) => wireAccount(root, close, 'worlds'), 'small-modal');
   enableTileDrag($('.shelf'));
 }
 
@@ -543,7 +562,9 @@ function nicknameForm() {
     onSave: async v => {
       await DB.saveSettings({ displayName: v.name });
       state.settings.displayName = v.name;
-      if (!parseHash()[0]) renderLibrary();
+      const [page, id] = parseHash();
+      if (!page) renderLibrary();
+      else if (page === 'books' && !id) renderBooks();
     },
   });
 }
@@ -680,7 +701,7 @@ function cardInk(el, ink) {
   if (ink) el.style.setProperty('--card-ink', ink); else el.style.removeProperty('--card-ink');
 }
 
-// ---------- wishlist (tap the doorway above "My Worlds") ----------
+// ---------- wishlist (Worlds gear menu) ----------
 // Ideas for future worlds: items of kind 'wish' that belong to no world.
 let wishToOpen = null;
 
