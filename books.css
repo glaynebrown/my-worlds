@@ -90,9 +90,15 @@
 .orn.top { top: 6px; }
 /* The looped swirl is wide and thin, so it gets more of the spine's width. */
 [data-orn="swirls"] > .orn, [data-top="swirls"] > .orn.top, [data-orn="fancy"] > .orn,
-[data-orn="knot"] > .orn, [data-top="knot"] > .orn.top { width: min(calc(var(--w) - 4px), 40px); }
+[data-orn="knot"] > .orn, [data-top="knot"] > .orn.top,
+[data-orn="lattice"] > .orn, [data-top="lattice"] > .orn.top { width: min(calc(var(--w) - 4px), 40px); }
+[data-orn="lattice"] > .orn, [data-top="lattice"] > .orn.top { height: 22px; }
+/* The scroll is tall and narrow, so it gets more height instead. */
+[data-orn="scroll"] > .orn, [data-top="scroll"] > .orn.top { width: min(calc(var(--w) - 6px), 16px); height: 30px; }
+.orn-demo[data-orn="scroll"] > .orn { height: 22px; }
 .orn.bot { bottom: 6px; transform: translateX(-50%) scaleY(-1); }
-.spine.pic .spine-no, .spine[data-top="swirls"] .spine-no, .spine[data-top="knot"] .spine-no { top: 30px; }
+.spine.pic .spine-no, .spine[data-top="swirls"] .spine-no, .spine[data-top="knot"] .spine-no, .spine[data-top="lattice"] .spine-no, .spine[data-top="scroll"] .spine-no { top: 30px; }
+.spine[data-orn="scroll"]:not([data-top]) .spine-no, .spine[data-top="scroll"] .spine-no { top: 40px; }
 /* A different bottom (book settings "Bottom of the spine"): lines under a picture, or nothing. */
 .spine.pic[data-bot]::after { display: block; }
 .spine[data-bot="lines"]::after { height: 1.5px; bottom: 11px; box-shadow: 0 -4px 0 currentColor; }
@@ -108,8 +114,10 @@
 .bot-chips { flex-wrap: wrap; overflow: visible; margin: 4px 0 0; padding: 0; }
 .bot-chips .chip { border-color: var(--line); color: var(--ink); }
 .bot-chips .chip.on { background: var(--ink); color: var(--card); }
-.spine.pic .spine-title, .spine[data-top="swirls"] .spine-title, .spine[data-top="knot"] .spine-title { max-height: calc(var(--h) - 66px); }
-.spine.pic .spine-no + .spine-title, .spine[data-top="swirls"] .spine-no + .spine-title, .spine[data-top="knot"] .spine-no + .spine-title { margin-top: 16px; max-height: calc(var(--h) - 82px); }
+.spine.pic .spine-title, .spine[data-top="swirls"] .spine-title, .spine[data-top="knot"] .spine-title, .spine[data-top="lattice"] .spine-title, .spine[data-top="scroll"] .spine-title { max-height: calc(var(--h) - 66px); }
+.spine.pic .spine-no + .spine-title, .spine[data-top="swirls"] .spine-no + .spine-title, .spine[data-top="knot"] .spine-no + .spine-title, .spine[data-top="lattice"] .spine-no + .spine-title, .spine[data-top="scroll"] .spine-no + .spine-title { margin-top: 16px; max-height: calc(var(--h) - 82px); }
+.spine[data-orn="scroll"] .spine-title { max-height: calc(var(--h) - 86px); }
+.spine[data-orn="scroll"] .spine-no + .spine-title { max-height: calc(var(--h) - 100px); }
 .spine-no + .spine-title { margin-top: 12px; max-height: calc(var(--h) - 62px); }
 @media (hover: hover) { .spine[data-book]:hover { transform: translateY(-5px); } }
 .spine[data-book]:active { transform: translateY(-8px); }
