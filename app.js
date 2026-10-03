@@ -181,8 +181,8 @@ let homeChecked = false;
 let waitingFor = null; // a book id route() is giving a moment to arrive
 function lastSide() { try { return localStorage.getItem('fw-side') || 'worlds'; } catch { return 'worlds'; } }
 function rememberSide(side) { try { localStorage.setItem('fw-side', side); } catch {} }
-const sideToggle = on => `<nav class="side-toggle" aria-label="Worlds or books">
-  <a href="#/" ${on === 'worlds' ? 'aria-current="page"' : ''}>Worlds</a><a href="#/books" ${on === 'books' ? 'aria-current="page"' : ''}>Books</a></nav>`;
+const sideToggle = on => `<nav class="side-toggle" aria-label="Watch or read">
+  <a href="#/" ${on === 'worlds' ? 'aria-current="page"' : ''}>Watch</a><a href="#/books" ${on === 'books' ? 'aria-current="page"' : ''}>Read</a></nav>`;
 
 const THEME_COLOR = { library: '#16110e', avatar: '#efe3c8', twd: '#1f1e1a', hp: '#1a120c', disney: '#171a3d', lotr: '#121812', narnia: '#16222f', got: '#14161a', firefly: '#141a26', tlou: '#1b211c', potc: '#0f1f26' };
 function setPageTheme(world) {
@@ -226,6 +226,7 @@ function route() {
   if (page === 'books') {
     setPageTheme(null);
     if (id === 'new') return renderBookForm(null);
+    if (id === 'pick') return renderBookPick();
     if (id === 'stats') return renderStats();
     return renderBooks();
   }
@@ -252,7 +253,7 @@ function route() {
 function refresh() {
   const [page, id, sub] = parseHash();
   if (modalOpen || tileSorting || spineSorting) { missedRefresh = true; return; }
-  if (page === 'new' || sub === 'settings' || (page === 'books' && id === 'new') || mapBusy()) return;
+  if (page === 'new' || sub === 'settings' || (page === 'books' && (id === 'new' || id === 'pick')) || mapBusy()) return;
   const y = window.scrollY;
   route();
   window.scrollTo(0, y);
@@ -303,6 +304,8 @@ async function openAccount(user) {
       state.settings = code ? await DB.join(code).catch(() => null) : null;
       if (!state.settings) { state.needsInvite = true; return route(); }
     }
+    // The book library (your bookcase, for everyone else to pick from).
+    state.bookLibraryP = !isOwner() && DB.loadBookLibrary ? DB.loadBookLibrary().catch(() => null) : Promise.resolve(null);
     if (state.settings.libraryMode || state.settings.sharedFrom) {
       DB.loadWallpapers().then(w => { state.wallpapers = w; if (parseHash()[0] === 'library') refresh(); }).catch(() => {});
     }
@@ -312,7 +315,7 @@ async function openAccount(user) {
       state[key] = key === 'books' ? list.map(b => ({ ...b, _book: true, name: b.title })) : list;
       got[key] = true;
       if (key === 'worlds' || key === 'books') syncSharedWatches();
-      if (state.loaded) { setTimeout(savePhotosForOffline, 3000); return refresh(); }
+      if (state.loaded) { setTimeout(savePhotosForOffline, 3000); if (key === 'books') publishBookLibrary(); return refresh(); }
       if (got.worlds && got.items && got.books) {
         setTimeout(savePhotosForOffline, 3000);
         state.loaded = true;
@@ -321,6 +324,7 @@ async function openAccount(user) {
         setTimeout(offerJoins, 1500);
       }
       publishWallpapers();
+      if (state.loaded) publishBookLibrary();
     };
     const onError = e => { console.error(e); toast(friendlyError(e), true); };
     state.unwatch = [
@@ -341,6 +345,7 @@ async function firstRun() {
   // Joined with the invite: they choose their own doors from the Library.
   if (s.libraryMode && !s.seeded && !state.worlds.length) { location.hash = '#/library'; return; }
   await seedStarters();
+  seedBookStarters();
   // Already has worlds? A copy that arrived later is offered, not forced.
   if (state.worlds.length && DB.loadShare) {
     const share = await DB.loadShare().catch(e => { console.error(e); return null; });

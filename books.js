@@ -22,10 +22,10 @@ const DEFAULT_SHELVES = [
   { id: 'reading', name: 'Currently reading', sort: 'started' },
   { id: 'read', name: 'Read', sort: 'finished' },
   { id: 'want', name: 'Want to read', sort: 'drag' },
-  { id: 'dnf', name: 'DNF', sort: 'added' },
+  { id: 'dnf', name: 'DNF', sort: 'added', off: true }, // hidden until turned on in Edit shelves
 ];
 const SORTS = [
-  ['drag', 'My order (hold a book to move it)'], ['title', 'Title A–Z'], ['author', 'Author A–Z'],
+  ['drag', 'My order'], ['title', 'Title A–Z'], ['author', 'Author A–Z'],
   ['finished', 'Date finished'], ['started', 'Date started'], ['added', 'Date added'], ['rating', 'Rating'],
 ];
 const SORT_SHORT = { drag: 'My order', title: 'Title', author: 'Author', finished: 'Finished', started: 'Started', added: 'Added', rating: 'Rating' };
@@ -42,7 +42,9 @@ const BOOK_CREST = `<svg viewBox="0 0 64 64" width="56" height="56"><path d="M32
 
 // ---------- little helpers ----------
 const bookById = id => state.books.find(b => b.id === id);
-const shelvesOf = () => (state.settings && state.settings.shelves) || DEFAULT_SHELVES;
+// Every shelf (Edit shelves), and the ones turned on (everywhere else).
+const allShelves = () => (state.settings && state.settings.shelves) || DEFAULT_SHELVES;
+const shelvesOf = () => { const on = allShelves().filter(s => !s.off); return on.length ? on : allShelves().slice(0, 1); };
 const shelfOf = b => (shelvesOf().some(s => s.id === b.shelf) ? b.shelf : shelvesOf()[0].id);
 const hasShelf = id => shelvesOf().some(s => s.id === id);
 const pad2 = n => String(n).padStart(2, '0');
@@ -195,8 +197,7 @@ function renderBooks() {
   const caseHtml = sh => {
     const list = booksOn(sh.id);
     return `<section class="case" data-shelf="${esc(sh.id)}">
-      <header class="case-head"><h2 class="case-name">${esc(sh.name)}</h2>
-        <button class="case-sort" data-sort="${esc(sh.id)}" aria-label="Sort ${esc(sh.name)}">${esc(SORT_SHORT[sh.sort || 'drag'])} <span aria-hidden="true">▾</span></button></header>
+      <header class="case-head"><h2 class="case-name">${esc(sh.name)}</h2></header>
       <div class="case-row">${list.map(spineHtml).join('')}
         <div class="slot add-slot" style="--w:30px;--h:110px"><button class="spine add-spine" data-add="${esc(sh.id)}" aria-label="Add a book to ${esc(sh.name)}">+</button></div></div>
     </section>`;
@@ -204,12 +205,13 @@ function renderBooks() {
   view.innerHTML = `<div class="library books-home">
     ${nick ? `<p class="lib-me">${esc(nick)}</p>` : ''}${sideToggle('books')}
     <header class="lib-head"><button class="lib-crest crest-link" id="bcrest" aria-label="Menu">${BOOK_CREST}</button>
-      <h1 class="lib-title">My Books</h1>
+      <h1 class="lib-title">My Worlds</h1>
       <a class="goal-line" href="#/books/stats">${goal
         ? `<span>${year} · ${done} of ${goal} books</span><span class="goal-bar"><span style="width:${Math.min(100, Math.round((done / goal) * 100))}%"></span></span>`
         : `<span>${done ? `${done} finished in ${year} · ` : ''}Set a ${year} reading goal ›</span>`}</a></header>
     <div class="bookcase" id="case">${shelvesOf().map(caseHtml).join('')}</div>
-    ${state.books.length ? '' : '<p class="empty">Your bookcase is empty. Tap a + to put your first book on a shelf.</p>'}
+    ${state.books.length ? '' : `<p class="empty">Your bookcase is empty. Tap a + to put your first book on a shelf.</p>
+      ${isOwner() ? '' : '<p class="center"><a class="btn primary" href="#/books/pick">Pick from the library</a></p>'}`}
   </div>`;
 
   $('#bcrest').onclick = () => openModal(`<div class="crest-menu">
@@ -221,7 +223,6 @@ function renderBooks() {
     $('#m-shelves', root).onclick = () => { close(); shelvesForm(); };
     $('#out', root).onclick = () => { close(); confirmBox('Sign out?', 'Your books stay saved in your account.', 'Sign out', () => DB.signOut()); };
   }, 'small-modal');
-  $$('.case-sort').forEach(b => { b.onclick = () => sortForm(shelvesOf().find(s => s.id === b.dataset.sort)); });
   fitSpines(view);
   enableSpineDrag($('#case'));
 }
@@ -231,40 +232,24 @@ function saveShelves(list) {
   return DB.saveSettings({ shelves: list });
 }
 
-function sortForm(sh) {
-  openModal(`<h2>Sort “${esc(sh.name)}”</h2><div class="sort-list">${SORTS.map(([k, l]) =>
-    `<label class="check"><input type="radio" name="srt" value="${k}" ${(sh.sort || 'drag') === k ? 'checked' : ''}><span>${l}</span></label>`).join('')}</div>
-    <p class="muted small">Books in a series always stand together, in order.</p>
-    <div class="actions"><span class="spacer"></span><button class="btn" data-close>Done</button></div>`, (root, close) => {
-    $$('input[name=srt]', root).forEach(r => {
-      r.onchange = async () => {
-        // Switching to "My order" starts from the order they're standing in now.
-        if (r.value === 'drag') {
-          const now = booksOn(sh.id);
-          await Promise.all(now.map((b, k) => (b.order === k ? null : DB.updateBook(b, { order: k }))));
-        }
-        await saveShelves(shelvesOf().map(s => (s.id === sh.id ? { ...s, sort: r.value } : s)));
-        close();
-        renderBooks();
-      };
-    });
-  }, 'small-modal');
-}
-
 function shelvesForm() {
-  const before = shelvesOf();
+  const before = allShelves();
   let list = before.map(s => ({ ...s }));
   openModal(`<h2>Shelves</h2><div id="slist" class="shelf-edits"></div>
     <button type="button" class="btn small" id="sadd">+ Add a shelf</button>
-    <p class="muted small">Removing a shelf moves its books to the first shelf.</p>
+    <p class="muted small">With My order, hold a book on the shelf to drag it. Books in a series always stand together, in order. A hidden shelf keeps its name and settings for later. Removing a shelf moves its books to the first one showing.</p>
     <div class="actions"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="ssave">Save</button></div>`, (root, close) => {
     const draw = () => {
       $('#slist', root).innerHTML = list.map((s, i) => `<div class="shelf-edit">
-        <input value="${esc(s.name)}" data-i="${i}" aria-label="Shelf name">
+        <div class="se-top"><input value="${esc(s.name)}" data-i="${i}" aria-label="Shelf name">
         <button type="button" class="btn small ghost" data-up="${i}" ${i ? '' : 'disabled'} aria-label="Move up">↑</button>
         <button type="button" class="btn small ghost" data-down="${i}" ${i < list.length - 1 ? '' : 'disabled'} aria-label="Move down">↓</button>
-        <button type="button" class="btn small ghost danger-text" data-del="${i}" ${list.length > 1 ? '' : 'disabled'} aria-label="Remove">✕</button></div>`).join('');
+        <button type="button" class="btn small ghost danger-text" data-del="${i}" ${list.length > 1 ? '' : 'disabled'} aria-label="Remove">✕</button></div>
+        <label class="switch se-show"><input type="checkbox" data-showi="${i}" ${s.off ? '' : 'checked'}><span class="track"></span><span>Show on my bookcase</span></label>
+        <label class="se-sort"><span>Sort by</span><select data-sorti="${i}">${SORTS.map(([k, l]) => `<option value="${k}" ${(s.sort || 'drag') === k ? 'selected' : ''}>${esc(l)}</option>`).join('')}</select></label></div>`).join('');
       $$('[data-i]', root).forEach(inp => { inp.oninput = () => { list[+inp.dataset.i].name = inp.value; }; });
+      $$('[data-sorti]', root).forEach(sel => { sel.onchange = () => { list[+sel.dataset.sorti].sort = sel.value; }; });
+      $$('[data-showi]', root).forEach(c => { c.onchange = () => { list[+c.dataset.showi].off = !c.checked; }; });
       $$('[data-up]', root).forEach(b => { b.onclick = () => { const i = +b.dataset.up; [list[i - 1], list[i]] = [list[i], list[i - 1]]; draw(); }; });
       $$('[data-down]', root).forEach(b => { b.onclick = () => { const i = +b.dataset.down; [list[i + 1], list[i]] = [list[i], list[i + 1]]; draw(); }; });
       $$('[data-del]', root).forEach(b => { b.onclick = () => { list.splice(+b.dataset.del, 1); draw(); }; });
@@ -274,12 +259,25 @@ function shelvesForm() {
     $('#ssave', root).onclick = e => busy(e.target, async () => {
       list = list.map(s => ({ ...s, name: s.name.trim() }));
       if (list.some(s => !s.name)) throw new Error('Give every shelf a name.');
+      if (!list.some(s => !s.off)) throw new Error('Keep at least one shelf showing.');
+      const hiding = list.find(s => s.off && state.books.some(b => b.shelf === s.id));
+      if (hiding) throw new Error(`“${hiding.name}” has books on it. Move them to another shelf before hiding it.`);
+      list = list.map(s => ({ ...s, off: !!s.off }));
+      const firstOn = list.find(s => !s.off);
       const gone = before.filter(o => !list.some(s => s.id === o.id)).map(s => s.id);
       const moving = state.books.filter(b => gone.includes(shelfOf(b)));
+      // A shelf switched to "My order" starts from the order its books stand in now.
+      for (const s2 of list) {
+        const was = before.find(o => o.id === s2.id);
+        if (was && (s2.sort || 'drag') === 'drag' && (was.sort || 'drag') !== 'drag') {
+          const now = booksOn(s2.id);
+          await Promise.all(now.map((b, k) => (b.order === k ? null : DB.updateBook(b, { order: k }))));
+        }
+      }
       await saveShelves(list);
-      await Promise.all(moving.map(b => DB.updateBook(b, { shelf: list[0].id })));
+      await Promise.all(moving.map(b => DB.updateBook(b, { shelf: firstOn.id })));
       close();
-      toast(moving.length ? `Shelves saved. ${moving.length} book${moving.length === 1 ? '' : 's'} moved to ${list[0].name}.` : 'Shelves saved');
+      toast(moving.length ? `Shelves saved. ${moving.length} book${moving.length === 1 ? '' : 's'} moved to ${firstOn.name}.` : 'Shelves saved');
       renderBooks();
     });
   });
@@ -353,7 +351,7 @@ function enableSpineDrag(caseEl) {
     if ((sh.sort || 'drag') === 'drag') {
       $$('.spine[data-book]', row).forEach((el, k) => { const b = bookById(el.dataset.book); if (b && (b.order !== k || patches[b.id])) add(b, { order: k }); });
     } else if (from === shelfId) {
-      toast(`“${sh.name}” is sorted by ${SORT_SHORT[sh.sort].toLowerCase()}. Tap ${SORT_SHORT[sh.sort]} ▾ and pick My order to arrange it by hand.`);
+      toast(`“${sh.name}” is sorted by ${SORT_SHORT[sh.sort].toLowerCase()}. To arrange it by hand, pick My order for it in Edit shelves.`);
     }
     const list = Object.values(patches);
     if (list.length) {
@@ -1036,8 +1034,9 @@ function renderBookForm(book) {
   view.innerHTML = `<div class="page form-page book-form">
     <header class="w-head"><a class="back" href="${isNew ? '#/books' : `#/b/${esc(b.id)}`}">‹ ${isNew ? 'Books' : 'Back'}</a></header>
     <h1 class="w-title small-title">${isNew ? 'Add a book' : 'Book settings'}</h1>
+    ${isNew ? '<div class="card form-card" id="fromlib" hidden><h2 class="form-h">From the library</h2><div class="lib-row"></div></div>' : ''}
     <div class="card form-card">
-      <h2 class="form-h">${isNew ? 'Find it' : 'Find the cover &amp; details'}</h2>
+      <h2 class="form-h" id="findh">${isNew ? 'Find it' : 'Find the cover &amp; details'}</h2>
       <form id="sf" class="search-row" novalidate><input id="q" type="search" placeholder="Title or author" value="${isNew ? '' : esc(b.title)}" autocomplete="off" enterkeyhint="search"><button class="btn small primary" id="go">Search</button></form>
       <div id="results" class="results"></div>
       ${isNew ? '<p class="muted small">Or type it in yourself below.</p>' : ''}
@@ -1244,6 +1243,7 @@ function renderBookForm(book) {
   };
 
   draw();
+  if (isNew) fillFromLibrary(b.shelf);
 
   // ----- save -----
   root.onsubmit = e => {
@@ -1439,6 +1439,219 @@ async function joinBuddyRead(d, me, shelf) {
   if (B.cover) { try { patch.cover = await DB.copyPhoto('books', id, B.cover); } catch (e) { console.warn(e); } }
   if (B.look && B.look.photo) { try { patch.look = { ...data.look, photo: await DB.copyPhoto('books', id, B.look.photo) }; } catch (e) { console.warn(e); } }
   if (Object.keys(patch).length) await DB.updateBook({ id }, patch);
+}
+
+// ---------- the book library (your bookcase, offered to your sisters) ----------
+// Your account publishes the books on your shelves to library/books: their
+// details, cover, look, spine and map, never your stars, dates, notes or
+// reviews. Everyone else picks from it the first time they sign in
+// (#/books/pick) and from "From the library" on Add a book after that.
+
+// The three books your bookcase starts with (added once, to your account only).
+const BOOK_STARTERS = [
+  {
+    title: 'A Court of Thorns and Roses', author: 'Sarah J. Maas', series: 'A Court of Thorns and Roses', seriesNo: '1', pages: 419,
+    coverUrl: 'https://covers.openlibrary.org/b/id/15102579-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/15102579-M.jpg',
+    blurb: 'When nineteen-year-old huntress Feyre kills a wolf in the woods, a beastly creature comes to demand a life for a life and carries her off to Prythian, the land of the faeries. Her captor isn’t what he seems, and the shadow spreading over the faerie lands may soon reach them all.',
+    theme: 'custom', look: { bg: '#2a1418', card: '#fbf1ee', ink: '#2e1a1c', accent: '#b3263a', font: 'Cinzel' },
+    spineFont: 'Cinzel', spineInk: '#f3e3c3', spineBg: '#8f1426',
+  },
+  {
+    title: 'Fourth Wing', author: 'Rebecca Yarros', series: 'The Empyrean', seriesNo: '1', pages: 518,
+    coverUrl: 'https://covers.openlibrary.org/b/id/14407898-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/14407898-M.jpg',
+    blurb: 'Violet Sorrengail expected a quiet life as a scribe, until her mother, the commanding general, orders her into Basgiath War College to train as a dragon rider. Smaller and more fragile than the other cadets, Violet has to outthink her rivals, earn a dragon’s bond, and survive Xaden Riorson, a wingleader with every reason to want her dead.',
+    theme: 'custom', look: { bg: '#e6d7b5', card: '#fbf4e2', ink: '#3a2c1b', accent: '#8c5a2b', font: 'Uncial Antiqua' },
+    spineFont: 'Uncial Antiqua', spineInk: '#2b2118', spineBg: '#e9dcc0',
+  },
+  {
+    title: 'House of Earth and Blood', author: 'Sarah J. Maas', series: 'Crescent City', seriesNo: '1', pages: 803,
+    coverUrl: 'https://covers.openlibrary.org/b/id/9289603-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/9289603-M.jpg',
+    blurb: 'Bryce Quinlan’s life in Crescent City is all late nights and half-Fae charm, until a demon murders her closest friends. Two years later the killings start again, and Bryce is forced to team up with Hunt Athalar, a fallen angel bound to serve the city’s rulers, to find the killer before the whole city burns.',
+    theme: 'custom', look: { bg: '#1a1020', card: '#f7f1ee', ink: '#2a1a22', accent: '#c8281e', font: 'Playfair Display' },
+    spineFont: 'Playfair Display', spineInk: '#b5121b', spineBg: '#f2ede6',
+  },
+];
+
+let seedingBooks = false;
+async function seedBookStarters() {
+  if (seedingBooks || !isOwner() || state.settings.bookStarters) return;
+  seedingBooks = true;
+  try {
+    const have = new Set(state.books.map(b => libKey(b)));
+    let order = Math.max(-1, ...state.books.filter(b => shelfOf(b) === 'want').map(b => b.order ?? 0)) + 1;
+    for (const st of BOOK_STARTERS) {
+      if (have.has(libKey(st))) continue;
+      await DB.addBook({
+        ...st, shelf: hasShelf('want') ? 'want' : shelvesOf()[0].id, order: order++,
+        reads: [{ start: '', end: '', physical: true, audio: false }], rating: 0, page: 0, chapter: '',
+        review: '', reviewSafe: '', ending: '', mapOn: false, canonOn: false, reviewsOn: true, ficsOn: false, worldId: null,
+      });
+    }
+    await DB.saveSettings({ bookStarters: true });
+    state.settings.bookStarters = true;
+  } catch (e) { console.error(e); }
+  seedingBooks = false;
+}
+
+const libKey = b => `${(b.title || '').trim().toLowerCase()}|${(b.author || '').trim().toLowerCase()}`;
+const photoLink = p => (p && p.url ? { url: p.url, thumbUrl: p.thumbUrl || p.url, w: p.w || null, h: p.h || null } : null);
+
+// Your books, as library entries (only what's safe to share).
+let lastBookLibrary = null;
+function publishBookLibrary() {
+  if (!isOwner() || !DB.saveBookLibrary) return;
+  const books = state.books.map(b => ({
+    id: b.id, title: b.title || '', author: b.author || '', series: b.series || '', seriesNo: b.seriesNo || '', pages: b.pages || null,
+    coverUrl: b.coverUrl || '', coverThumb: b.coverThumb || '', cover: photoLink(b.cover), blurb: b.blurb || '',
+    theme: b.theme || 'custom', look: b.look ? { ...b.look, photo: photoLink(b.look.photo) } : null,
+    spineFont: b.spineFont || '', spineInk: b.spineInk || '', spineBg: b.spineBg || '',
+    map: photoLink(b.map), mapOn: !!b.mapOn || !!b.map, canonOn: !!b.canonOn,
+    canonParts: b.canonParts || { ending: true, ships: true, headcanons: true }, reviewsOn: b.reviewsOn !== false, ficsOn: b.ficsOn === true,
+  })).sort((a, b) => titleKey(a.title).localeCompare(titleKey(b.title)));
+  const json = JSON.stringify(books);
+  if (json === lastBookLibrary) return;
+  lastBookLibrary = json;
+  DB.saveBookLibrary({ books }).catch(e => console.warn('Could not publish the book library', e));
+}
+
+// Library books this person doesn't have yet.
+function libChoices(lib) {
+  const mine = new Set(state.books.map(b => b.fromLib).filter(Boolean));
+  const keys = new Set(state.books.map(libKey));
+  return ((lib && lib.books) || []).filter(e => !mine.has(e.id) && !keys.has(libKey(e)));
+}
+const bookLibrary = () => state.bookLibraryP || Promise.resolve(null);
+
+function libCoverHtml(e) {
+  const src = (e.cover && (e.cover.thumbUrl || e.cover.url)) || e.coverThumb || e.coverUrl;
+  return src ? `<img class="cover-img" src="${esc(src)}" alt="Cover of ${esc(e.title)}" loading="lazy">`
+    : `<span class="gen-cover" data-lib-cover="${esc(e.id)}"><span class="gc-title">${esc(e.title)}</span>${e.author ? `<span class="gc-author">${esc(e.author)}</span>` : ''}</span>`;
+}
+function paintLibCovers(root, entries) {
+  $$('[data-lib-cover]', root).forEach(el => { const e = entries.find(x => x.id === el.dataset.libCover); if (e) Themes.apply(el, { theme: e.theme, look: e.look }); });
+}
+
+// Puts a library book on this person's shelf (their own copy of every picture).
+async function addFromLibrary(e, shelf) {
+  const onShelf = state.books.filter(x => shelfOf(x) === shelf);
+  const data = {
+    title: e.title, author: e.author, series: e.series, seriesNo: e.seriesNo, pages: e.pages || null,
+    coverUrl: e.coverUrl || '', coverThumb: e.coverThumb || '', blurb: e.blurb || '',
+    theme: e.theme || 'custom', look: e.look ? { ...e.look, photo: null } : null,
+    spineFont: e.spineFont || '', spineInk: e.spineInk || '', spineBg: e.spineBg || '',
+    // Canon and Fics always start off (there's nothing in them yet); they can turn them on in the book's settings.
+    mapOn: !!e.mapOn, canonOn: false, canonParts: e.canonParts || { ending: true, ships: true, headcanons: true },
+    reviewsOn: e.reviewsOn !== false, ficsOn: false, worldId: null, fromLib: e.id,
+    shelf, order: Math.max(-1, ...onShelf.map(x => x.order ?? 0)) + 1, rating: 0, page: 0, chapter: '', review: '', reviewSafe: '', ending: '',
+    reads: [{ start: shelf === 'reading' ? today() : '', end: shelf === 'read' ? today() : '', physical: true, audio: false }],
+  };
+  checkPhotoRoom((e.cover ? 1 : 0) + (e.map ? 1 : 0) + (e.look && e.look.photo ? 1 : 0));
+  const id = await DB.addBook(data);
+  const patch = {};
+  const copy = async p => { try { return await DB.copyPhoto('books', id, p); } catch (x) { console.warn('Picture not copied', x); return null; } };
+  if (e.cover) { const c = await copy(e.cover); if (c) patch.cover = c; }
+  if (e.map) { const m = await copy(e.map); if (m) patch.map = m; }
+  if (e.look && e.look.photo) { const ph = await copy(e.look.photo); if (ph) patch.look = { ...data.look, photo: ph }; }
+  if (Object.keys(patch).length) await DB.updateBook({ id }, patch);
+  return id;
+}
+
+// After picking worlds the first time: on to books, if the library has any.
+async function afterWorldsPick() {
+  const lib = await bookLibrary();
+  return libChoices(lib).length && !state.settings.booksPicked ? '#/books/pick' : null;
+}
+
+// "Pick your books": the first-time step, and the empty bookcase's way in.
+function renderBookPick() {
+  view.innerHTML = '<p class="loading">Opening the library…</p>';
+  bookLibrary().then(lib => { if (parseHash()[0] === 'books' && parseHash()[1] === 'pick') drawBookPick(lib); });
+}
+
+function drawBookPick(lib) {
+  const firstTime = !state.settings.booksPicked;
+  const choices = libChoices(lib);
+  const def = hasShelf('want') ? 'want' : shelvesOf()[0].id;
+  const picked = new Map();
+  const shelfSelect = `${shelvesOf().map(s => `<option value="${esc(s.id)}" ${s.id === def ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}`;
+  view.innerHTML = `<div class="library books-pick">
+    <header class="w-head"><a class="back" href="#/books">‹ Books</a></header>
+    <header class="lib-head"><div class="lib-crest" aria-hidden="true">${BOOK_CREST}</div>
+      <h1 class="lib-title">Pick your books</h1>
+      <p class="lib-sub">${firstTime ? 'Tap the ones you want on your shelves. You can add more anytime, and your own too.' : 'Tap the ones you want on your shelves.'}</p></header>
+    ${choices.length ? `<div class="pick-books">${choices.map(e => `<div class="pick-book" data-lib="${esc(e.id)}">
+        <button type="button" class="pick-cover" aria-pressed="false" aria-label="${esc(e.title)}">${libCoverHtml(e)}<span class="pick-check" aria-hidden="true">✓</span></button>
+        <span class="pick-title">${esc(e.title)}</span>${e.author ? `<span class="pick-author">${esc(e.author)}</span>` : ''}
+        <label class="mini-field pick-shelf" hidden><span>Shelf</span><select>${shelfSelect}</select></label></div>`).join('')}</div>`
+      : '<p class="empty">You already have every book in the library.</p>'}
+    <div class="pick-bar">${choices.length ? '<button class="btn primary block" id="go" disabled>Pick a book</button>' : ''}
+      <button class="linkish skip-link" id="skip">${firstTime ? 'Skip for now' : 'Back to my books'}</button></div>
+  </div>`;
+  paintLibCovers(view, choices);
+  const go = $('#go');
+  const label = () => { go.disabled = !picked.size; go.textContent = picked.size ? `Put ${picked.size === 1 ? 'it' : `these ${picked.size}`} on my shelves` : 'Pick a book'; };
+  $$('.pick-book').forEach(el => {
+    const e = choices.find(x => x.id === el.dataset.lib);
+    const btn = $('.pick-cover', el), sel = $('select', el);
+    btn.onclick = () => {
+      if (picked.has(e.id)) picked.delete(e.id); else picked.set(e.id, sel.value);
+      const on = picked.has(e.id);
+      el.classList.toggle('picked', on);
+      btn.setAttribute('aria-pressed', on);
+      $('.pick-shelf', el).hidden = !on;
+      label();
+    };
+    sel.onchange = () => { if (picked.has(e.id)) picked.set(e.id, sel.value); };
+  });
+  const finish = async () => {
+    if (!state.settings.booksPicked) { await DB.saveSettings({ booksPicked: true }); state.settings.booksPicked = true; }
+  };
+  $('#skip').onclick = () => busy($('#skip'), async () => { await finish(); location.hash = !picked.size && state.worlds.length && firstTime ? '#/' : '#/books'; }, '…');
+  if (go) {
+    go.onclick = () => busy(go, async () => {
+      let n = 0;
+      for (const [id, shelf] of picked) {
+        go.textContent = `Shelving ${++n} of ${picked.size}…`;
+        await addFromLibrary(choices.find(x => x.id === id), shelf);
+      }
+      await finish();
+      toast(picked.size === 1 ? 'It’s on your shelf' : `${picked.size} books on your shelves`);
+      location.hash = '#/books';
+    }, 'Shelving…');
+  }
+}
+
+// "From the library" on Add a book: tap one to put it on a shelf.
+function fillFromLibrary(defShelf) {
+  bookLibrary().then(lib => {
+    const box = $('#fromlib');
+    if (!box) return;
+    const choices = libChoices(lib);
+    if (!choices.length) return;
+    box.hidden = false;
+    if ($('#findh')) $('#findh').textContent = 'Or find another';
+    $('.lib-row', box).innerHTML = choices.map(e => `<button type="button" class="lib-book" data-lib="${esc(e.id)}" aria-label="${esc(e.title)}">${libCoverHtml(e)}<span class="lib-book-title">${esc(e.title)}</span></button>`).join('');
+    paintLibCovers(box, choices);
+    $$('.lib-book', box).forEach(el => {
+      el.onclick = () => {
+        const e = choices.find(x => x.id === el.dataset.lib);
+        const shelfNow = ($('#shelf') && $('#shelf').value) || defShelf;
+        openModal(`<div class="lib-detail"><div class="lib-detail-cover">${libCoverHtml(e)}</div>
+            <div><h2>${esc(e.title)}</h2>${e.author ? `<p class="muted">${esc(e.author)}</p>` : ''}${e.series ? `<p class="muted small">${esc(e.series)}${e.seriesNo ? ` · Book ${esc(e.seriesNo)}` : ''}</p>` : ''}</div></div>
+          ${e.blurb ? `<p class="lib-blurb">${esc(e.blurb)}</p>` : ''}
+          <label class="field"><span class="field-label">Put it on</span><select id="lshelf">${shelvesOf().map(sh => `<option value="${esc(sh.id)}" ${sh.id === shelfNow ? 'selected' : ''}>${esc(sh.name)}</option>`).join('')}</select></label>
+          <div class="actions"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="ladd">Add to my shelf</button></div>`,
+        (root, close) => {
+          paintLibCovers(root, [e]);
+          $('#ladd', root).onclick = ev => busy(ev.target, async () => {
+            const id = await addFromLibrary(e, $('#lshelf', root).value);
+            close();
+            location.hash = `#/b/${id}`;
+          }, 'Adding…');
+        });
+      };
+    });
+  });
 }
 
 // ---------- reading goal & stats ----------

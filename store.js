@@ -117,6 +117,12 @@ const Store = (() => {
       return snap && snap.exists ? snap.data() : null;
     },
     saveWallpapers: data => db.collection('library').doc('wallpapers').set({ ...data, owner: uid() }),
+    // ----- the book library (library/books: your bookcase, for everyone else to pick from) -----
+    async loadBookLibrary() {
+      const snap = await db.collection('library').doc('books').get().catch(() => null);
+      return snap && snap.exists ? snap.data() : null;
+    },
+    saveBookLibrary: data => db.collection('library').doc('books').set({ ...data, owner: uid() }),
 
     // Deletes every photo, world and saved thing, then the login itself.
     async deleteAccount(password, onStep) {

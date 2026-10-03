@@ -69,7 +69,8 @@ function renderLibraryPick() {
         <span class="tile-art" aria-hidden="true"></span><span class="pick-check" aria-hidden="true">✓</span>
         <span class="tile-name">${esc(s.name)}</span></div>`).join('')}
       <a class="tile add-tile" href="#/new"><span class="plus" aria-hidden="true">+</span><span class="tile-name">Build your own</span></a></div>
-    ${choices.length ? '<div class="pick-bar"><button class="btn primary block" id="go" disabled>Pick a door</button></div>' : ''}
+    ${choices.length || firstTime ? `<div class="pick-bar">${choices.length ? '<button class="btn primary block" id="go" disabled>Pick a door</button>' : ''}
+      ${firstTime ? '<button class="linkish skip-link" id="skipw">No worlds for now</button>' : ''}</div>` : ''}
   </div>`;
 
   $$('[data-theme-pick]').forEach(el => {
@@ -114,8 +115,17 @@ function renderLibraryPick() {
         state.settings.seeded = true;
       }
       toast(picked.size === 1 ? 'Door added' : `${picked.size} doors added`);
-      location.hash = '#/';
+      // First time: on to picking books (books.js), if there are any to pick.
+      location.hash = (firstTime && await afterWorldsPick()) || '#/';
     }, 'Opening doors…');
+  }
+  // Books only: no worlds is fine.
+  const skipw = $('#skipw');
+  if (skipw) {
+    skipw.onclick = () => busy(skipw, async () => {
+      if (!state.settings.seeded) { await DB.saveSettings({ seeded: true }); state.settings.seeded = true; }
+      location.hash = (await afterWorldsPick()) || '#/books';
+    }, '…');
   }
 }
 

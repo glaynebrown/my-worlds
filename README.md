@@ -24,6 +24,13 @@ the world's page). Reading goal + stats at #/books/stats. Buddy reads share a
 book like a shared world (stars, dates and reviews stay personal). Book search
 uses Open Library (free, no key), with Google Books as a backup.
 
+**Book library:** the books on your (the owner's) bookcase are published to
+`library/books` (details, cover, look, spine, map; never stars, dates, notes or
+reviews). Everyone who joins picks from it the first time (after picking worlds,
+or "No worlds for now") at #/books/pick, and later from "From the library" on
+Add a book. Your bookcase starts with A Court of Thorns and Roses, Fourth Wing
+and House of Earth and Blood (added once; settings.bookStarters).
+
 Plain HTML/CSS/JS + Firebase (Auth, Firestore, Storage), hosted on GitHub Pages.
 Until `firebase-config.js` is filled in, the app offers **sample mode** (nothing saved).
 

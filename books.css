@@ -19,7 +19,6 @@
 .bookcase { display: grid; gap: 26px; margin-top: 4px; }
 .case-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 4px 8px; }
 .case-name { margin: 0; font-family: var(--font-head); font-weight: 500; font-size: 1.5rem; color: #ecd9ae; line-height: 1.1; }
-.case-sort { flex: none; background: none; border: 0; color: var(--page-muted); font: 600 .8rem/1 system-ui, sans-serif; padding: 8px 2px; }
 
 /* Each row of books is exactly --row tall, so the planks (a repeating stripe)
    always land under the books, however many rows a shelf wraps onto. */
@@ -242,7 +241,11 @@
 .spine-opts .field:first-child { margin-top: 0; }
 
 .shelf-edits { display: grid; gap: 8px; margin: 12px 0; }
-.shelf-edit { display: flex; gap: 4px; align-items: center; }
+.shelf-edit { display: flex; flex-direction: column; gap: 6px; padding: 10px; border: 1.5px solid var(--line); border-radius: 12px; }
+.se-top { display: flex; gap: 4px; align-items: center; }
+.se-show { margin-top: 2px; font-size: .88rem; }
+.se-sort { display: flex; align-items: center; gap: 8px; font-size: .78rem; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--muted); }
+.se-sort select { flex: 1; min-width: 0; font: 500 .9rem/1.2 var(--font-body); text-transform: none; letter-spacing: 0; color: var(--ink); background: color-mix(in srgb, var(--card) 70%, #fff); border: 1.5px solid var(--line); border-radius: 10px; padding: 7px 8px; }
 .shelf-edit input { flex: 1; min-width: 0; padding: 9px 11px; border-radius: 10px; border: 1.5px solid var(--line); background: color-mix(in srgb, var(--card) 70%, #fff); color: var(--ink); font-size: 16px; }
 .shelf-edit .btn.small { min-width: 36px; padding: 6px 8px; }
 .sort-list { margin-top: 8px; }
@@ -284,3 +287,32 @@
 .fin-cover .gc-author { display: none; }
 .fin-txt { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .fin-title { font-family: var(--font-head); font-size: 1.15rem; line-height: 1.15; }
+
+/* ---------- the book library ---------- */
+.pick-books { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 12px; }
+.pick-book { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 4px; min-width: 0; }
+.pick-cover { position: relative; width: 100%; padding: 0; border: 0; background: none; border-radius: 4px; overflow: hidden; box-shadow: 0 6px 16px rgba(0,0,0,.45); transition: transform .15s; }
+.pick-cover:active { transform: scale(.97); }
+.pick-cover .gen-cover { width: 100%; }
+.pick-cover .gc-title { font-size: .9rem; }
+.pick-book .pick-check { top: 6px; right: 6px; }
+.pick-book.picked .pick-cover { outline: 3px solid #e9c97a; outline-offset: 2px; }
+.pick-book.picked .pick-check { background: #e9c97a; border-color: #e9c97a; color: #1a140f; }
+.pick-title { margin-top: 6px; font-family: var(--font-head); font-size: 1.05rem; line-height: 1.15; color: #ecd9ae; }
+.pick-author { font-size: .78rem; color: var(--page-muted); }
+.pick-shelf { width: 100%; margin-top: 4px; color: var(--page-muted); }
+.pick-shelf select { padding: 6px 4px; min-height: 34px; font-size: .74rem; text-overflow: ellipsis; }
+.skip-link { display: block; margin: 8px auto 0; color: var(--page-muted); }
+.lib-row { display: flex; gap: 12px; overflow-x: auto; scrollbar-width: none; margin: 10px -18px 0; padding: 4px 18px 6px; }
+.lib-row::-webkit-scrollbar { display: none; }
+.lib-book { flex: none; width: 84px; padding: 0; border: 0; background: none; text-align: center; color: var(--ink); }
+.lib-book > .cover-img, .lib-book > .gen-cover { width: 84px; border-radius: 3px; box-shadow: 0 3px 10px rgba(0,0,0,.25); }
+.lib-book .gc-title { font-size: .7rem; }
+.lib-book .gc-author { display: none; }
+.lib-book-title { display: block; margin-top: 6px; font-size: .78rem; line-height: 1.2; }
+.lib-detail { display: flex; gap: 14px; align-items: flex-start; }
+.lib-detail-cover { flex: none; width: 90px; border-radius: 3px; overflow: hidden; box-shadow: 0 4px 12px rgba(0,0,0,.25); }
+.lib-detail-cover .gen-cover { width: 100%; }
+.lib-detail h2 { font-size: 1.4rem; line-height: 1.15; }
+.lib-detail p { margin: 4px 0 0; }
+.lib-blurb { margin-top: 12px; line-height: 1.5; font-size: .95rem; display: -webkit-box; -webkit-line-clamp: 7; -webkit-box-orient: vertical; overflow: hidden; }

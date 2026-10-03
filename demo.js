@@ -2,7 +2,7 @@
    as store.js, but everything lives in memory and disappears on reload.
    Photos you add stay on this phone only (never uploaded). */
 const DemoStore = (() => {
-  let worlds = [], items = [], books = [], settings = {};
+  let worlds = [], items = [], books = [], settings = {}, bookLib = null;
   const shared = {}, sharedNotes = {}, sharedWatchers = {};
   const sharedItems = {};
   const sharedView = sid => ({ doc: shared[sid] ? clone(shared[sid]) : { id: sid, gone: true }, notes: clone(sharedNotes[sid] || []), items: clone(sharedItems[sid] || []) });
@@ -46,6 +46,8 @@ const DemoStore = (() => {
     createAccount: async () => {},
     loadWallpapers: async () => null,
     saveWallpapers: async () => {},
+    loadBookLibrary: async () => (bookLib ? clone(bookLib) : null),
+    saveBookLibrary: async data => { bookLib = clone(data); },
     deleteAccount: async () => { throw new Error('Sample mode has no account to delete.'); },
     saveSettings: async patch => { settings = { ...settings, ...patch }; },
 
