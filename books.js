@@ -198,6 +198,7 @@ const ORNAMENTS = [
   ['compass', 'Compass', "<path d='M12 .8l2.7 8.5 8.5 2.7-8.5 2.7L12 23.2l-2.7-8.5L.8 12l8.5-2.7z'/>"],
 ];
 const ORN_IDS = ORNAMENTS.map(o => o[0]);
+const SPINE_BOTTOMS = [['', 'Same as top'], ['lines', 'Two lines'], ['band', 'Thick line'], ['triple', 'Three lines'], ['none', 'Nothing']];
 const ornPicture = id => !!(ORNAMENTS.find(o => o[0] === id) || [])[2];
 // The pictures, as CSS (added to the page once).
 (function addOrnamentStyles() {
@@ -256,10 +257,12 @@ function spineHtml(b, opts = {}) {
   let orn = ornOf(b);
   if (ornPicture(orn) && s.w < 22) orn = 'diamond';
   const pic = ornPicture(orn);
+  // The bottom: the same design flipped (default), or lines / nothing.
+  const bot = SPINE_BOTTOMS.some(([k]) => k && k === b.spineBottom) ? b.spineBottom : '';
   const fit = spineFit(b, s);
   return `<div class="slot${fit.lines > 1 ? ' two-line' : ''}" style="--w:${s.w}px;--h:${s.h}px;--fs:${fit.fs.toFixed(1)}px;--sb:${cssColor(s.bg)};--si:${cssColor(s.ink)};--sf:'${esc(s.font.replace(/'/g, ''))}'${ribbon != null ? `;--rp:${ribbon}%;--rc:${cssColor(ribbonColorOf(b, s))}` : ''}">
     ${ribbon != null ? '<span class="ribbon" aria-hidden="true"></span>' : ''}
-    <button class="spine${pic ? ' pic' : ''}" data-book="${esc(b.id)}" data-orn="${orn}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}">${pic ? '<span class="orn top"></span><span class="orn bot"></span>' : ''}
+    <button class="spine${pic ? ' pic' : ''}" data-book="${esc(b.id)}" data-orn="${orn}"${bot ? ` data-bot="${bot}"` : ''} aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}">${pic ? `<span class="orn top"></span>${bot ? '' : '<span class="orn bot"></span>'}` : ''}
       ${b.series && b.seriesNo ? `<span class="spine-no">${esc(b.seriesNo)}</span>` : ''}<span class="spine-title">${esc(b.title)}</span></button></div>`;
 }
 
@@ -1168,6 +1171,7 @@ function renderBookForm(book) {
   // The spine design: a new book gets one that fits its look (and a new one when the look
   // changes), until one is picked or shuffled by hand.
   let orn = isNew ? shuffleOrn(b) : ornOf(b), ornTouched = !isNew;
+  let sBot = b.spineBottom || '';
   const parts = { ending: true, ships: true, headcanons: true, ...(b.canonParts || {}) };
   const worldKeys = Object.keys(Themes.BUILT_IN);
   const swatchRow = (id, list, cur) => `<div class="swatches ink-swatches" id="${id}">
@@ -1229,6 +1233,8 @@ function renderBookForm(book) {
         </div></div>
       <div class="field"><span class="field-label orn-head">Spine design <button type="button" class="btn small ghost" id="ornshuffle">Shuffle</button></span>
         <div class="orn-grid" id="orngrid"></div></div>
+      <div class="field"><span class="field-label">Bottom of the spine</span>
+        <div class="chips bot-chips" id="botpick">${SPINE_BOTTOMS.map(([k, l]) => `<button type="button" class="chip${k === sBot ? ' on' : ''}" data-bot="${k}">${l}</button>`).join('')}</div></div>
       <label class="switch" id="serieswrap" hidden><input type="checkbox" id="allseries"><span class="track"></span><span id="serieslabel"></span></label>
 
       <h2 class="form-h">Linked world</h2>
@@ -1264,7 +1270,7 @@ function renderBookForm(book) {
   const current = () => ({
     id: b.id || 'new', title: $('#title').value.trim() || 'Your book', author: $('#author').value.trim(),
     pages: Number($('#pages').value) || 0, theme, look: theme === 'custom' ? readLook() : null,
-    spineFont: $('#sfont').value, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, spineOrn: orn, shelf: $('#shelf').value,
+    spineFont: $('#sfont').value, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, spineOrn: orn, spineBottom: sBot, shelf: $('#shelf').value,
     series: $('#series').value.trim(), seriesNo: $('#seriesNo').value.trim(),
   });
   const coverSrcNow = () => (coverMode === 'upload' ? URL.createObjectURL(coverPrepared.thumb.blob)
@@ -1289,6 +1295,7 @@ function renderBookForm(book) {
         <span class="spine orn-demo${svg ? ' pic' : ''}" data-orn="${id}" style="--w:30px;--h:64px;--sb:${cssColor(st.bg)};--si:${cssColor(st.ink)}">${svg ? '<span class="orn top"></span><span class="orn bot"></span>' : ''}</span>
         <span class="orn-name">${name}</span></button>`).join('');
     $$('#orngrid .orn-pick').forEach(btn => { btn.onclick = () => { orn = btn.dataset.o; ornTouched = true; draw(); }; });
+    $$('#botpick .chip').forEach(ch => ch.classList.toggle('on', ch.dataset.bot === sBot));
     fitSpines($('#sdemo'));
     const src = coverSrcNow();
     $('#cprev').innerHTML = src ? `<img src="${esc(src)}" alt="">` : `<span class="gen-cover" id="gc"><span class="gc-title">${esc(c.title)}</span>${c.author ? `<span class="gc-author">${esc(c.author)}</span>` : ''}</span>`;
@@ -1340,6 +1347,7 @@ function renderBookForm(book) {
       $('#sfont').value = mate.spineFont || '';
       sInk = mate.spineInk || ''; sBg = mate.spineBg || ''; rCol = mate.ribbonColor || '';
       orn = ornOf(mate);
+      sBot = mate.spineBottom || '';
       $$('#rcols .swatch').forEach(s => s.classList.toggle('on', (s.dataset.c ?? null) === rCol));
       $$('#sinks .swatch').forEach(s => s.classList.toggle('on', (s.dataset.c ?? null) === sInk));
       $$('#sbgs .swatch').forEach(s => s.classList.toggle('on', (s.dataset.c ?? null) === sBg));
@@ -1355,6 +1363,7 @@ function renderBookForm(book) {
   swatches('sinks', v => { sInk = v; });
   swatches('sbgs', v => { sBg = v; });
   swatches('rcols', v => { rCol = v; });
+  $$('#botpick .chip').forEach(ch => { ch.onclick = () => { sBot = ch.dataset.bot; draw(); }; });
   $('#ornshuffle').onclick = () => { orn = shuffleOrn(current(), orn); ornTouched = true; draw(); };
   $('#bgfile').onchange = async e => {
     const f = e.target.files[0];
@@ -1431,7 +1440,7 @@ function renderBookForm(book) {
         totalChapters: Number($('#chapters').value) || null,
         blurb: $('#blurb').value.trim(), shelf: c.shelf, theme,
         look: theme === 'custom' ? { ...readLook(), photo: lookDrop ? null : (look.photo || null) } : (b.look || null),
-        spineFont: c.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, spineOrn: orn, worldId: $('#world').value || null,
+        spineFont: c.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, spineOrn: orn, spineBottom: sBot, worldId: $('#world').value || null,
         mapOn: $('#mapon').checked, canonOn: $('#canon').checked, canonParts: canonPicked,
         reviewsOn: $('#reviewson').checked, ficsOn: $('#ficson').checked,
       };
@@ -1459,7 +1468,7 @@ function renderBookForm(book) {
         const key = c.series.toLowerCase();
         const look2 = data.look ? { ...data.look, photo: null } : null;
         await Promise.all(state.books.filter(x => x.id !== b.id && seriesKey(x) === key)
-          .map(x => DB.updateBook(x, { theme, look: look2, spineFont: data.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, spineOrn: orn })));
+          .map(x => DB.updateBook(x, { theme, look: look2, spineFont: data.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, spineOrn: orn, spineBottom: sBot })));
       }
       toast('Saved');
       location.hash = `#/b/${b.id}`;
@@ -1563,7 +1572,7 @@ async function startBuddyRead(book, me, email, secs) {
     book: {
       title: book.title, author: book.author || '', series: book.series || '', seriesNo: book.seriesNo || '', pages: book.pages || null,
       coverUrl: book.coverUrl || '', coverThumb: book.coverThumb || '', cover: book.cover || null, blurb: book.blurb || '',
-      theme: book.theme || 'custom', look: book.look || null, spineFont: book.spineFont || '', spineInk: book.spineInk || '', spineBg: book.spineBg || '', ribbonColor: book.ribbonColor || '', spineOrn: ornOf(book),
+      theme: book.theme || 'custom', look: book.look || null, spineFont: book.spineFont || '', spineInk: book.spineInk || '', spineBg: book.spineBg || '', ribbonColor: book.ribbonColor || '', spineOrn: ornOf(book), spineBottom: book.spineBottom || '',
     },
   });
   await moveIntoShared(book, sid, secs, me);
@@ -1601,7 +1610,7 @@ async function joinBuddyRead(d, me, shelf) {
     title: B.title || d.name, author: B.author || '', series: B.series || '', seriesNo: B.seriesNo || '', pages: B.pages || null,
     coverUrl: B.coverUrl || '', coverThumb: B.coverThumb || '', blurb: B.blurb || '',
     theme: B.theme || 'custom', look: B.look ? { ...B.look, photo: null } : null,
-    spineFont: B.spineFont || '', spineInk: B.spineInk || '', spineBg: B.spineBg || '', ribbonColor: B.ribbonColor || '', spineOrn: B.spineOrn || '',
+    spineFont: B.spineFont || '', spineInk: B.spineInk || '', spineBg: B.spineBg || '', ribbonColor: B.ribbonColor || '', spineOrn: B.spineOrn || '', spineBottom: B.spineBottom || '',
     shelf, order: Math.max(-1, ...onShelf.map(x => x.order ?? 0)) + 1, rating: 0, page: 0, chapter: '', review: '', reviewSafe: '', ending: '',
     reads: [{ start: shelf === 'reading' ? today() : '', end: '', physical: true, audio: false }],
     sharedId: d.id, mapOn: !!sec.map, canonOn: !!sec.canon, ficsOn: !!sec.fics,
@@ -1678,7 +1687,7 @@ function publishBookLibrary() {
     id: b.id, title: b.title || '', author: b.author || '', series: b.series || '', seriesNo: b.seriesNo || '', pages: b.pages || null,
     coverUrl: b.coverUrl || '', coverThumb: b.coverThumb || '', cover: photoLink(b.cover), blurb: b.blurb || '',
     theme: b.theme || 'custom', look: b.look ? { ...b.look, photo: photoLink(b.look.photo) } : null,
-    spineFont: b.spineFont || '', spineInk: b.spineInk || '', spineBg: b.spineBg || '', ribbonColor: b.ribbonColor || '', spineOrn: ornOf(b),
+    spineFont: b.spineFont || '', spineInk: b.spineInk || '', spineBg: b.spineBg || '', ribbonColor: b.ribbonColor || '', spineOrn: ornOf(b), spineBottom: b.spineBottom || '',
     map: photoLink(b.map), mapOn: !!b.mapOn || !!b.map, canonOn: !!b.canonOn,
     canonParts: b.canonParts || { ending: true, ships: true, headcanons: true }, reviewsOn: b.reviewsOn !== false, ficsOn: b.ficsOn === true,
   })).sort((a, b) => titleKey(a.title).localeCompare(titleKey(b.title)));
@@ -1712,7 +1721,7 @@ async function addFromLibrary(e, shelf) {
     title: e.title, author: e.author, series: e.series, seriesNo: e.seriesNo, pages: e.pages || null,
     coverUrl: e.coverUrl || '', coverThumb: e.coverThumb || '', blurb: e.blurb || '',
     theme: e.theme || 'custom', look: e.look ? { ...e.look, photo: null } : null,
-    spineFont: e.spineFont || '', spineInk: e.spineInk || '', spineBg: e.spineBg || '', ribbonColor: e.ribbonColor || '', spineOrn: e.spineOrn || '',
+    spineFont: e.spineFont || '', spineInk: e.spineInk || '', spineBg: e.spineBg || '', ribbonColor: e.ribbonColor || '', spineOrn: e.spineOrn || '', spineBottom: e.spineBottom || '',
     // Canon and Fics always start off (there's nothing in them yet); they can turn them on in the book's settings.
     mapOn: !!e.mapOn, canonOn: false, canonParts: e.canonParts || { ending: true, ships: true, headcanons: true },
     reviewsOn: e.reviewsOn !== false, ficsOn: false, worldId: null, fromLib: e.id,

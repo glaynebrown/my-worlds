@@ -72,6 +72,15 @@
 .orn.top { top: 6px; }
 .orn.bot { bottom: 6px; transform: translateX(-50%) scaleY(-1); }
 .spine.pic .spine-no { top: 30px; }
+/* A different bottom (book settings "Bottom of the spine"): lines under a picture, or nothing. */
+.spine.pic[data-bot]::after { display: block; }
+.spine[data-bot="lines"]::after { height: 1.5px; bottom: 11px; box-shadow: 0 -4px 0 currentColor; }
+.spine[data-bot="band"]::after { height: 4px; bottom: 12px; box-shadow: none; }
+.spine[data-bot="triple"]::after { height: 1.2px; bottom: 9px; box-shadow: 0 -3.5px 0 currentColor, 0 -7px 0 currentColor; }
+.spine[data-bot="none"]::after { display: none !important; }
+.bot-chips { flex-wrap: wrap; overflow: visible; margin: 4px 0 0; padding: 0; }
+.bot-chips .chip { border-color: var(--line); color: var(--ink); }
+.bot-chips .chip.on { background: var(--ink); color: var(--card); }
 .spine.pic .spine-title { max-height: calc(var(--h) - 66px); }
 .spine.pic .spine-no + .spine-title { margin-top: 16px; max-height: calc(var(--h) - 82px); }
 .spine-no + .spine-title { margin-top: 12px; max-height: calc(var(--h) - 62px); }
