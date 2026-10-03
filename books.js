@@ -419,14 +419,17 @@ function renderBooks() {
       <button class="btn block" id="m-add">+ Add a book</button>
       <button class="btn block" id="m-shelves">Edit shelves</button>
       <a class="btn block" href="#/books/stats" data-close>Reading goal &amp; stats</a>
+      <button class="btn block" id="m-tour">How to use</button>
       <hr class="menu-rule">${accountRows(nick)}</div>`, (root, close) => {
     $('#m-add', root).onclick = () => { close(); addBook(); };
+    $('#m-tour', root).onclick = () => { close(); startTour(['books']); };
     $('#m-shelves', root).onclick = () => { close(); shelvesForm(); };
     wireAccount(root, close, 'books');
   }, 'small-modal');
   fitSpines(view);
   fitPlates(view);
   enableSpineDrag($('#case'));
+  maybeTour('books');
 }
 
 function saveShelves(list) {

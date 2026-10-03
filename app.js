@@ -537,7 +537,7 @@ function renderLibrary() {
     ${worlds.length ? '' : `<div class="side-empty"><p class="empty">No worlds yet</p>
       <div class="side-empty-btns"><a class="btn" href="#/library">Browse the library</a><a class="btn ghost" href="#/new">Build your own</a></div></div>`}</div>`;
   // Each tile wears its own world's look.
-  $$('.tile[data-world]').forEach(el => {
+  $$('.tile[data-world]', view).forEach(el => {
     const w = worldById(el.dataset.world);
     Themes.apply(el, w); // (resets inline style for worlds you added, so the photo goes on after)
     if (w.cardPhoto) el.style.setProperty('--card-photo', `url('${w.cardPhoto.thumbUrl}')`);
@@ -550,8 +550,13 @@ function renderLibrary() {
   $('#hgear').onclick = () => openModal(`<div class="crest-menu">
       <a class="btn block" href="#/library" data-close>+ Add a world</a>
       <a class="btn block" href="#/wishlist" data-close>Wishlist</a>
-      <hr class="menu-rule">${accountRows(nick)}</div>`, (root, close) => wireAccount(root, close, 'worlds'), 'small-modal');
+      <button class="btn block" id="m-tour">How to use</button>
+      <hr class="menu-rule">${accountRows(nick)}</div>`, (root, close) => {
+    $('#m-tour', root).onclick = () => { close(); startTour(['worlds']); };
+    wireAccount(root, close, 'worlds');
+  }, 'small-modal');
   enableTileDrag($('.shelf'));
+  maybeTour('worlds');
 }
 
 // Your name or nickname: top left of the home page, and filled in when you share a world.
