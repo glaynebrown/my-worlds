@@ -2148,8 +2148,78 @@ function renderSeries(name) {
   });
 }
 
+// Hold a card (about half a second), drag it, let go: the same feel as the doors and
+// books. onDrop gets the new order (each card's data-* key, from the selector's attribute).
+let holdDrag = null;
+function enableHoldDrag(box, sel, onDrop) {
+  if (!box) return;
+  if (holdDrag) holdDrag.abort();
+  holdDrag = new AbortController();
+  const opts = { signal: holdDrag.signal };
+  const attr = /\[data-([a-z-]+)\]/.exec(sel)[1];
+  const keyOf = el => el.getAttribute(`data-${attr}`);
+  let timer = null, start = null, item = null, ghost = null, offset = null, dragging = false;
+  const cancel = () => { clearTimeout(timer); timer = null; };
+  const begin = (el, x, y) => { item = el; start = { x, y }; cancel(); timer = setTimeout(pick, 450); };
+  function pick() {
+    timer = null;
+    if (!item || !item.isConnected) return;
+    dragging = true;
+    const r = item.getBoundingClientRect();
+    offset = { x: start.x - r.left, y: start.y - r.top };
+    ghost = item.cloneNode(true);
+    ghost.classList.add('hold-ghost');
+    Object.assign(ghost.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+    document.body.appendChild(ghost);
+    item.classList.add('hold-placeholder');
+    if (navigator.vibrate) navigator.vibrate(8);
+  }
+  function move(x, y) {
+    ghost.style.left = `${x - offset.x}px`;
+    ghost.style.top = `${y - offset.y}px`;
+    const over = document.elementFromPoint(x, y);
+    const target = over && over.closest(sel);
+    if (!target || target === item || !box.contains(target)) return;
+    const list = $$(sel, box);
+    box.insertBefore(item, list.indexOf(target) > list.indexOf(item) ? target.nextSibling : target);
+  }
+  function drop() {
+    if (ghost) ghost.remove();
+    ghost = null;
+    item.classList.remove('hold-placeholder');
+    dragging = false;
+    box.dataset.draggedAt = Date.now(); // so letting go isn't also taken as a tap
+    onDrop($$(sel, box).map(keyOf));
+  }
+  const end = () => { cancel(); if (dragging) drop(); };
+  box.addEventListener('touchstart', e => { const el = e.target.closest(sel); if (el && e.touches.length === 1) begin(el, e.touches[0].clientX, e.touches[0].clientY); }, { passive: true, ...opts });
+  box.addEventListener('touchmove', e => {
+    const p = e.touches[0];
+    if (dragging) { e.preventDefault(); move(p.clientX, p.clientY); return; }
+    if (timer && Math.hypot(p.clientX - start.x, p.clientY - start.y) > 10) cancel();
+  }, { passive: false, ...opts });
+  box.addEventListener('touchend', end, opts);
+  box.addEventListener('touchcancel', end, opts);
+  box.addEventListener('pointerdown', e => { if (e.pointerType !== 'mouse' || e.button > 0) return; const el = e.target.closest(sel); if (el) begin(el, e.clientX, e.clientY); }, opts);
+  window.addEventListener('pointermove', e => {
+    if (e.pointerType !== 'mouse') return;
+    if (dragging) { move(e.clientX, e.clientY); return; }
+    if (timer && Math.hypot(e.clientX - start.x, e.clientY - start.y) > 10) cancel();
+  }, opts);
+  window.addEventListener('pointerup', e => { if (e.pointerType === 'mouse') end(); }, opts);
+  box.addEventListener('contextmenu', e => { if (e.target.closest(sel)) e.preventDefault(); }, opts);
+}
+
 // ---------- reading goal & stats ----------
 let statsYear = null;
+// Whether a stats section is open (By month starts open, Finished starts closed); remembered on this phone.
+function statsFold(key, dflt, set) {
+  try {
+    const all = JSON.parse(localStorage.getItem('fw-stats') || '{}');
+    if (set) { all[key] = dflt; localStorage.setItem('fw-stats', JSON.stringify(all)); return dflt; }
+    return key in all ? all[key] : dflt;
+  } catch { return dflt; }
+}
 function renderStats() {
   const now = new Date().getFullYear();
   const year = statsYear || now;
@@ -2159,16 +2229,35 @@ function renderStats() {
   const fin = finishesIn(year);
   const goal = goalFor(year);
   const pages = fin.reduce((n, f) => n + (Number(f.book.pages) || 0), 0);
-  const rated = fin.filter(f => f.book.rating);
-  const avg = rated.length ? (rated.reduce((n, f) => n + f.book.rating, 0) / rated.length).toFixed(1) : '–';
   const fmt = {
     physical: fin.filter(f => f.read.physical && !f.read.audio).length,
     audio: fin.filter(f => f.read.audio && !f.read.physical).length,
     both: fin.filter(f => f.read.audio && f.read.physical).length,
   };
-  const months = Array(12).fill(0);
-  fin.forEach(f => { months[Number(f.read.end.slice(5, 7)) - 1]++; });
-  const maxM = Math.max(1, ...months);
+  // Books finished each month, as little stacks of books lying flat (in their spine colors).
+  const byMonth = Array.from({ length: 12 }, () => []);
+  fin.forEach(f => { byMonth[Number(f.read.end.slice(5, 7)) - 1].push(f); });
+  const thisMonth = new Date().getMonth();
+  const MAX_STACK = 6;
+  const flatBook = (f, k) => {
+    const st = spineStyle(f.book);
+    const w = 80 + (hashOf(`${f.book.id}${k}`) % 5) * 4;            // 80–96% wide, a little uneven
+    const shift = ((hashOf(f.book.title || '') % 5) - 2) * 1.5;      // and not perfectly lined up
+    const h = Math.round(Math.min(22, Math.max(16, 13 + (Number(f.book.pages) || 300) / 120)));
+    Themes.loadFont(st.font);
+    return `<span class="flat-book" style="--fw:${w}%;--fh:${h}px;--fx:${shift}px;--sb:${cssColor(st.bg)};--si:${cssColor(st.ink)};--sf:'${esc(st.font.replace(/'/g, ''))}'"><span class="flat-title">${esc(f.book.title)}</span></span>`;
+  };
+  const monthCard = (list, i) => {
+    const future = year === now && i > thisMonth;
+    const shown = list.slice(0, MAX_STACK).reverse();  // first finished at the bottom
+    const full = new Date(2000, i, 1).toLocaleDateString(undefined, { month: 'long' });
+    const short = new Date(2000, i, 1).toLocaleDateString(undefined, { month: 'short' });
+    return `<button class="month-card${future ? ' future' : ''}${list.length ? '' : ' none'}" data-m="${i}" ${list.length ? '' : 'disabled'}>
+      <span class="stack">${list.length > MAX_STACK ? `<span class="stack-more">+${list.length - MAX_STACK}</span>` : ''}${shown.map(flatBook).join('')}</span>
+      <span class="month-shelf" aria-hidden="true"></span>
+      <span class="month-name" data-short="${esc(short)}">${esc(full)}</span>
+      <span class="month-count">${list.length ? `${list.length} book${list.length === 1 ? '' : 's'}` : '—'}</span></button>`;
+  };
   const pct = goal ? Math.min(100, Math.round((fin.length / goal) * 100)) : 0;
   let pace = '';
   if (goal && year === now && fin.length < goal) {
@@ -2178,7 +2267,41 @@ function renderStats() {
     pace = diff > 0 ? `${diff} book${diff === 1 ? '' : 's'} ahead of schedule` : diff < 0 ? `${-diff} book${diff === -1 ? '' : 's'} behind schedule` : 'Right on track';
   }
   const fmtTotal = Math.max(1, fmt.physical + fmt.audio + fmt.both);
-  const tile = (label, value) => `<div class="card stat"><span class="stat-v">${value}</span><span class="stat-l">${label}</span></div>`;
+  // The four tiles, in the order you've dragged them into (settings.statOrder).
+  // Five little stars, filled to the rating (halves too).
+  const miniStars = r => `<span class="mini-stars" role="img" aria-label="${r} out of 5 stars">${[1, 2, 3, 4, 5].map(n =>
+    `<span class="mini-star" style="--fill:${r >= n ? 100 : r >= n - 0.5 ? 50 : 0}%"></span>`).join('')}</span>`;
+  // Favorite of the year: one book. The one you picked (settings.favorites[year]), or else your
+  // most recently finished book with your highest rating that year. Tap the tile to change it.
+  const finBooks = [...new Map(fin.map(f => [f.book.id, f])).values()];
+  const best = Math.max(0, ...finBooks.map(f => f.book.rating || 0));
+  const picked = (((state.settings || {}).favorites || {})[year]);
+  const favF = finBooks.find(f => f.book.id === picked)
+    || (best ? finBooks.filter(f => f.book.rating === best).sort((a, z) => z.read.end.localeCompare(a.read.end))[0] : null);
+  const fav = favF && favF.book;
+  const favHtml = !fav ? '–'
+    : `<span class="fav-covers"><span class="fav-cover">${coverHtml(fav)}</span>${fav.rating ? miniStars(fav.rating) : ''}</span>
+       <span class="fav-line">${esc(fav.title)}</span>`;
+  // Average days per book: start to finish, for reads with both dates.
+  const spans = fin.filter(f => f.read.start && f.read.start <= f.read.end)
+    .map(f => Math.round((new Date(f.read.end) - new Date(f.read.start)) / 864e5) + 1);
+  const days = spans.length ? Math.round(spans.reduce((a, b) => a + b, 0) / spans.length) : null;
+  // Want to read: the next few books on that shelf (in its order), and how many are waiting.
+  const wantList = hasShelf('want') ? booksOn('want') : [];
+  const wantHtml = !wantList.length ? '0'
+    : `<span class="fav-covers">${wantList.slice(0, 3).map(b => `<a class="fav-cover" href="#/b/${esc(b.id)}" aria-label="${esc(b.title)}">${coverHtml(b)}</a>`).join('')}</span>
+       <span class="fav-line">${wantList.length} book${wantList.length === 1 ? '' : 's'} waiting</span>`;
+  const TILES = {
+    fav: ['Favorite of the year', favHtml],
+    want: ['Up next', wantHtml],
+    pages: ['Pages read', pages.toLocaleString()],
+    days: ['Average days per book', days == null ? '–' : `${days}<span class="stat-unit"> day${days === 1 ? '' : 's'}</span>`],
+  };
+  // (Older saved orders used avg and reading for the two tiles these replaced.)
+  const renamed = { avg: 'fav', reading: 'days' };
+  const saved = ((state.settings || {}).statOrder || []).map(k => renamed[k] || k).filter(k => TILES[k]);
+  const order = [...saved, ...Object.keys(TILES).filter(k => !saved.includes(k))];
+  const tile = k => `<div class="card stat${(k === 'fav' && fav) || (k === 'want' && wantList.length) ? ' stat-fav' : ''}" data-stat="${k}"><span class="stat-v">${TILES[k][1]}</span><span class="stat-l">${TILES[k][0]}</span></div>`;
   view.innerHTML = `<div class="page stats-page">
     <header class="w-head"><a class="back" href="#/books">‹ Books</a></header>
     <h1 class="w-title small-title">Reading stats</h1>
@@ -2190,28 +2313,86 @@ function renderStats() {
       ${goal && fin.length >= goal ? '<p class="goal-done">Goal reached!</p>' : pace ? `<p class="muted small">${pace}</p>` : ''}
       <button class="btn small" id="setgoal">${goal ? 'Change goal' : `Set a ${year} goal`}</button>
     </div>
-    <div class="stat-grid">
-      ${tile('Pages read', pages.toLocaleString())}
-      ${tile('Average rating', avg === '–' ? '–' : `${avg}<span class="stat-star" aria-hidden="true">★</span>`)}
-      ${tile('Currently reading', state.books.filter(inReading).length)}
-      ${tile('Want to read', state.books.filter(b => shelfOf(b) === 'want').length)}
-    </div>
+    <div class="stat-grid" id="statgrid">${order.map(tile).join('')}</div>
     <h2 class="sec-h">How I read</h2>
     <div class="card fmt-card">
       <div class="fmt-bar" role="img" aria-label="Physical ${fmt.physical}, audiobook ${fmt.audio}, both ${fmt.both}">
         ${[['physical', fmt.physical], ['audio', fmt.audio], ['both', fmt.both]].filter(([, n]) => n).map(([k, n]) => `<span class="fmt-${k}" style="flex:${n / fmtTotal}"></span>`).join('') || '<span class="fmt-none"></span>'}</div>
       <div class="fmt-keys"><span><i class="fmt-physical"></i>Physical ${fmt.physical}</span><span><i class="fmt-audio"></i>Audiobook ${fmt.audio}</span><span><i class="fmt-both"></i>Both ${fmt.both}</span></div>
     </div>
-    <h2 class="sec-h">By month</h2>
-    <div class="card months">${months.map((n, i) => `<div class="month"><span class="month-n">${n || ''}</span><span class="month-bar" style="height:${Math.round((n / maxM) * 100)}%"></span><span class="month-l">${'JFMAMJJASOND'[i]}</span></div>`).join('')}</div>
-    <h2 class="sec-h">Finished in ${year}</h2>
+    <details class="rw-block stat-block" data-block="months" ${statsFold('months', true) ? 'open' : ''}><summary class="block-head"><h2 class="sec-h">By month<span class="fold-caret" aria-hidden="true"></span></h2></summary>
+    <div class="months">${byMonth.map(monthCard).join('')}</div></details>
+    <details class="rw-block stat-block" data-block="finished" ${statsFold('finished', false) ? 'open' : ''}><summary class="block-head"><h2 class="sec-h">Finished in ${year}<span class="fold-caret" aria-hidden="true"></span></h2></summary>
     ${fin.length ? `<div class="fin-list">${fin.slice().reverse().map(f => `<a class="fin card" href="#/b/${esc(f.book.id)}">
         <span class="fin-cover">${coverHtml(f.book)}</span>
         <span class="fin-txt"><span class="fin-title">${esc(f.book.title)}</span>${f.book.author ? `<span class="muted small">${esc(f.book.author)}</span>` : ''}
         <span class="muted small">${esc(fmtDate(f.read.end))}${f.book.rating ? ` · ${f.book.rating} ★` : ''}${f.i > 0 ? ' · re-read' : ''}</span></span></a>`).join('')}</div>`
-      : '<p class="empty">Nothing finished yet this year. The next one’s waiting.</p>'}
+      : '<p class="empty">Nothing finished yet this year. The next one’s waiting.</p>'}</details>
   </div>`;
   paintCovers(view);
+  // Tap the favorite to choose a different one from the books finished this year.
+  const favTile = $('[data-stat="fav"]');
+  if (favTile && finBooks.length) {
+    favTile.classList.add('tappable');
+    favTile.onclick = () => Date.now() - Number($('#statgrid').dataset.draggedAt || 0) < 500 ? null : openModal(`<h2>Favorite of ${year}</h2><p class="muted small">Pick the book that wins the year.</p>
+      <div class="fin-list fav-pick">${finBooks.slice().sort((a, z) => (z.book.rating || 0) - (a.book.rating || 0) || z.read.end.localeCompare(a.read.end)).map(f => `<button class="fin card${fav && f.book.id === fav.id ? ' on' : ''}" data-fav="${esc(f.book.id)}">
+          <span class="fin-cover">${coverHtml(f.book)}</span>
+          <span class="fin-txt"><span class="fin-title">${esc(f.book.title)}</span>${f.book.rating ? miniStars(f.book.rating) : '<span class="muted small">Not rated</span>'}</span></button>`).join('')}</div>
+      <div class="actions">${fav ? `<a class="btn ghost" href="#/b/${esc(fav.id)}" data-close>Open ${esc(fav.title)}</a>` : ''}<span class="spacer"></span><button class="btn" data-close>Close</button></div>`, (root, close) => {
+      paintCovers(root);
+      $$('[data-fav]', root).forEach(b => {
+        b.onclick = () => busy(b, async () => {
+          const favorites = { ...((state.settings || {}).favorites || {}), [year]: b.dataset.fav };
+          await DB.saveSettings({ favorites });
+          state.settings.favorites = favorites;
+          close();
+          renderStats();
+        }, '…');
+      });
+    });
+  }
+  enableHoldDrag($('#statgrid'), '.stat[data-stat]', keys => {
+    state.settings.statOrder = keys;
+    DB.saveSettings({ statOrder: keys }).catch(e => toast(friendlyError(e), true));
+  });
+  // The two sections fold open and closed (remembered on this phone).
+  $$('.stat-block').forEach(d => d.addEventListener('toggle', () => statsFold(d.dataset.block, d.open, true)));
+  // Stacked-book titles shrink to fit their book; a very long one wraps onto two lines.
+  const fitFlat = () => $$('.flat-title').forEach(t => {
+    let fs = 8;
+    t.style.fontSize = ''; t.classList.remove('two');
+    // The text's exact width (scrollWidth rounds, which can hide a sliver of overflow).
+    const tooWide = () => { const r = document.createRange(); r.selectNodeContents(t); return r.getBoundingClientRect().width > t.getBoundingClientRect().width - 0.5; };
+    while (tooWide() && fs > 5.5) { fs -= 0.25; t.style.fontSize = `${fs}px`; }
+    if (tooWide() && t.parentElement.offsetHeight >= 15) {
+      t.classList.add('two');
+      fs = 6.5; t.style.fontSize = `${fs}px`;
+      while (t.scrollHeight > t.clientHeight + 0.5 && fs > 5) { fs -= 0.25; t.style.fontSize = `${fs}px`; }
+    }
+  });
+  fitFlat();
+  // Book fonts load as they're needed, so fit again whenever one arrives.
+  if (document.fonts) {
+    document.fonts.ready.then(() => { if ($('.months')) fitFlat(); });
+    const again = () => { if ($('.months')) fitFlat(); else document.fonts.removeEventListener('loadingdone', again); };
+    document.fonts.addEventListener('loadingdone', again);
+  }
+  setTimeout(() => { if ($('.months')) fitFlat(); }, 900);
+  // Full month names where they fit; "Sep" where they don't.
+  $$('.month-name').forEach(el => { if (el.scrollWidth > el.clientWidth + 1) el.textContent = el.dataset.short; });
+  // Tap a month: the books finished then.
+  $$('.month-card[data-m]').forEach(card => {
+    card.onclick = () => {
+      const list = byMonth[Number(card.dataset.m)];
+      if (!list.length) return;
+      const name = new Date(2000, Number(card.dataset.m), 1).toLocaleDateString(undefined, { month: 'long' });
+      openModal(`<h2>${esc(name)} ${year}</h2><div class="fin-list month-list">${list.map(f => `<a class="fin card" href="#/b/${esc(f.book.id)}" data-close>
+          <span class="fin-cover">${coverHtml(f.book)}</span>
+          <span class="fin-txt"><span class="fin-title">${esc(f.book.title)}</span>${f.book.author ? `<span class="muted small">${esc(f.book.author)}</span>` : ''}
+          <span class="muted small">Finished ${esc(fmtDate(f.read.end))}${f.book.rating ? ` · ${f.book.rating} ★` : ''}${f.i > 0 ? ' · re-read' : ''}</span></span></a>`).join('')}</div>
+        <div class="actions"><span class="spacer"></span><button class="btn" data-close>Close</button></div>`, root => paintCovers(root));
+    };
+  });
   $('#py').onclick = () => { statsYear = year - 1; renderStats(); };
   $('#ny').onclick = () => { statsYear = year + 1; renderStats(); };
   $('#setgoal').onclick = () => formModal({
