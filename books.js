@@ -1867,6 +1867,7 @@ function publishBookLibrary() {
   if (!isOwner() || !DB.saveBookLibrary) return;
   const books = state.books.map(b => ({
     id: b.id, title: b.title || '', author: b.author || '', series: b.series || '', seriesNo: b.seriesNo || '', pages: b.pages || null,
+    totalChapters: b.totalChapters || null,
     coverUrl: b.coverUrl || '', coverThumb: b.coverThumb || '', cover: photoLink(b.cover), blurb: b.blurb || '',
     theme: b.theme || 'custom', look: b.look ? { ...b.look, photo: photoLink(b.look.photo) } : null,
     spineFont: b.spineFont || '', spineInk: b.spineInk || '', spineBg: b.spineBg || '', ribbonColor: b.ribbonColor || '', spineOrn: ornOf(b), spineBottom: b.spineBottom || '', spineTop: b.spineTop || '',
@@ -1902,7 +1903,7 @@ function paintLibCovers(root, entries) {
 async function addFromLibrary(e, shelf) {
   const onShelf = state.books.filter(x => shelfOf(x) === shelf);
   const data = {
-    title: e.title, author: e.author, series: e.series, seriesNo: e.seriesNo, pages: e.pages || null,
+    title: e.title, author: e.author, series: e.series, seriesNo: e.seriesNo, pages: e.pages || null, totalChapters: e.totalChapters || null,
     coverUrl: e.coverUrl || '', coverThumb: e.coverThumb || '', blurb: e.blurb || '',
     theme: e.theme || 'custom', look: e.look ? { ...e.look, photo: null } : null,
     spineFont: e.spineFont || '', spineInk: e.spineInk || '', spineBg: e.spineBg || '', ribbonColor: e.ribbonColor || '', spineOrn: e.spineOrn || '', spineBottom: e.spineBottom || '', spineTop: e.spineTop || '',
