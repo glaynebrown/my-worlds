@@ -3,7 +3,8 @@
    A garland under the title, and garlands strung between rows of doors (about
    every other row, at random), with softly twinkling bulbs. Worlds gear →
    Accessories turns them on (off to start) and opens Arrange, where the lights
-   slide between rows (tap one for its dangling strands, or to remove it). Doors
+   slide between rows, trading places with a string already there (tap one for its
+   dangling strands, or to remove it). Doors
    can still be dragged while arranging.
 
    Saved per person in settings.decor = { lights, garlands, lightSeed }.
@@ -207,7 +208,10 @@ function wireDecorArrange(lib) {
     const sp = decorSpots(lib);
     const gy = sp.gaps[Math.min(lib._garlands[d.i].gap, sp.gaps.length - 1)].y + (e.clientY - d.y);
     const gap = sp.gaps.reduce((best, g, k) => (Math.abs(g.y - gy) < Math.abs(sp.gaps[best].y - gy) ? k : best), 0);
+    // A string already on that row trades places with this one.
     const list = lib._garlands.map(x => ({ ...x }));
+    const from = list[d.i].gap, other = list.findIndex((x, k) => k !== d.i && x.gap === gap);
+    if (other >= 0) list[other].gap = from;
     list[d.i].gap = gap;
     keepDecor({ garlands: list });
   }
