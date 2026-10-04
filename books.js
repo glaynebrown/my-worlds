@@ -475,7 +475,7 @@ function potSvg(kind, rnd) {
 
 // Each shelf's own arrangement, once you've arranged it (Edit shelves → Arrange greenery):
 // settings.greens[shelfId] = { pots: [{ kind, size, seed, after, index }] | null,
-//   drapes: [{ row, x, kind, seed }] | null, side: 'left'|'right'|null, potSeed, vineSeed }.
+//   drapes: [{ row, x, kind, seed }] | null, side: 'left'|'right'|'none'|null, sideKind, potSeed, vineSeed }.
 // null = still random. A pot remembers the book it sits after (index if that book has
 // gone); a drape remembers its row and how far along the shelf's top edge (0–1).
 const POT_K = { s: 0.75, m: 1.1, l: 1.55 };
@@ -565,15 +565,15 @@ function growGreenery(root = document) {
     if (vines) {
       // Down one side of the bookcase (tap it while arranging to flip sides).
       const sideR = vrnd(), len = H * (0.55 + vrnd() * 0.35), sideKind = vrnd() < 0.5 ? 'ivy' : 'pothos', sideSeed = Math.floor(vrnd() * 1e9);
-      const side = g.side || (sideR < 0.5 ? 'left' : 'right');
-      row._side = side;
+      const side = g.side || (sideR < 0.5 ? 'left' : 'right'), kindOfSide = g.sideKind || sideKind;
+      row._side = side; row._sideKind = kindOfSide;
       const sx = side === 'left' ? 9 : W - 9, dir = side === 'left' ? 1 : -1;
       const segs = [];
       for (let y = 0, k = 0; y < len - 1; y += 70, k++) {
         const y2 = Math.min(len, y + 70), w = (k % 2 ? 5 : -5) * dir;
         segs.push([[sx + (k ? -w : 0), y], [sx + w * 1.6, y + 22], [sx - w * 1.2, y2 - 22], [sx - w, y2]]);
       }
-      if (segs.length) svg += `<g class="side-vine"><rect class="hit" x="${sx - 14}" y="0" width="28" height="${len.toFixed(0)}" fill="transparent"/>${vineSvg(segs, seeded(`side:${sideSeed}`), sideKind, { every: 8.5, big: 11.5 })}</g>`;
+      if (segs.length && side !== 'none') svg += `<g class="side-vine"><rect class="hit" x="${sx - 14}" y="0" width="28" height="${len.toFixed(0)}" fill="transparent"/>${vineSvg(segs, seeded(`side:${sideSeed}`), kindOfSide, { every: 8.5, big: 11.5 })}</g>`;
       // Draping from the top of each shelf: never starting on a series name plate.
       const box = row.getBoundingClientRect();
       const plates = $$('.ser-plate', row).map(p => { const q = p.getBoundingClientRect(); return { l: q.left - box.left, r: q.right - box.left, row: Math.floor((q.top - box.top) / R) }; });
@@ -636,14 +636,50 @@ const rowOfShelf = id => $(`.case[data-shelf="${CSS.escape(id)}"] .case-row`, vi
 function saveGreens(changes) {
   const all = { ...((state.settings || {}).greens || {}) };
   Object.entries(changes).forEach(([id, patch]) => {
-    all[id] = { pots: null, drapes: null, side: null, potSeed: 0, vineSeed: 0, ...(all[id] || {}), ...patch };
+    all[id] = { pots: null, drapes: null, side: null, sideKind: null, potSeed: 0, vineSeed: 0, ...(all[id] || {}), ...patch };
   });
   state.settings.greens = all;
   growGreenery(view);
   DB.saveSettings({ greens: all }).catch(e => toast(friendlyError(e), true));
 }
 // Freezes a shelf's current random layout so editing one thing doesn't reshuffle the rest.
-const keepShelf = id => { const row = rowOfShelf(id); return { pots: potsFromDom(row), drapes: row._drapes, side: row._side }; };
+// (With vines off, drapes stay null: still random for when they're turned on.)
+const keepShelf = id => { const row = rowOfShelf(id); return { pots: potsFromDom(row), drapes: row._drapes ? row._drapes.map(d => ({ ...d })) : null, side: row._side }; };
+const VINE_KINDS = [['ivy', 'Ivy'], ['pothos', 'Pothos']];
+const kindChips = cur => `<div class="chips bot-chips" id="vk">${VINE_KINDS.map(([k, l]) => `<button type="button" class="chip${k === cur ? ' on' : ''}" data-k="${k}">${l}</button>`).join('')}</div>`;
+
+// Tap a draping vine (while arranging): ivy or pothos, or remove it.
+function drapeMenu(shelf, i) {
+  const cur = rowOfShelf(shelf)._drapes[i];
+  openModal(`<h2>This vine</h2><div class="field"><span class="field-label">Leaves</span>${kindChips(cur.kind)}</div>
+    <div class="actions"><button type="button" class="btn ghost danger-text" id="vrm">Remove</button><span class="spacer"></span><button type="button" class="btn primary" data-close>Done</button></div>`, (root, close) => {
+    $('#vk', root).onclick = e => {
+      const c = e.target.closest('[data-k]');
+      if (!c) return;
+      $$('#vk .chip', root).forEach(x => x.classList.toggle('on', x === c));
+      const kept = keepShelf(shelf);
+      kept.drapes[i].kind = c.dataset.k;
+      saveGreens({ [shelf]: kept });
+    };
+    $('#vrm', root).onclick = () => { const kept = keepShelf(shelf); kept.drapes.splice(i, 1); saveGreens({ [shelf]: kept }); close(); };
+  }, 'small-modal');
+}
+// Tap the long side vine: flip it, ivy or pothos, or remove it.
+function sideMenu(shelf) {
+  const row = rowOfShelf(shelf);
+  openModal(`<h2>The side vine</h2><div class="field"><span class="field-label">Leaves</span>${kindChips(row._sideKind)}</div>
+    <button type="button" class="btn block" id="vflip">Move it to the ${row._side === 'left' ? 'right' : 'left'} side</button>
+    <div class="actions"><button type="button" class="btn ghost danger-text" id="vrm">Remove</button><span class="spacer"></span><button type="button" class="btn primary" data-close>Done</button></div>`, (root, close) => {
+    $('#vk', root).onclick = e => {
+      const c = e.target.closest('[data-k]');
+      if (!c) return;
+      $$('#vk .chip', root).forEach(x => x.classList.toggle('on', x === c));
+      saveGreens({ [shelf]: { ...keepShelf(shelf), sideKind: c.dataset.k } });
+    };
+    $('#vflip', root).onclick = () => { const kept = keepShelf(shelf); saveGreens({ [shelf]: { ...kept, side: kept.side === 'left' ? 'right' : 'left' } }); close(); };
+    $('#vrm', root).onclick = () => { saveGreens({ [shelf]: { ...keepShelf(shelf), side: 'none' } }); close(); };
+  }, 'small-modal');
+}
 
 function potMenu(el) {
   const row = el.closest('.case-row'), shelf = row.closest('.case').dataset.shelf;
@@ -662,7 +698,7 @@ function potMenu(el) {
 
 const arrangeBtns = () => {
   const m = greeneryOf(), v = m === 'vines' || m === 'both', p = m === 'pots' || m === 'both';
-  return `<div class="arrange-btns">${v ? '<button type="button" class="chip" data-ga="vines">Shuffle vines</button>' : ''}${p ? '<button type="button" class="chip" data-ga="pots">Shuffle pots</button><button type="button" class="chip" data-ga="add">+ Plant</button>' : ''}</div>`;
+  return `<div class="arrange-btns">${v ? '<button type="button" class="chip" data-ga="vines">Shuffle vines</button><button type="button" class="chip" data-ga="vine">+ Vine</button>' : ''}${p ? '<button type="button" class="chip" data-ga="pots">Shuffle pots</button><button type="button" class="chip" data-ga="add">+ Plant</button>' : ''}</div>`;
 };
 function wireArrange(caseEl) {
   if (!arranging || !caseEl) return;
@@ -674,6 +710,14 @@ function wireArrange(caseEl) {
     const shelf = b.closest('.case').dataset.shelf, what = b.dataset.ga, seed = Math.floor(Math.random() * 1e9);
     if (what === 'pots') saveGreens({ [shelf]: { pots: null, potSeed: seed } });
     if (what === 'vines') saveGreens({ [shelf]: { drapes: null, side: null, vineSeed: seed } });
+    if (what === 'vine') {
+      // Brings the side vine back first, then adds drapes at the top of the shelf.
+      const kept = keepShelf(shelf);
+      if (kept.side === 'none') { saveGreens({ [shelf]: { ...kept, side: null } }); toast('The side vine is back.'); return; }
+      kept.drapes.push({ row: 0, x: 0.5, kind: Math.random() < 0.5 ? 'ivy' : 'pothos', seed });
+      saveGreens({ [shelf]: kept });
+      toast('Added at the top of the shelf. Drag it where you like.');
+    }
     if (what === 'add') {
       const kept = keepShelf(shelf);
       const row = rowOfShelf(shelf), items = shelfItems(row);
@@ -762,7 +806,8 @@ function wireArrange(caseEl) {
     if (d.ghost) d.ghost.remove();
     if (!d.moved) {
       if (d.pot) potMenu(d.pot);
-      else if (d.side) { const shelf = d.side.closest('.case').dataset.shelf, kept = keepShelf(shelf); saveGreens({ [shelf]: { ...kept, side: kept.side === 'left' ? 'right' : 'left' } }); }
+      else if (d.side) sideMenu(d.side.closest('.case').dataset.shelf);
+      else if (d.drape) drapeMenu(d.drape.closest('.case').dataset.shelf, Number(d.drape.dataset.i));
       return;
     }
     if (d.pot) {
@@ -976,7 +1021,7 @@ function renderBooks() {
         ? `<span>${year} · ${done} of ${goal} books</span><span class="goal-bar"><span style="width:${Math.min(100, Math.round((done / goal) * 100))}%"></span></span>`
         : `<span>${done ? `${done} finished in ${year} · ` : ''}Set a ${year} reading goal ›</span>`}</a></header>
     <div class="bookcase${arranging ? ' arranging' : ''}" id="case">${shelvesOf().map(caseHtml).join('')}</div>
-    ${arranging ? `<div class="arrange-bar"><span>Drag the pots and vines. Tap a pot to change it, or the side vine to flip it.</span><button class="btn primary" id="adone">Done</button></div>` : ''}
+    ${arranging ? `<div class="arrange-bar"><span>Drag the pots and vines. Tap one to change or remove it.</span><button class="btn primary" id="adone">Done</button></div>` : ''}
     ${state.books.length ? '' : `<div class="side-empty"><p class="empty">No books yet</p>
       <div class="side-empty-btns">${isOwner() ? '' : '<a class="btn" href="#/books/pick">Browse the library</a>'}<button class="btn ghost" id="e-add">Add a book</button></div></div>`}
   </div>`;
