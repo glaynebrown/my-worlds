@@ -2562,8 +2562,10 @@ function renderStats() {
   const days = spans.length ? Math.round(spans.reduce((a, b) => a + b, 0) / spans.length) : null;
   // Want to read: the next few books on that shelf (in its order), and how many are waiting.
   const wantList = hasShelf('want') ? booksOn('want') : [];
+  // Up next: the first book of each series (the shelf keeps a series together, lowest number first), so three covers aren't one set.
+  const upNext = wantList.filter((b, i) => !seriesKey(b) || wantList.findIndex(x => seriesKey(x) === seriesKey(b)) === i);
   const wantHtml = !wantList.length ? '0'
-    : `<span class="fav-covers">${wantList.slice(0, 3).map(b => `<a class="fav-cover" href="#/b/${esc(b.id)}" aria-label="${esc(b.title)}">${coverHtml(b)}</a>`).join('')}</span>
+    : `<span class="fav-covers">${upNext.slice(0, 3).map(b => `<a class="fav-cover" href="#/b/${esc(b.id)}" aria-label="${esc(b.title)}">${coverHtml(b)}</a>`).join('')}</span>
        <span class="fav-line">${wantList.length} book${wantList.length === 1 ? '' : 's'} waiting</span>`;
   const TILES = {
     fav: ['Favorite of the year', favHtml],
