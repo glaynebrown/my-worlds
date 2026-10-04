@@ -21,7 +21,9 @@ const TOUR_STEPS = {
     { scene: 'world', target: '.watch-btn', place: 'below', text: 'Finished an episode? Tap Watched it. The arrows step between episodes.' },
     { scene: 'world', target: '.note-btn', text: 'Jot notes about an episode here. They stay even when you rewatch.' },
     { scene: 'world', target: '.rw-eps', text: 'Tap an episode to bring it up. Tap it again to mark it watched.' },
+    { scene: 'worldCanon', target: '.canon-end', place: 'below', gap: 30, text: 'My Canon is your version: pick where the story ends for you, write your own ending, and keep your ships and headcanons.' },
     { scene: 'world', target: '.gear', text: 'Change a world’s look, turn pages on or off, or share it with family.' },
+    { scene: 'worldShare', target: '.share-secs', text: 'Share a world with family from its settings. Pick which pages you share: watched marks and episode notes show side by side, and anything unchecked stays private.' },
     { scene: 'worldsHome', target: '.side-flip', flip: true, text: 'Your books live on the other side. Tap here anytime to flip over.', bridge: 'Now tap here to flip over to your books.' },
   ],
   books: [
@@ -108,6 +110,34 @@ const TOUR_SCENES = {
       </section></div>`;
   },
 
+  // My Canon on a Walking Dead page: where the story ends, your ending, a headcanon.
+  worldCanon(el) {
+    const w = tourWorld('twd');
+    Themes.apply(el, w);
+    const info = Themes.info(w), colors = info.tabColors || {};
+    const tabs = [['board', 'Board'], ['quotes', 'Quotes'], ['favs', 'Favorites'], ['canon', 'My Canon'], ['fics', 'Fics'], ['rewatch', 'Rewatch']];
+    el.innerHTML = `<div class="page world">
+      <header class="w-head"><span class="back">‹ Worlds</span>${tourGearMock()}</header>
+      <div class="w-hero"><h1 class="w-title">${esc(w.name)}</h1><div class="w-flourish" aria-hidden="true"></div></div>
+      <nav class="w-tabs">${tabs.map(([k, label]) => `<a class="tab-mock" style="${colors[k] ? `--tab:${colors[k]}` : ''}" ${k === 'canon' ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
+      <section class="w-body" style="${colors.canon ? `--tab:${colors.canon}` : ''}">
+        <div class="card canon-end"><div class="the-end"><span class="the-end-word">${esc(info.theEnd || 'The End')}</span><span class="the-end-at">S5 E1 · No Sanctuary</span></div>
+          <div class="ending-text">They walk out of Terminus together, and nobody else gets left behind.</div>
+          <span class="btn small">Edit my ending</span></div>
+        <h2 class="sec-h">Headcanons</h2>
+        <div class="heads"><span class="head card">Daryl keeps every one of the kids’ drawings in his saddlebag.</span></div>
+      </section></div>`;
+  },
+  // The Avatar page with the Share pop-up up.
+  worldShare(el) {
+    TOUR_SCENES.world(el);
+    const secs = [['Rewatch', true], ['Board', false], ['Quotes', true], ['Favorites', false], ['My Canon', false], ['Fics', false]];
+    el.insertAdjacentHTML('beforeend', `<div class="modal-bg tour-modal"><div class="modal"><h2>Share Avatar: The Last Airbender</h2>
+      <span class="field-label" style="margin-top:12px">What to share</span>
+      <div class="share-secs">${secs.map(([l, on]) => `<label class="check"><input type="checkbox" ${on ? 'checked' : ''}><span>${l}</span></label>${l === 'Rewatch' ? '<label class="check sub-check"><input type="checkbox" checked><span>Share watched marks too</span></label>' : ''}`).join('')}</div>
+      <label class="field"><span class="field-label">Their email (the one they sign in with)</span><span class="tour-box"></span></label>
+      <div class="actions"><span class="btn">Cancel</span><span class="spacer"></span><span class="btn primary">Send invite</span></div></div></div>`);
+  },
   // opts.ribbon: the book being read wears a bookmark ribbon; opts.green: draw greenery.
   booksHome(el, opts = {}) {
     const books = tourBooks();
