@@ -680,7 +680,7 @@ function enableTileDrag(shelf) {
   window.addEventListener('pointerup', e => { if (e.pointerType === 'mouse') end(); }, opts);
 
   // ----- opening a world -----
-  const open = t => { location.hash = `#/w/${t.dataset.world}`; };
+  const open = t => openDoor(t);
   shelf.addEventListener('click', e => {
     const t = e.target.closest('.tile[data-world]');
     if (!t) return;
@@ -692,6 +692,58 @@ function enableTileDrag(shelf) {
     if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(t); }
   }, opts);
   shelf.addEventListener('contextmenu', e => { if (e.target.closest('.tile')) e.preventDefault(); }, opts);
+}
+
+// Stepping into a world (like a book opening): the door comes to the middle of the
+// screen, swings open on its hinge, warm light pours out, and the world's colors fill
+// the screen as its page appears. (A tap skips ahead; reduce-motion just goes.)
+function openDoor(tile) {
+  const id = tile.dataset.world, w = worldById(id), href = `#/w/${id}`;
+  const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if (still || !w || !Element.prototype.animate) { location.hash = href; return; }
+  if ($('.door-open')) return;
+  const r = tile.getBoundingClientRect();
+  const k = Math.min((window.innerHeight * 0.62) / r.height, (window.innerWidth * 0.7) / r.width);
+  const color = w.theme === 'custom' ? (w.look || Themes.BOOK_PRESETS[0]).bg : THEME_COLOR[w.theme] || THEME_COLOR.library;
+  const ov = document.createElement('div');
+  ov.className = 'door-open';
+  ov.style.setProperty('--wc', color);
+  ov.innerHTML = `<div class="do-frame" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px">
+      <div class="do-light"></div><div class="do-door"><div class="do-back"></div></div></div><div class="do-flood"></div>`;
+  const face = tile.cloneNode(true);
+  face.removeAttribute('data-world');
+  face.classList.add('do-face');
+  $('.do-door', ov).prepend(face);
+  document.body.appendChild(ov);
+  tile.style.visibility = 'hidden';
+  const frame = $('.do-frame', ov), door = $('.do-door', ov), flood = $('.do-flood', ov);
+  const dx = window.innerWidth / 2 - (r.left + r.width / 2), dy = window.innerHeight / 2 - (r.top + r.height / 2);
+
+  let done = false;
+  const finish = () => {
+    if (done) return;
+    done = true;
+    location.hash = href;
+    const fade = ov.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, fill: 'forwards' });
+    fade.onfinish = () => ov.remove();
+    setTimeout(() => ov.remove(), 700);
+  };
+  ov.addEventListener('click', finish);
+  setTimeout(finish, 4000); // never stuck
+
+  ov.animate([{ backgroundColor: 'rgba(10,8,6,0)' }, { backgroundColor: 'rgba(10,8,6,.8)' }], { duration: 420, fill: 'forwards' });
+  frame.animate([{ transform: 'translate(0, 0) scale(1)' }, { transform: `translate(${dx}px, ${dy}px) scale(${k})` }],
+    { duration: 560, easing: 'cubic-bezier(.2,.75,.25,1)', fill: 'forwards' }).finished
+    .then(() => wait(140))
+    .then(() => {
+      // The door swings in on its left hinge, and the doorway glows brighter as it opens.
+      frame.animate([{ boxShadow: '0 0 0 0 rgba(255,214,130,0)' }, { boxShadow: '0 0 60px 18px rgba(255,214,130,.55)' }], { duration: 760, fill: 'forwards' });
+      return door.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(-108deg)' }],
+        { duration: 760, easing: 'cubic-bezier(.45,.05,.3,1)', fill: 'forwards' }).finished;
+    })
+    .then(() => flood.animate([{ opacity: 0, transform: 'scale(.35)' }, { opacity: 1, transform: 'scale(1.6)' }],
+      { duration: 460, easing: 'ease-in', fill: 'forwards' }).finished)
+    .then(finish, finish);
 }
 
 // The world name's color on its home card (null = the theme's own, or white on a photo).

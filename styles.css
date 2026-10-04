@@ -461,3 +461,16 @@ body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
 .sub-check { grid-column: 1 / -1; padding-left: 28px; font-size: .88rem; }
 .sub-check:has(input:disabled) { opacity: .5; }
 .share-secs > label:first-child { grid-column: 1 / -1; }
+
+/* ---------- stepping into a world (app.js openDoor) ---------- */
+.door-open { position: fixed; inset: 0; z-index: 70; overflow: hidden; background: rgba(10,8,6,0); }
+.do-frame { position: absolute; transform-origin: 50% 50%; perspective: 900px; border-radius: 16px 16px 10px 10px; will-change: transform; }
+/* The doorway: warm light, fading to the world's own color at the edges. */
+.do-light { position: absolute; inset: 0; border-radius: inherit;
+  background: radial-gradient(ellipse at 50% 62%, #fff6dc 0%, #ffd98a 32%, color-mix(in srgb, var(--wc) 55%, #ffb948) 72%, var(--wc) 100%); }
+.do-door { position: absolute; inset: 0; transform-style: preserve-3d; transform-origin: 0 50%; border-radius: inherit; }
+.do-door > .do-face { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; margin: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; transition: none; }
+.do-back { position: absolute; inset: 0; border-radius: inherit; transform: rotateY(180deg); backface-visibility: hidden; -webkit-backface-visibility: hidden;
+  background: linear-gradient(90deg, color-mix(in srgb, var(--wc) 55%, #000), color-mix(in srgb, var(--wc) 80%, #000)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
+.do-flood { position: absolute; inset: -20%; opacity: 0; pointer-events: none;
+  background: radial-gradient(circle at 50% 50%, #fff6dc 0%, #ffd98a 22%, color-mix(in srgb, var(--wc) 60%, #ffb948) 45%, var(--wc) 70%); }
