@@ -1,0 +1,22 @@
+/* Accessories (decor.js): fairy lights between the rows of doors, and arranging
+   them. Decoration only: taps go through. */
+.shelf.lit { row-gap: 34px; margin-top: 26px; }
+.decor { position: absolute; left: 0; top: 0; z-index: 4; pointer-events: none; }
+.decor svg { display: block; overflow: visible; }
+.decor .hit { pointer-events: none; }
+.decor .bulb { animation: twinkle var(--t, 2.4s) ease-in-out var(--d, 0s) infinite alternate; }
+@keyframes twinkle { from { opacity: .45; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .decor .bulb { animation: none; } }
+.library:has(.shelf.sorting) .decor { opacity: 0; transition: opacity .15s; }
+
+/* Arranging */
+.decor-arranging .decor .hit { pointer-events: all; cursor: grab; touch-action: none; stroke: rgba(242,213,138,.45); stroke-width: 1.5; stroke-dasharray: 4 4; rx: 10px; }
+.decor-arranging.decor-dragging .decor .hit { stroke: none; }
+.decor-arranging .shelf.sorting ~ .decor .hit { pointer-events: none; }
+.decor-arranging { padding-bottom: 110px; }
+.decor-bar { align-items: center; }
+.decor-bar-text { flex: 1; display: grid; gap: 8px; }
+.decor-bar .arrange-btns { justify-content: flex-start; flex-wrap: wrap; }
+.decor-bar .ab-label { color: #6b5a3a; }
+.decor-bar .arrange-btns .chip { color: #2b221a; border-color: rgba(43,34,26,.3); background: transparent; }
+.decor-bar .arrange-btns span { flex: none; }

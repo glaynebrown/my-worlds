@@ -405,8 +405,13 @@ const LEAF_SHAPES = {
 };
 // A steady "random" for each shelf, so the plants stay put between visits.
 function seeded(seed) {
-  let h = hashOf(seed) || 1;
-  return () => { h = (h * 1664525 + 1013904223) >>> 0; return h / 4294967296; };
+  let a = hashOf(seed) || 1;
+  return () => { // mulberry32: well mixed, so neighboring picks don't follow a pattern
+    a = (a + 0x6D2B79F5) >>> 0;
+    let t = Math.imul(a ^ (a >>> 15), a | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
 }
 const leafSvg = (x, y, angle, size, kind, fill) =>
   `<g transform="translate(${x.toFixed(1)} ${y.toFixed(1)}) rotate(${angle.toFixed(0)}) scale(${size.toFixed(1)})">

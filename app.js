@@ -554,12 +554,20 @@ function renderLibrary() {
   $('#hgear').onclick = () => openModal(`<div class="crest-menu">
       <a class="btn block" href="#/library" data-close>+ Add a world</a>
       <a class="btn block" href="#/wishlist" data-close>Wishlist</a>
+      <button class="btn block" id="m-decor">Accessories</button>
       <button class="btn block" id="m-tour">Take the tour</button>
       <hr class="menu-rule">${accountRows(nick)}</div>`, (root, close) => {
     $('#m-tour', root).onclick = () => { close(); startTour(['worlds']); };
+    $('#m-decor', root).onclick = () => { close(); accessoriesForm(); };
     wireAccount(root, close, 'worlds');
   }, 'small-modal');
   enableTileDrag($('.shelf'));
+  // Fairy lights (decor.js), and arranging them.
+  const lib = $('.library', view);
+  if (decorArranging) { lib.classList.add('decor-arranging'); lib.insertAdjacentHTML('beforeend', decorBar()); }
+  hangDecor(lib);
+  wireDecorArrange(lib);
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (lib.isConnected) hangDecor(lib); });
   maybeTour('worlds');
 }
 
@@ -676,7 +684,7 @@ function enableTileDrag(shelf) {
   shelf.addEventListener('click', e => {
     const t = e.target.closest('.tile[data-world]');
     if (!t) return;
-    if (dragging || justDragged) return;
+    if (dragging || justDragged || decorArranging) return; // arranging accessories: doors move, but don't open
     open(t);
   }, opts);
   shelf.addEventListener('keydown', e => {
