@@ -25,11 +25,15 @@ const TOUR_STEPS = {
     { scene: 'worldsHome', target: '.side-flip', flip: true, text: 'Your books live on the other side. Tap here anytime to flip over.', bridge: 'Now tap here to flip over to your books.' },
   ],
   books: [
-    { scene: 'booksHome', target: '.slot:not(.add-slot)', text: 'Tap a book to open it. Hold one to move it, even onto another shelf.' },
-    { scene: 'booksHome', target: '.add-slot', text: 'Tap + to put a new book on that shelf.' },
+    { scene: 'booksHome', target: '.slot', text: 'Tap a book to open it. Hold one to move it, even onto another shelf.' },
+    { scene: 'booksHome', target: '.case-add', text: 'Tap the + beside a shelf’s name to put a new book on it.' },
     { scene: 'booksHome', target: '.home-gear', text: 'Add books, edit your shelves and set a reading goal here.' },
+    { scene: 'booksRibbon', target: '.slot:has(.ribbon)', text: 'Turn on bookmark ribbons in Edit shelves to see how far you are in each book you’re reading.' },
+    { scene: 'booksGreen', target: '.plant-slot', text: 'Add trailing vines and potted plants in Edit shelves, then use Arrange greenery to move them wherever you like.' },
+    { scene: 'booksFinish', target: '[data-when="today"]', gap: 118, text: 'Moving a book to Read asks when you finished it. Only dated finishes count toward your goal, and each one gets a little confetti.' },
     { scene: 'book', target: '.w-tabs', gap: 170, text: 'Every book has About, Notes, Quotes and a Board. Reviews, a Map, My Canon and Fics are optional pages you can turn on or off in its settings.' },
     { scene: 'bookNotes', target: '.bnote', text: 'Add notes as you read. Each one gets the date and your page.' },
+    { scene: 'bookPhoto', target: '.scan-btn', text: 'No typing needed: take a picture of the page, then drag across the words you want for a quote or a note.' },
     { scene: 'bookReviews', target: '.icon-btn', text: 'Done reading? Copy your notes for Claude, then paste the review it writes back here.' },
     { scene: 'book', target: '.gear', text: 'Change a book’s look and spine, or start a buddy read and share it with your sister.' },
     { scene: 'booksHome', target: '.side-flip', flip: true, text: 'Your worlds are on the other side. Tap here anytime to flip over.', bridge: 'Now tap here to flip over to your worlds.' },
@@ -104,17 +108,40 @@ const TOUR_SCENES = {
       </section></div>`;
   },
 
-  booksHome(el) {
+  // opts.ribbon: the book being read wears a bookmark ribbon; opts.green: draw greenery.
+  booksHome(el, opts = {}) {
     const books = tourBooks();
     el.dataset.theme = 'library';
-    const shelf = (name, list) => `<section class="case"><header class="case-head"><h2 class="case-name">${name}</h2></header>
-      <div class="case-row">${shelfRowHtml(list)}<div class="slot add-slot" style="--w:30px;--h:110px"><span class="spine add-spine">+</span></div></div></section>`;
+    const shelf = (id, name, list, row) => `<section class="case" data-shelf="tour-${id}"><header class="case-head"><div class="case-title"><h2 class="case-name">${name}</h2><span class="case-add">+</span></div></header>
+      <div class="case-row">${row || shelfRowHtml(list)}</div></section>`;
     el.innerHTML = `<div class="library books-home">${tourHomeHead('books', `<span class="goal-line"><span>${new Date().getFullYear()} · 3 of 20 books</span><span class="goal-bar"><span style="width:15%"></span></span></span>`)}
-      <div class="bookcase">${shelf('Currently reading', [books[1]])}${shelf('Read', [books[0], books[3], books[4]])}${shelf('Want to read', [books[2]])}</div></div>`;
+      <div class="bookcase">${shelf('reading', 'Currently reading', [books[1]], opts.ribbon ? spineHtml(books[1], { ribbon: 62 }) : '')}${shelf('read', 'Read', [books[0], books[3], books[4]])}${shelf('want', 'Want to read', [books[2]])}</div></div>`;
     $$('.ser-plate', el).forEach(a => a.removeAttribute('href'));
     $$('[data-book]', el).forEach(x => x.removeAttribute('data-book'));
     fitSpines(el);
     fitPlates(el);
+    if (opts.green) growGreenery(el, 'both');
+  },
+  booksRibbon(el) { TOUR_SCENES.booksHome(el, { ribbon: true }); },
+  booksGreen(el) { TOUR_SCENES.booksHome(el, { green: true }); },
+  // The bookcase with the "When did you finish it?" question up, and a little confetti.
+  booksFinish(el) {
+    TOUR_SCENES.booksHome(el);
+    const flecks = ['#e2c27a', '#f6ecd4', '#8f1426', '#c9a35a', '#127a70'];
+    const bits = Array.from({ length: 26 }, (_, i) => `<span class="tour-fleck" style="left:${(i * 37) % 100}%;top:${(i * 53) % 40 + 4}%;background:${flecks[i % 5]};transform:rotate(${(i * 47) % 180}deg)"></span>`).join('');
+    el.insertAdjacentHTML('beforeend', `${bits}<div class="modal-bg tour-modal"><div class="modal small-modal">
+      <h2 class="finish-h">When did you finish <em>A Court of Mist and Fury</em>?</h2>
+      <div class="finish-btns"><span class="btn primary block" data-when="today">Today</span><span class="btn block">Pick a date</span><span class="btn block ghost">I don’t remember</span></div>
+      <div class="actions"><span class="spacer"></span><span class="btn">Cancel</span></div></div></div>`);
+  },
+  // A book's Quotes page with the Add a quote form up.
+  bookPhoto(el) {
+    TOUR_SCENES.book(el, 'quotes');
+    el.insertAdjacentHTML('beforeend', `<div class="modal-bg tour-modal"><div class="modal"><h2>Add a quote</h2>
+      <span class="btn small scan-btn">${CAMERA_ICON}<span>From a photo</span></span>
+      <label class="field"><span class="field-label">Quote</span><span class="tour-box tall"></span></label>
+      <label class="field"><span class="field-label">Who said it (optional)</span><span class="tour-box"></span></label>
+      <label class="field"><span class="field-label">Page (optional)</span><span class="tour-box"></span></label></div></div>`);
   },
 
   book(el, tab = 'about') {
@@ -125,6 +152,8 @@ const TOUR_SCENES = {
     if (tab === 'about') {
       body = `<div class="card about"><div class="about-top"><span class="about-cover">${coverHtml(b, '', true)}</span>
           <div class="about-info"><span class="about-series">${esc(b.series)} · Book 1&nbsp;›</span>${starsHtml(4.5, 'tour-stars')}<p class="muted small">${b.pages} pages</p></div></div></div>`;
+    } else if (tab === 'quotes') {
+      body = `${addBtn('tour-addq', 'Add a quote')}<span class="quote card"><span class="quote-text own-marks">“To the stars who listen, and the dreams that are answered.”</span><span class="quote-by">— Rhysand to Feyre, p. 312</span></span>`;
     } else if (tab === 'notes') {
       const notes = [['Sep 28', 'p. 112', 'Tamlin’s masks!! And the Suriel scene was so creepy.'], ['Sep 30', 'p. 241', 'Calanmai… not sure how I feel about this.'], ['Oct 2', 'p. 356', 'Rhysand stealing every scene he’s in.']];
       body = `${addBtn('tour-addn', 'Add a note')}<div class="bnotes">${notes.map(([d, p, t]) => `<span class="bnote card"><span class="bnote-at">${d} · ${p}</span><span class="bnote-text">${t}</span></span>`).join('')}</div>`;

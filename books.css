@@ -137,11 +137,6 @@
   filter: drop-shadow(0 1px 1px rgba(0,0,0,.4));
 }
 .slot { justify-content: center; }
-.add-spine {
-  background: transparent; border: 1.5px dashed rgba(236,217,174,.32); color: rgba(236,217,174,.65);
-  font: 300 1.6rem/1 system-ui, sans-serif; box-shadow: none;
-}
-.add-spine::before, .add-spine::after { display: none; }
 .slot-placeholder .spine { opacity: .2; }
 .spine-ghost { position: fixed; z-index: 40; margin: 0; pointer-events: none; transform: rotate(-4deg) scale(1.06); filter: drop-shadow(0 16px 22px rgba(0,0,0,.55)); --row: 196px; --plank: 16px; }
 .bookcase.sorting .spine:active { transform: none; }
@@ -565,8 +560,7 @@
 /* ---------- arranging the greenery ---------- */
 .greenery .hit { pointer-events: none; }
 .arrange-open { margin-top: 10px; }
-.bookcase.arranging .slot:not(.plant-slot), .bookcase.arranging .ser-grp, .bookcase.arranging .ser-plate { opacity: .5; }
-.bookcase.arranging .spine, .bookcase.arranging .ser-plate, .bookcase.arranging .add-spine { pointer-events: none; }
+.bookcase.arranging .ser-plate { pointer-events: none; }
 .bookcase.arranging .plant-slot { cursor: grab; touch-action: none; }
 .bookcase.arranging .plant-slot::after { content: ''; position: absolute; inset: auto -3px var(--plank) -3px; height: calc(100% - var(--plank) - 30px); max-height: 100px; border: 1.5px dashed rgba(242,213,138,.55); border-radius: 10px; pointer-events: none; }
 .bookcase.arranging .greenery .hit { pointer-events: all; cursor: grab; touch-action: none; }
@@ -575,11 +569,24 @@
 .pot-holding { opacity: .25; }
 .green-ghost { position: fixed; z-index: 60; pointer-events: none; margin: 0; filter: drop-shadow(0 10px 16px rgba(0,0,0,.5)); }
 .drape-ghost svg { display: block; overflow: visible; }
-.arrange-btns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
-.arrange-btns .chip { font-size: .78rem; padding: 5px 10px; border-color: rgba(236,217,174,.35); color: #ecd9ae; background: rgba(255,255,255,.05); }
+.arrange-btns { display: flex; gap: 8px; justify-content: flex-end; flex: none; }
+.ab-group { display: inline-flex; align-items: center; gap: 3px; }
+.ab-label { font: 600 .7rem/1 system-ui, sans-serif; color: #bfae8d; letter-spacing: .02em; }
+.arrange-btns .chip { font-size: .72rem; padding: 4px 7px; min-height: 0; border-color: rgba(236,217,174,.35); color: #ecd9ae; background: rgba(255,255,255,.05); }
+.arrange-btns .ab-plus { width: 24px; padding: 4px 0; justify-content: center; font-size: .95rem; line-height: 1; }
+.bookcase.arranging .case-head { align-items: center; }
+.bookcase.arranging .case-name { font-size: 1.2rem; min-width: 0; }
+.bookcase.arranging .case-head { margin-right: 0; gap: 8px; }
 .arrange-bar { position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px); z-index: 40; display: flex; align-items: center; gap: 12px;
   padding: 10px 10px 10px 16px; border-radius: 16px; background: #f6ecd4; color: #2b221a; box-shadow: 0 10px 30px rgba(0,0,0,.5); font: 400 .88rem/1.35 'Lora', Georgia, serif; max-width: 640px; margin: 0 auto; }
 .arrange-bar span { flex: 1; }
 .books-home:has(.arrange-bar) { padding-bottom: 90px; }
 .plant-slot.end-pot { position: absolute; margin: 0; pointer-events: none; }
 .bookcase.arranging .plant-slot.end-pot { pointer-events: auto; }
+.bookcase.arranging.sorting .greenery .hit, .bookcase.arranging.sorting .plant-slot.end-pot { pointer-events: none; }
+
+/* Adding a book: a quiet + beside each shelf's name (the shelves are just books and plants). */
+.case-title { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.case-add { flex: none; width: 26px; height: 26px; border-radius: 50%; display: inline-grid; place-items: center; padding: 0 0 2px; cursor: pointer;
+  border: 1px solid rgba(236,217,174,.3); background: transparent; color: #ecd9ae; opacity: .7; font: 400 1.15rem/1 'Cormorant Garamond', Georgia, serif; -webkit-tap-highlight-color: transparent; }
+.case-add:hover, .case-add:focus-visible { opacity: 1; border-color: rgba(236,217,174,.6); }

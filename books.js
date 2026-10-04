@@ -136,7 +136,7 @@ function fitSpines(root = document) {
     }
     while (over() && fs > min) { fs -= 0.5; el.style.fontSize = `${fs}px`; } // already two lines: just smaller
   };
-  const all = () => $$('.slot:not(.add-slot) .spine-title', root).forEach(fit);
+  const all = () => $$('.slot .spine-title', root).forEach(fit);
   all();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (root === document || root.isConnected) all(); });
 }
@@ -483,8 +483,9 @@ const POT_KINDS = [['succulent', 'Succulent'], ['flowers', 'Flowering'], ['potho
 const POT_SIZES = [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']];
 const greensOf = id => (((state.settings || {}).greens) || {})[id] || {};
 const lastBookIn = el => { const s = $$('.spine[data-book]', el); return s.length ? s[s.length - 1].dataset.book : null; };
+const rowEnd = row => [...row.children].find(el => el.classList.contains('greenery') || el.classList.contains('end-pot')) || null;
 const shelfItems = row => [...row.children].filter(el => (el.classList.contains('slot') || el.classList.contains('ser-grp'))
-  && !el.classList.contains('add-slot') && !el.classList.contains('plant-slot'));
+  && !el.classList.contains('plant-slot'));
 let arranging = false; // Arrange greenery mode (the bookcase only)
 
 function plantSlotEl(p) {
@@ -510,8 +511,9 @@ function drapeSvg(x0, y0, run, kind, seed) {
 }
 
 // Draws the plants onto every shelf in root (after the spines are laid out).
-function growGreenery(root = document) {
-  const mode = greeneryOf();
+// force: draw this greenery whatever the setting (the tour's pretend bookcase).
+function growGreenery(root = document, force) {
+  const mode = force || greeneryOf();
   $$('.case', root).forEach(caseEl => {
     const row = $('.case-row', caseEl);
     if (!row) return;
@@ -523,7 +525,6 @@ function growGreenery(root = document) {
     const P = parseFloat(getComputedStyle(row).getPropertyValue('--plank')) || 16;
     const prnd = seeded(`greens:${shelf}:${g.potSeed || 0}`), vrnd = seeded(`vines:${shelf}:${g.vineSeed || 0}`);
     const pots = mode === 'pots' || mode === 'both', vines = mode === 'vines' || mode === 'both';
-    const addSlot = $('.add-slot', row);
     const randomPot = () => ({ kind: POT_KINDS[Math.floor(prnd() * 3)][0], size: POT_SIZES[Math.floor(prnd() * 3)][0], seed: Math.floor(prnd() * 1e9) });
     let svg = '';
     if (pots && Array.isArray(g.pots)) {
@@ -532,7 +533,7 @@ function growGreenery(root = document) {
       g.pots.forEach(p => {
         const i = p.after == null ? -1 : items.findIndex(el => lastBookIn(el) === p.after);
         const ref = p.after == null ? items[0] : i >= 0 ? items[i + 1] : items[Math.min(p.index ?? items.length, items.length)];
-        row.insertBefore(plantSlotEl(p), ref || addSlot);
+        row.insertBefore(plantSlotEl(p), ref || null);
       });
     } else if (pots) {
       // Random: about every other row gets one between two books or sets (never inside a series).
@@ -628,7 +629,7 @@ function potsFromDom(row) {
   let last = null, n = 0;
   [...row.children].forEach(el => {
     if (el.classList.contains('plant-slot')) out.push({ kind: el.dataset.kind, size: el.dataset.size, seed: Number(el.dataset.seed), after: last, index: n });
-    else if ((el.classList.contains('slot') || el.classList.contains('ser-grp')) && !el.classList.contains('add-slot')) { last = lastBookIn(el) || last; n++; }
+    else if (el.classList.contains('slot') || el.classList.contains('ser-grp')) { last = lastBookIn(el) || last; n++; }
   });
   return out;
 }
@@ -698,7 +699,8 @@ function potMenu(el) {
 
 const arrangeBtns = () => {
   const m = greeneryOf(), v = m === 'vines' || m === 'both', p = m === 'pots' || m === 'both';
-  return `<div class="arrange-btns">${v ? '<button type="button" class="chip" data-ga="vines">Shuffle vines</button><button type="button" class="chip" data-ga="vine">+ Vine</button>' : ''}${p ? '<button type="button" class="chip" data-ga="pots">Shuffle pots</button><button type="button" class="chip" data-ga="add">+ Plant</button>' : ''}</div>`;
+  const group = (label, shuffle, add, what) => `<span class="ab-group"><span class="ab-label">${label}:</span><button type="button" class="chip" data-ga="${shuffle}" aria-label="Shuffle ${what}">Shuffle</button><button type="button" class="chip ab-plus" data-ga="${add}" aria-label="Add ${what === 'vines' ? 'a vine' : 'a plant'}">+</button></span>`;
+  return `<div class="arrange-btns">${v ? group('Vines', 'vines', 'vine', 'vines') : ''}${p ? group('Pots', 'pots', 'add', 'pots') : ''}</div>`;
 };
 function wireArrange(caseEl) {
   if (!arranging || !caseEl) return;
@@ -757,7 +759,7 @@ function wireArrange(caseEl) {
         drag.pot.classList.remove('end-pot');
         drag.pot.removeAttribute('style');
         drag.pot.style.setProperty('--w', drag.ghost.style.width);
-        drag.pot.closest('.case-row').insertBefore(drag.pot, $('.add-slot', drag.pot.closest('.case-row')));
+        drag.pot.closest('.case-row').insertBefore(drag.pot, rowEnd(drag.pot.closest('.case-row')));
       }
     } else if (drag.drape) {
       const row = drag.drape.closest('.case-row'), d = row._drapes[Number(drag.drape.dataset.i)];
@@ -784,9 +786,9 @@ function wireArrange(caseEl) {
       if (!row) return;
       const item = over.closest('.case-row > *');
       if (item && item !== drag.pot && !item.classList.contains('greenery')) {
-        if (item.classList.contains('add-slot')) row.insertBefore(drag.pot, item);
+        if (item.classList.contains('end-pot')) row.insertBefore(drag.pot, rowEnd(row));
         else { const r = item.getBoundingClientRect(); row.insertBefore(drag.pot, e.clientX > r.left + r.width / 2 ? item.nextSibling : item); }
-      } else if (!item) row.insertBefore(drag.pot, $('.add-slot', row));
+      } else if (!item) row.insertBefore(drag.pot, rowEnd(row));
     } else if (drag.drape) {
       // Height locked to a shelf's top edge: slides along it, or snaps to another shelf's.
       const want = drag.from.y + (e.clientY - drag.y);
@@ -1008,9 +1010,8 @@ function renderBooks() {
   const caseHtml = sh => {
     const list = booksOn(sh.id);
     return `<section class="case" data-shelf="${esc(sh.id)}">
-      <header class="case-head"><h2 class="case-name">${esc(sh.name)}</h2>${arranging ? arrangeBtns() : ''}</header>
-      <div class="case-row">${shelfRowHtml(list)}
-        <div class="slot add-slot" style="--w:30px;--h:110px"><button class="spine add-spine" data-add="${esc(sh.id)}" aria-label="Add a book to ${esc(sh.name)}">+</button></div></div>
+      <header class="case-head"><div class="case-title"><h2 class="case-name">${esc(sh.name)}</h2>${arranging ? '' : `<button type="button" class="case-add" data-add="${esc(sh.id)}" aria-label="Add a book to ${esc(sh.name)}">+</button>`}</div>${arranging ? arrangeBtns() : ''}</header>
+      <div class="case-row">${shelfRowHtml(list)}</div>
     </section>`;
   };
   view.innerHTML = `<div class="library books-home">
@@ -1021,7 +1022,7 @@ function renderBooks() {
         ? `<span>${year} · ${done} of ${goal} books</span><span class="goal-bar"><span style="width:${Math.min(100, Math.round((done / goal) * 100))}%"></span></span>`
         : `<span>${done ? `${done} finished in ${year} · ` : ''}Set a ${year} reading goal ›</span>`}</a></header>
     <div class="bookcase${arranging ? ' arranging' : ''}" id="case">${shelvesOf().map(caseHtml).join('')}</div>
-    ${arranging ? `<div class="arrange-bar"><span>Drag the pots and vines. Tap one to change or remove it.</span><button class="btn primary" id="adone">Done</button></div>` : ''}
+    ${arranging ? `<div class="arrange-bar"><span>Drag the pots, vines and books. Tap a plant to change or remove it.</span><button class="btn primary" id="adone">Done</button></div>` : ''}
     ${state.books.length ? '' : `<div class="side-empty"><p class="empty">No books yet</p>
       <div class="side-empty-btns">${isOwner() ? '' : '<a class="btn" href="#/books/pick">Browse the library</a>'}<button class="btn ghost" id="e-add">Add a book</button></div></div>`}
   </div>`;
@@ -1043,10 +1044,12 @@ function renderBooks() {
   fitSpines(view);
   fitPlates(view);
   growGreenery(view);
+  // Arranging greenery: books can still be held and dragged, to plan around them.
+  enableSpineDrag($('#case'));
   if (arranging) {
     wireArrange($('#case'));
     $('#adone').onclick = () => { arranging = false; renderBooks(); toast('Greenery saved'); };
-  } else enableSpineDrag($('#case'));
+  }
   maybeTour('books');
 }
 
@@ -1165,12 +1168,12 @@ function enableSpineDrag(caseEl) {
     const row = over && over.closest('.case-row');
     if (!row || !caseEl.contains(row)) return;
     const target = over.closest('.slot');
-    const addSlot = $('.add-slot', row);
-    if (target && target !== slot && target !== addSlot) {
+    const tail = rowEnd(row); // the shelf's end (after the last book)
+    if (target && target !== slot && !target.classList.contains('end-pot')) {
       const r = target.getBoundingClientRect();
       target.parentElement.insertBefore(slot, x > r.left + r.width / 2 ? target.nextSibling : target);
-    } else if (!target || target === addSlot) {
-      if (slot.parentElement !== row || slot.nextElementSibling !== addSlot) row.insertBefore(slot, addSlot);
+    } else if (!target || target.classList.contains('end-pot')) {
+      if (slot.parentElement !== row || slot.nextElementSibling !== tail) row.insertBefore(slot, tail);
     }
   }
 
@@ -1242,7 +1245,7 @@ function enableSpineDrag(caseEl) {
     const add = e.target.closest('[data-add]');
     if (add) { newBookShelf = add.dataset.add; location.hash = '#/books/new'; return; }
     const sp = e.target.closest('.spine[data-book]');
-    if (!sp || dragging || justDragged) return;
+    if (!sp || dragging || justDragged || arranging) return; // arranging: books move, but don't open
     openBook(sp, bookById(sp.dataset.book));
   }, opts);
   caseEl.addEventListener('contextmenu', e => { if (e.target.closest('.spine')) e.preventDefault(); }, opts);

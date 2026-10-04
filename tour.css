@@ -40,3 +40,10 @@ body.tour-on { overflow: hidden; }
 .tour-dots span { flex: none; width: 5px; height: 5px; border-radius: 50%; background: #ecd9ae; opacity: .25; }
 .tour-dots span.on { opacity: .9; }
 @media (prefers-reduced-motion: reduce) { .tour-spot { animation: none; } }
+/* Pretend pop-ups and confetti inside the phone (the screen is the containing block). */
+.tour-screen .tour-modal { position: absolute; animation: none; }
+.tour-screen .tour-box { display: block; min-height: 42px; border: 1.5px solid var(--line, #d9c9a8); border-radius: 10px; background: color-mix(in srgb, var(--card, #fff) 70%, #fff); }
+.tour-screen .tour-box.tall { min-height: 84px; }
+.tour-screen .scan-btn { margin-bottom: 10px; }
+.tour-fleck { position: absolute; z-index: 60; width: 7px; height: 11px; border-radius: 1px; opacity: .9; }
+.tour-screen .tour-modal .modal { animation: none; transform: none; }
