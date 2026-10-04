@@ -65,6 +65,10 @@ const coverOf = b => (b.cover && b.cover.url) || b.coverUrl || null;
 const coverSmall = b => (b.cover && b.cover.thumbUrl) || b.coverThumb || b.coverUrl || null;
 const lookOf = b => ({ ...Themes.BOOK_PRESETS[0], ...(b.look || {}) });
 const seriesKey = b => (b.series || '').trim().toLowerCase();
+// A series' short name, for a shelf plate too short for the full one (series page:
+// "Short name for the shelf"). Kept in settings.seriesShort by series; '' = none.
+const SERIES_SHORT = { 'a court of thorns and roses': 'ACOTAR', 'the lord of the rings': 'LOTR' };
+const seriesShortOf = key => { const mine = (state.settings && state.settings.seriesShort) || {}; return key in mine ? mine[key] : SERIES_SHORT[key] || ''; };
 const titleKey = t => (t || '').toLowerCase().replace(/^(the|a|an)\s+/, '');
 const authorKey = a => { const p = (a || '').split(',')[0].trim().split(/\s+/); return `${p.pop() || ''} ${p.join(' ')}`.toLowerCase(); };
 const hashOf = s => [...String(s)].reduce((h, c) => (h * 31 + c.charCodeAt(0)) >>> 0, 7);
@@ -290,15 +294,18 @@ async function assignOrnaments() {
 
 // After drawing: a plate only stays within its own books when the next series really
 // sits beside it on the same row; a name that still doesn't fit gets smaller lettering.
+// A plate never runs past its own books: the name shrinks a little to fit, then
+// the series' short name is tried, and past that it ends in "…".
 function fitPlates(root = document) {
-  $$('.ser-grp.before-set', root).forEach(g => {
-    const next = g.nextElementSibling;
-    if (!next || Math.abs(next.offsetTop + next.offsetHeight - (g.offsetTop + g.offsetHeight)) > 4) g.classList.remove('before-set');
-  });
   $$('.ser-plate', root).forEach(p => {
-    p.style.fontSize = ''; p.style.letterSpacing = '';
-    let fs = 8;
-    while (p.scrollWidth > p.clientWidth + 1 && fs > 6) { fs -= 0.5; p.style.fontSize = `${fs}px`; p.style.letterSpacing = '.03em'; }
+    const fit = text => {
+      p.textContent = text;
+      p.style.fontSize = ''; p.style.letterSpacing = '';
+      let fs = 8;
+      while (p.scrollWidth > p.clientWidth + 1 && fs > 6) { fs -= 0.5; p.style.fontSize = `${fs}px`; p.style.letterSpacing = '.03em'; }
+      return p.scrollWidth <= p.clientWidth + 1;
+    };
+    if (!fit(p.title) && p.dataset.short) fit(p.dataset.short);
   });
 }
 
@@ -336,11 +343,8 @@ function shelfRowHtml(list) {
     while (key && j < list.length && seriesKey(list[j]) === key) j++;
     const h = nudge(spineStyle(list[i]).h);
     if (j - i >= 2) {
-      // Another series right after this one: this plate stays within its own books.
-      const k = list[j] && seriesKey(list[j]);
-      const nextIsSet = !!(k && list.slice(j, j + 2).length === 2 && seriesKey(list[j + 1]) === k);
-      html += `<div class="ser-grp${nextIsSet ? ' before-set' : ''}">${list.slice(i, j).map(b => spineHtml(b, { h })).join('')}
-        <a class="ser-plate" href="${seriesHref(list[i].series)}" title="${esc(list[i].series)}">${esc(list[i].series)}</a></div>`;
+      html += `<div class="ser-grp">${list.slice(i, j).map(b => spineHtml(b, { h })).join('')}
+        <a class="ser-plate" href="${seriesHref(list[i].series)}" title="${esc(list[i].series)}" data-short="${esc(seriesShortOf(key))}">${esc(list[i].series)}</a></div>`;
     } else html += spineHtml(list[i], { h });
     prevH = h;
     i = j;
@@ -2169,6 +2173,9 @@ function renderSeries(name) {
     <h1 class="w-title small-title">${esc(display)}</h1>
     <div class="ser-progress"><span>${done} of ${list.length + missing.length} read</span>
       <span class="goal-bar"><span style="width:${Math.round((done / (list.length + missing.length)) * 100)}%"></span></span></div>
+    <label class="mini-field ser-short"><span>Short name for the shelf</span>
+      <input id="sershort" value="${esc(seriesShortOf(key))}" placeholder="${esc(display.length > 12 ? display.split(/\s+/).map(w => w[0]).join('').toUpperCase() : display)}" maxlength="30" autocomplete="off"></label>
+    <p class="muted small ser-short-note">Shown on the shelf’s name plate when “${esc(display)}” doesn’t fit under the books.</p>
     <div class="ser-list">${rows.map(r => (r.missing
       ? `<div class="card ser-row missing" data-n="${r.n}"><span class="ser-cover ser-blank">${r.n}</span>
           <span class="ser-txt"><span class="ser-no">Book ${r.n}</span><span class="ser-title muted" data-libtitle="${r.n}">Not on your shelves</span></span>
@@ -2181,6 +2188,11 @@ function renderSeries(name) {
   paintCovers(view);
   $$('.ser-row[data-book]').forEach(el => { el.onclick = () => openBook($('.ser-cover', el), bookById(el.dataset.book)); });
   $('#addafter').onclick = () => addSeriesBook(display, max + 1);
+  $('#sershort').onchange = async e => {
+    const seriesShort = { ...((state.settings && state.settings.seriesShort) || {}), [key]: e.target.value.trim() };
+    state.settings.seriesShort = seriesShort;
+    try { await DB.saveSettings({ seriesShort }); toast('Short name saved'); } catch (x) { toast(friendlyError(x), true); }
+  };
   $$('[data-addn]').forEach(b => { b.onclick = () => addSeriesBook(display, Number(b.dataset.addn)); });
   // Missing books that are in the library: show their titles and add them in one tap.
   bookLibrary().then(lib => {

@@ -438,16 +438,17 @@
 .ser-plate {
   /* It spans the whole series, end to end. */
   position: absolute; left: 1px; bottom: 2px; z-index: 1; text-align: center;
-  min-width: calc(100% - 2px); width: max-content; max-width: min(260px, 86vw); padding: 1px 7px; border-radius: 2px;
+  min-width: calc(100% - 2px); width: max-content; max-width: calc(100% - 2px); padding: 1px 7px; border-radius: 2px;
   background: linear-gradient(#e2c27a, #b48a3e 55%, #9a7330); color: #3b2a12;
   font: 700 8px/11px system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase; text-decoration: none;
   white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   box-shadow: inset 0 1px 0 rgba(255,255,255,.45), 0 1px 1px rgba(0,0,0,.45);
 }
 .bookcase.sorting .ser-plate { pointer-events: none; }
-/* Two series side by side: a little space between them, so each plate is clearly its own. */
-.ser-grp + .ser-grp { margin-left: 8px; }
-.ser-grp.before-set .ser-plate { max-width: calc(100% - 2px); }
+/* A little space on both sides of a series, so it reads as a set (next to another series or a single book). */
+.case-row > .ser-grp:not(:first-child), .case-row > .ser-grp + * { margin-left: 8px; }
+.ser-short { margin: 14px 0 2px; }
+.ser-short-note { margin: 0 0 12px; }
 
 /* Opened from the Home Screen: iPhone softly blurs the strip just under the
    clock, so the gear and your name sit a little lower there. */
