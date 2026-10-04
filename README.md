@@ -21,6 +21,12 @@ doors and books, a glowing spot, an arrow and an info bubble). Everyone sees
 both sides' tours once (settings.tourSeen), starting with the side they're on;
 after that, "Take the tour" in each side's gear menu replays that side.
 
+**Accessories** (Worlds gear; decor.js + decor.css, fx.js): fairy lights, and
+how a world opens: Theater curtains (default), VHS tape (optional "Start with
+static"), Old TV (power on), Color bars, or None. "Exit effect" plays on
+"‹ Worlds": curtains close; TV, VHS and color bars switch off like an old TV.
+Tap skips. Saved in settings.openFx / vhsStatic / exitFx.
+
 Plus a **Books** side (tap the big doorway/book icon at the top to flip sides; settings are under the gear, top right; books.js + books.css):
 a wooden bookcase with your shelves (Currently reading / Read / Want to read /
 DNF, editable, each with its own sort; hold a book to drag it). Spine thickness
@@ -65,7 +71,7 @@ S5 E1, Zutara is on the Avatar ships list, Daryl/Rick/Glenn/Maggie are TWD favor
 
 ## Site files (upload these to GitHub)
 
-index.html, styles.css, themes.css, books.css, themes.js, app.js, world.js, share.js, library.js, together.js, books.js, store.js,
+index.html, styles.css, themes.css, books.css, tour.css, decor.css, themes.js, app.js, world.js, share.js, library.js, together.js, books.js, tour.js, scan.js, decor.js, fx.js, store.js,
 demo.js, photos.js, firebase-config.js, sw.js, manifest.json,
 icon-192.png, icon-512.png, apple-touch-icon.png
 

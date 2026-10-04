@@ -680,7 +680,7 @@ function enableTileDrag(shelf) {
   window.addEventListener('pointerup', e => { if (e.pointerType === 'mouse') end(); }, opts);
 
   // ----- opening a world -----
-  const open = t => vhsOpen(t);
+  const open = t => openWorldFx(t); // fx.js
   shelf.addEventListener('click', e => {
     const t = e.target.closest('.tile[data-world]');
     if (!t) return;
@@ -692,47 +692,6 @@ function enableTileDrag(shelf) {
     if (t && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); open(t); }
   }, opts);
   shelf.addEventListener('contextmenu', e => { if (e.target.closest('.tile')) e.preventDefault(); }, opts);
-}
-
-// Opening a world, VHS style (Accessories → "VHS tape transition", on unless turned off). The door pushes in like a tape going into the VCR, the
-// screen cuts to static with ▶ PLAY in the corner, and the world comes up with
-// scanlines, a rolling tracking bar and a little wobble before it settles.
-function vhsOpen(tile) {
-  const href = `#/w/${tile.dataset.world}`;
-  const off = state.settings && state.settings.vhs === false;
-  if (off || matchMedia('(prefers-reduced-motion: reduce)').matches || !Element.prototype.animate) { location.hash = href; return; }
-  if ($('.vhs')) return;
-  const ov = document.createElement('div');
-  ov.className = 'vhs';
-  ov.innerHTML = '<canvas width="120" height="210"></canvas><div class="vhs-lines"></div><div class="vhs-bar"></div><div class="vhs-osd">▶ PLAY</div><div class="vhs-time">SP&nbsp;&nbsp;0:00:00</div>';
-  const cv = $('canvas', ov), g = cv.getContext('2d'), img = g.createImageData(cv.width, cv.height);
-  let noise = true;
-  const snow = () => {
-    if (!noise) return;
-    for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255 | 0; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
-    g.putImageData(img, 0, 0);
-    requestAnimationFrame(snow);
-  };
-  // 1. The tape goes in.
-  tile.animate([{ transform: 'scale(1)', filter: 'brightness(1)' }, { transform: 'scale(.94) translateY(6px)', filter: 'brightness(.7)' }],
-    { duration: 220, easing: 'ease-in', fill: 'forwards' }).finished.then(() => {
-    // 2. Static, with PLAY.
-    document.body.appendChild(ov);
-    snow();
-    return wait(620);
-  }).then(() => {
-    // 3. The world comes up through the tracking lines.
-    location.hash = href;
-    noise = false;
-    ov.classList.add('vhs-on');
-    $('#view').animate([
-      { transform: 'translateX(-3px) skewX(-1deg)', filter: 'contrast(1.25) saturate(1.5) hue-rotate(-8deg) blur(.6px)' },
-      { transform: 'translateX(2px)', filter: 'contrast(1.15) saturate(1.3) blur(.3px)', offset: .3 },
-      { transform: 'translateX(-1px)', filter: 'contrast(1.05) saturate(1.1)', offset: .65 },
-      { transform: 'none', filter: 'none' },
-    ], { duration: 900, easing: 'steps(9, end)' });
-    return ov.animate([{ opacity: 1 }, { opacity: 1, offset: .55 }, { opacity: 0 }], { duration: 1100, fill: 'forwards' }).finished;
-  }).then(() => ov.remove(), () => ov.remove());
 }
 
 // The world name's color on its home card (null = the theme's own, or white on a photo).

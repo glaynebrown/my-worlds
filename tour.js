@@ -17,7 +17,7 @@ const TOUR_STEPS = {
   worlds: [
     { scene: 'worldsHome', target: '.tile', text: 'Tap a door to step inside a world. Hold one and drag to rearrange your doors.' },
     { scene: 'worldsHome', target: '.home-gear', text: 'Add new worlds, keep a wishlist of things to watch, and set your name here.' },
-    { scene: 'worldsLights', target: '.decor .garland', text: 'Turn on fairy lights in Accessories (in the gear menu), then use Arrange to move them between rows or let them dangle down.' },
+    { scene: 'worldsLights', target: '.decor .garland', text: 'Turn on fairy lights in Accessories (in the gear menu), then use Arrange to move them between rows or let them dangle down. You can also pick how a world opens there: theater curtains, VHS, an old TV or color bars.' },
     { scene: 'world', target: '.w-tabs', text: 'Every world has a mood board, quotes, favorites and a watch tracker. My Canon and Fics are optional pages you can turn on or off in its settings.' },
     { scene: 'world', target: '.watch-btn', place: 'below', text: 'Finished an episode? Tap Watched it. The arrows step between episodes.' },
     { scene: 'world', target: '.note-btn', text: 'Jot notes about an episode here. They stay even when you rewatch.' },

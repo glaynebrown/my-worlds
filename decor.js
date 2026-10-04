@@ -1,5 +1,5 @@
-/* Accessories (the Watch side's home page): fairy lights, and the switch for the
-   VHS tape transition when opening a world (app.js vhsOpen; settings.vhs, on by default).
+/* Accessories (the Watch side's home page): fairy lights, and the effect for
+   opening a world and going back to the doors (fx.js).
 
    A garland under the title, and garlands strung between rows of doors (about
    every other row, at random), with softly twinkling bulbs. Worlds gear →
@@ -123,13 +123,13 @@ function accessoriesForm() {
   openModal(`<h2>Accessories</h2>
     <label class="switch ribbon-switch"><input type="checkbox" id="dlights" ${d.lights ? 'checked' : ''}><span class="track"></span><span>Fairy lights</span></label>
     <button type="button" class="btn small arrange-open" id="darr" ${d.lights ? '' : 'disabled'}>Arrange accessories</button>
-    <label class="switch ribbon-switch"><input type="checkbox" id="dvhs" ${state.settings && state.settings.vhs === false ? '' : 'checked'}><span class="track"></span><span>VHS tape transition when opening a world</span></label>
+    ${fxFields()}
     <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-close>Cancel</button><button type="button" class="btn primary" id="dsave">Save</button></div>`, (root, close) => {
     $('#dlights', root).onchange = () => { $('#darr', root).disabled = !$('#dlights', root).checked; };
+    wireFxFields(root);
     const save = () => {
       saveDecor({ lights: $('#dlights', root).checked });
-      const vhs = $('#dvhs', root).checked;
-      if (vhs !== (state.settings.vhs !== false)) { state.settings.vhs = vhs; DB.saveSettings({ vhs }).catch(e => toast(friendlyError(e), true)); }
+      saveFxFields(root);
     };
     $('#dsave', root).onclick = () => { save(); close(); renderLibrary(); };
     $('#darr', root).onclick = () => { save(); decorArranging = true; close(); renderLibrary(); };
