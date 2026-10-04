@@ -473,6 +473,42 @@ function potSvg(kind, rnd) {
   return plant + pot;
 }
 
+// Each shelf's own arrangement, once you've arranged it (Edit shelves → Arrange greenery):
+// settings.greens[shelfId] = { pots: [{ kind, size, seed, after, index }] | null,
+//   drapes: [{ row, x, kind, seed }] | null, side: 'left'|'right'|null, potSeed, vineSeed }.
+// null = still random. A pot remembers the book it sits after (index if that book has
+// gone); a drape remembers its row and how far along the shelf's top edge (0–1).
+const POT_K = { s: 0.75, m: 1.1, l: 1.55 };
+const POT_KINDS = [['succulent', 'Succulent'], ['flowers', 'Flowering'], ['pothos', 'Pothos']];
+const POT_SIZES = [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']];
+const greensOf = id => (((state.settings || {}).greens) || {})[id] || {};
+const lastBookIn = el => { const s = $$('.spine[data-book]', el); return s.length ? s[s.length - 1].dataset.book : null; };
+const shelfItems = row => [...row.children].filter(el => (el.classList.contains('slot') || el.classList.contains('ser-grp'))
+  && !el.classList.contains('add-slot') && !el.classList.contains('plant-slot'));
+let arranging = false; // Arrange greenery mode (the bookcase only)
+
+function plantSlotEl(p) {
+  const k = POT_K[p.size] || POT_K.m, w = Math.round(46 * k);
+  const el = document.createElement('div');
+  el.className = 'slot plant-slot';
+  el.setAttribute('aria-label', `${(POT_KINDS.find(x => x[0] === p.kind) || POT_KINDS[0])[1]} plant`);
+  Object.assign(el.dataset, { kind: p.kind, size: p.size, seed: p.seed });
+  el.style.setProperty('--w', `${w}px`);
+  el.innerHTML = `<svg width="${w}" height="${Math.round(60 * k)}" viewBox="0 0 46 60">${potSvg(p.kind, seeded(`pot:${p.seed}`))}</svg>`;
+  return el;
+}
+// One draping vine: a run along the top edge to the left of (x0, y0), then 2–3 strands hanging down.
+function drapeSvg(x0, y0, run, kind, seed) {
+  const rnd = seeded(`drape:${seed}`);
+  let svg = vineSvg([[[x0 - run, y0], [x0 - run * 0.6, y0 - 2], [x0 - run * 0.3, y0 + 2], [x0, y0]]], rnd, kind, { every: 7, big: 10 });
+  const strands = 2 + (rnd() < 0.5 ? 1 : 0);
+  for (let k = 0; k < strands; k++) {
+    const sx = x0 + (k - 1) * (5 + rnd() * 5), drop = 34 + rnd() * 52 - k * 6, lean = (rnd() - 0.5) * 18;
+    svg += vineSvg([[[x0 - 4, y0], [sx + 2, y0 + drop * 0.3], [sx + lean, y0 + drop * 0.65], [sx + lean * 0.7, y0 + drop]]], rnd, kind, { every: 7.5, big: 9.5 });
+  }
+  return svg;
+}
+
 // Draws the plants onto every shelf in root (after the spines are laid out).
 function growGreenery(root = document) {
   const mode = greeneryOf();
@@ -480,100 +516,100 @@ function growGreenery(root = document) {
     const row = $('.case-row', caseEl);
     if (!row) return;
     $$('.greenery, .plant-slot', row).forEach(el => el.remove());
+    row._drapes = null; row._side = null;
     if (mode === 'none') return;
+    const shelf = caseEl.dataset.shelf, g = greensOf(shelf);
     const R = parseFloat(getComputedStyle(row).getPropertyValue('--row')) || 196;
     const P = parseFloat(getComputedStyle(row).getPropertyValue('--plank')) || 16;
-    const rnd = seeded(`greens:${caseEl.dataset.shelf}`);
-    const pots = mode === 'pots' || mode === 'both';
-    const potSize = () => [0.75, 1.1, 1.55][Math.floor(rnd() * 3)]; // small, medium, large
-    const potKind = () => ['succulent', 'flowers', 'pothos'][Math.floor(rnd() * 3)];
-    // Pots between books: on about every other row (at random), between two books or
-    // sets (never inside a series). They take up shelf space like a book would.
-    if (pots) {
-      const list = [...row.children].filter(el => el.classList.contains('slot') || el.classList.contains('ser-grp'))
-        .filter(el => !el.classList.contains('add-slot'));
+    const prnd = seeded(`greens:${shelf}:${g.potSeed || 0}`), vrnd = seeded(`vines:${shelf}:${g.vineSeed || 0}`);
+    const pots = mode === 'pots' || mode === 'both', vines = mode === 'vines' || mode === 'both';
+    const addSlot = $('.add-slot', row);
+    const randomPot = () => ({ kind: POT_KINDS[Math.floor(prnd() * 3)][0], size: POT_SIZES[Math.floor(prnd() * 3)][0], seed: Math.floor(prnd() * 1e9) });
+    let svg = '';
+    if (pots && Array.isArray(g.pots)) {
+      // Where you put them: after the same book (or in its old spot if that book has moved).
+      const items = shelfItems(row);
+      g.pots.forEach(p => {
+        const i = p.after == null ? -1 : items.findIndex(el => lastBookIn(el) === p.after);
+        const ref = p.after == null ? items[0] : i >= 0 ? items[i + 1] : items[Math.min(p.index ?? items.length, items.length)];
+        row.insertBefore(plantSlotEl(p), ref || addSlot);
+      });
+    } else if (pots) {
+      // Random: about every other row gets one between two books or sets (never inside a series).
+      const list = shelfItems(row);
       const rowOf = el => Math.round(el.offsetTop / R);
       const spots = [];
-      const rowsNow = new Set(list.map(rowOf));
-      rowsNow.forEach(r => {
-        if (rnd() >= 0.5) return;
+      new Set(list.map(rowOf)).forEach(r => {
+        const pick = prnd(), at = prnd(), p = randomPot();
+        if (pick >= 0.5) return;
         const between = list.filter((el, i) => i > 0 && rowOf(el) === r && rowOf(list[i - 1]) === r);
-        if (between.length) spots.push(between[Math.floor(rnd() * between.length)]);
+        if (between.length) spots.push([between[Math.floor(at * between.length)], p]);
       });
-      spots.forEach(before => {
-        const k = potSize(), w = Math.round(46 * k);
-        const el = document.createElement('div');
-        el.className = 'slot plant-slot';
-        el.setAttribute('aria-hidden', 'true');
-        el.style.setProperty('--w', `${w}px`);
-        el.innerHTML = `<svg width="${w}" height="${Math.round(60 * k)}" viewBox="0 0 46 60">${potSvg(potKind(), rnd)}</svg>`;
-        row.insertBefore(el, before);
-      });
+      spots.forEach(([before, p]) => row.insertBefore(plantSlotEl(p), before));
     }
     const W = row.clientWidth, H = row.scrollHeight, rows = Math.max(1, Math.round(H / R));
-    let svg = '';
-    // A pot in the empty space after the last book, if there's room for one.
-    if (pots) {
-      const items = [...row.children].filter(el => !el.classList.contains('greenery'));
+    if (pots && !Array.isArray(g.pots)) {
+      // And one in the empty space after the last book, if there's room.
       const lastTop = (rows - 1) * R;
-      const right = Math.max(14, ...items.filter(el => el.offsetTop >= lastTop - 2).map(el => el.offsetLeft + el.offsetWidth));
-      const free = W - 16 - right, k = potSize(), w = 46 * k;
+      const right = Math.max(14, ...[...row.children].filter(el => el.offsetTop >= lastTop - 2).map(el => el.offsetLeft + el.offsetWidth));
+      const p = randomPot(), k = POT_K[p.size], w = 46 * k, free = W - 16 - right, nudge = prnd();
       if (free >= w + 18) {
-        const x = W - 16 - w - Math.floor(rnd() * Math.min(70, free - w - 12));
-        svg += `<g transform="translate(${x.toFixed(0)} ${rows * R - P - 60 * k}) scale(${k})">${potSvg(potKind(), rnd)}</g>`;
+        // It floats in that space (it joins the row like the others once it's moved).
+        const x = W - 16 - w - Math.floor(nudge * Math.min(70, free - w - 12));
+        const el = plantSlotEl(p);
+        el.classList.add('end-pot');
+        Object.assign(el.style, { left: `${x.toFixed(0)}px`, top: `${lastTop}px` });
+        row.appendChild(el);
       }
     }
-    if (mode === 'vines' || mode === 'both') {
-      // Down one side of the bookcase.
-      const left = rnd() < 0.5, sx = left ? 9 : W - 9, dir = left ? 1 : -1;
-      const len = H * (0.55 + rnd() * 0.35);
+    if (vines) {
+      // Down one side of the bookcase (tap it while arranging to flip sides).
+      const sideR = vrnd(), len = H * (0.55 + vrnd() * 0.35), sideKind = vrnd() < 0.5 ? 'ivy' : 'pothos', sideSeed = Math.floor(vrnd() * 1e9);
+      const side = g.side || (sideR < 0.5 ? 'left' : 'right');
+      row._side = side;
+      const sx = side === 'left' ? 9 : W - 9, dir = side === 'left' ? 1 : -1;
       const segs = [];
       for (let y = 0, k = 0; y < len - 1; y += 70, k++) {
         const y2 = Math.min(len, y + 70), w = (k % 2 ? 5 : -5) * dir;
         segs.push([[sx + (k ? -w : 0), y], [sx + w * 1.6, y + 22], [sx - w * 1.2, y2 - 22], [sx - w, y2]]);
       }
-      if (segs.length) svg += vineSvg(segs, rnd, rnd() < 0.5 ? 'ivy' : 'pothos', { every: 8.5, big: 11.5 });
-      // Trailing down from the top of each shelf (the top of the plank above it, or the
-      // top of the bookcase): a run along the edge, then a few strands hanging into the
-      // shelf. A vine never starts on a series name plate (its leaves may brush one).
+      if (segs.length) svg += `<g class="side-vine"><rect class="hit" x="${sx - 14}" y="0" width="28" height="${len.toFixed(0)}" fill="transparent"/>${vineSvg(segs, seeded(`side:${sideSeed}`), sideKind, { every: 8.5, big: 11.5 })}</g>`;
+      // Draping from the top of each shelf: never starting on a series name plate.
       const box = row.getBoundingClientRect();
       const plates = $$('.ser-plate', row).map(p => { const q = p.getBoundingClientRect(); return { l: q.left - box.left, r: q.right - box.left, row: Math.floor((q.top - box.top) / R) }; });
-      for (let r = 0; r < rows; r++) {
-        const y0 = r ? r * R - P - 1 : 2;
-        const spots = rnd() < 0.55 ? [rnd() < 0.5 ? 0.18 : 0.72] : [0.12 + rnd() * 0.15, 0.62 + rnd() * 0.22];
-        const used = [];
-        spots.forEach(f => {
-          const want = 26 + rnd() * 26;
-          // How much room to run along the edge to the left of x before a plate (or the side).
-          const room = x => {
-            if (x < 12 || x > W - 8 || used.some(u => Math.abs(u - x) < 36)) return 0;
-            const on = plates.filter(p => p.row === r - 1);
-            if (on.some(p => x + 6 > p.l && x - 2 < p.r)) return 0;
-            const leftEdge = Math.max(6, ...on.filter(p => p.r <= x).map(p => p.r + 4));
-            return x - leftEdge;
-          };
-          const x0 = [W * f, W * (f + 0.12), W * (f - 0.12), W * 0.93, W * 0.15, W * 0.5].find(x => room(x) >= 10);
-          if (x0 == null) return;
-          const run = Math.min(want, room(x0));
-          used.push(x0);
-          const kind = rnd() < 0.5 ? 'pothos' : 'ivy';
-          // Along the edge.
-          svg += vineSvg([[[x0 - run, y0], [x0 - run * 0.6, y0 - 2], [x0 - run * 0.3, y0 + 2], [x0, y0]]], rnd, kind, { every: 7, big: 10 });
-          // Two or three strands hanging down, different lengths.
-          const strands = 2 + (rnd() < 0.5 ? 1 : 0);
-          for (let k = 0; k < strands; k++) {
-            const sx = x0 + (k - 1) * (5 + rnd() * 5), drop = 34 + rnd() * 52 - k * 6;
-            const lean = (rnd() - 0.5) * 18;
-            svg += vineSvg([[[x0 - 4, y0], [sx + 2, y0 + drop * 0.3], [sx + lean, y0 + drop * 0.65], [sx + lean * 0.7, y0 + drop]]], rnd, kind, { every: 7.5, big: 9.5 });
-          }
-        });
+      const room = (x, r, used = []) => {
+        if (x < 12 || x > W - 8 || used.some(u => Math.abs(u - x) < 36)) return 0;
+        const on = plates.filter(p => p.row === r - 1);
+        if (on.some(p => x + 6 > p.l && x - 2 < p.r)) return 0;
+        return x - Math.max(6, ...on.filter(p => p.r <= x).map(p => p.r + 4));
+      };
+      let list = g.drapes;
+      if (!Array.isArray(list)) {
+        list = [];
+        for (let r = 0; r < rows; r++) {
+          const two = vrnd() >= 0.55, a = vrnd(), b = vrnd();
+          const spots = two ? [0.12 + a * 0.15, 0.62 + b * 0.22] : [a < 0.5 ? 0.18 : 0.72];
+          const used = [];
+          spots.forEach(f => {
+            const kind = vrnd() < 0.5 ? 'pothos' : 'ivy', seed = Math.floor(vrnd() * 1e9);
+            const x0 = [W * f, W * (f + 0.12), W * (f - 0.12), W * 0.93, W * 0.15, W * 0.5].find(x => room(x, r, used) >= 10);
+            if (x0 == null) return;
+            used.push(x0);
+            list.push({ row: r, x: +(x0 / W).toFixed(3), kind, seed });
+          });
+        }
       }
+      row._drapes = list;
+      list.forEach((d, i) => {
+        const r = Math.min(d.row, rows - 1), x0 = d.x * W, y0 = r ? r * R - P - 1 : 2;
+        const run = Math.max(10, Math.min(26 + (d.seed % 27), room(x0, r) || 10));
+        svg += `<g class="drape" data-i="${i}"><rect class="hit" x="${(x0 - run - 8).toFixed(0)}" y="${(y0 - 12).toFixed(0)}" width="${(run + 30).toFixed(0)}" height="56" fill="transparent"/>${drapeSvg(x0, y0, run, d.kind, d.seed)}</g>`;
+      });
     }
     if (!svg) return;
     const layer = document.createElement('div');
     layer.className = 'greenery';
-    layer.setAttribute('aria-hidden', 'true');
-    layer.innerHTML = `<svg width="${W}" height="${H + 40}" viewBox="0 0 ${W} ${H + 40}">${svg}</svg>`;
+    layer.innerHTML = `<svg width="${W}" height="${H + 40}" viewBox="0 0 ${W} ${H + 40}" aria-hidden="true">${svg}</svg>`;
     row.appendChild(layer);
   });
 }
@@ -583,6 +619,168 @@ window.addEventListener('resize', () => {
   clearTimeout(greeneryResize);
   greeneryResize = setTimeout(() => { if (parseHash()[0] === 'books' && !parseHash()[1]) growGreenery(view); }, 200);
 });
+window.addEventListener('hashchange', () => { const [p, id] = parseHash(); if (p !== 'books' || id) arranging = false; });
+
+// ---------- arranging the greenery ----------
+// The pots on a shelf as they stand now (a floating one at the end counts as after the last book).
+function potsFromDom(row) {
+  const out = [];
+  let last = null, n = 0;
+  [...row.children].forEach(el => {
+    if (el.classList.contains('plant-slot')) out.push({ kind: el.dataset.kind, size: el.dataset.size, seed: Number(el.dataset.seed), after: last, index: n });
+    else if ((el.classList.contains('slot') || el.classList.contains('ser-grp')) && !el.classList.contains('add-slot')) { last = lastBookIn(el) || last; n++; }
+  });
+  return out;
+}
+const rowOfShelf = id => $(`.case[data-shelf="${CSS.escape(id)}"] .case-row`, view);
+function saveGreens(changes) {
+  const all = { ...((state.settings || {}).greens || {}) };
+  Object.entries(changes).forEach(([id, patch]) => {
+    all[id] = { pots: null, drapes: null, side: null, potSeed: 0, vineSeed: 0, ...(all[id] || {}), ...patch };
+  });
+  state.settings.greens = all;
+  growGreenery(view);
+  DB.saveSettings({ greens: all }).catch(e => toast(friendlyError(e), true));
+}
+// Freezes a shelf's current random layout so editing one thing doesn't reshuffle the rest.
+const keepShelf = id => { const row = rowOfShelf(id); return { pots: potsFromDom(row), drapes: row._drapes, side: row._side }; };
+
+function potMenu(el) {
+  const row = el.closest('.case-row'), shelf = row.closest('.case').dataset.shelf;
+  const save = () => saveGreens({ [shelf]: { ...keepShelf(shelf) } });
+  openModal(`<h2>This plant</h2>
+    <div class="field"><span class="field-label">Plant</span><div class="chips bot-chips" id="pk">${POT_KINDS.map(([k, l]) => `<button type="button" class="chip${k === el.dataset.kind ? ' on' : ''}" data-k="${k}">${l}</button>`).join('')}</div></div>
+    <div class="field"><span class="field-label">Size</span><div class="chips bot-chips" id="ps">${POT_SIZES.map(([k, l]) => `<button type="button" class="chip${k === el.dataset.size ? ' on' : ''}" data-s="${k}">${l}</button>`).join('')}</div></div>
+    <div class="actions"><button type="button" class="btn ghost danger-text" id="prm">Remove</button><span class="spacer"></span><button type="button" class="btn primary" data-close>Done</button></div>`, (root, close) => {
+    const idx = $$('.plant-slot', row).indexOf(el);
+    const live = () => $$('.plant-slot', rowOfShelf(shelf))[idx];
+    $('#pk', root).onclick = e => { const c = e.target.closest('[data-k]'); if (!c) return; $$('#pk .chip', root).forEach(x => x.classList.toggle('on', x === c)); live().dataset.kind = c.dataset.k; save(); };
+    $('#ps', root).onclick = e => { const c = e.target.closest('[data-s]'); if (!c) return; $$('#ps .chip', root).forEach(x => x.classList.toggle('on', x === c)); live().dataset.size = c.dataset.s; save(); };
+    $('#prm', root).onclick = () => { live().remove(); save(); close(); };
+  }, 'small-modal');
+}
+
+const arrangeBtns = () => {
+  const m = greeneryOf(), v = m === 'vines' || m === 'both', p = m === 'pots' || m === 'both';
+  return `<div class="arrange-btns">${v ? '<button type="button" class="chip" data-ga="vines">Shuffle vines</button>' : ''}${p ? '<button type="button" class="chip" data-ga="pots">Shuffle pots</button><button type="button" class="chip" data-ga="add">+ Plant</button>' : ''}</div>`;
+};
+function wireArrange(caseEl) {
+  if (!arranging || !caseEl) return;
+  let drag = null;
+  const R = () => parseFloat(getComputedStyle($('.case-row', caseEl)).getPropertyValue('--row')) || 196;
+  caseEl.onclick = e => {
+    const b = e.target.closest('[data-ga]');
+    if (!b) return;
+    const shelf = b.closest('.case').dataset.shelf, what = b.dataset.ga, seed = Math.floor(Math.random() * 1e9);
+    if (what === 'pots') saveGreens({ [shelf]: { pots: null, potSeed: seed } });
+    if (what === 'vines') saveGreens({ [shelf]: { drapes: null, side: null, vineSeed: seed } });
+    if (what === 'add') {
+      const kept = keepShelf(shelf);
+      const row = rowOfShelf(shelf), items = shelfItems(row);
+      kept.pots.push({ kind: POT_KINDS[Math.floor(Math.random() * 3)][0], size: 'm', seed, after: items.length ? lastBookIn(items[items.length - 1]) : null, index: items.length });
+      saveGreens({ [shelf]: kept });
+      toast('Added at the end of the shelf. Drag it where you like.');
+    }
+  };
+  caseEl.onpointerdown = e => {
+    const pot = e.target.closest('.plant-slot'), drape = e.target.closest('.drape'), side = e.target.closest('.side-vine');
+    if (!pot && !drape && !side) return;
+    e.preventDefault();
+    drag = { pot, drape, side, x: e.clientX, y: e.clientY, moved: false };
+    document.addEventListener('pointermove', move);
+    document.addEventListener('pointerup', up, { once: true });
+  };
+  // Every shelf's top edges (where drapes hang from), in page coordinates.
+  const edges = () => $$('.case-row', caseEl).flatMap(row => {
+    const b = row.getBoundingClientRect(), r = R(), P = parseFloat(getComputedStyle(row).getPropertyValue('--plank')) || 16;
+    const n = Math.max(1, Math.round(row.scrollHeight / r));
+    return Array.from({ length: n }, (_, i) => ({ row, i, y: b.top + (i ? i * r - P - 1 : 2), l: b.left, w: row.clientWidth }));
+  });
+  function start() {
+    drag.moved = true;
+    spineSorting = true;
+    caseEl.classList.add('green-dragging');
+    if (drag.pot) {
+      const r = drag.pot.getBoundingClientRect();
+      drag.off = { x: drag.x - r.left, y: drag.y - r.top };
+      drag.ghost = drag.pot.cloneNode(true);
+      drag.ghost.classList.add('green-ghost');
+      Object.assign(drag.ghost.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
+      document.body.appendChild(drag.ghost);
+      drag.pot.classList.add('pot-holding');
+      drag.src = drag.pot.closest('.case').dataset.shelf;
+      if (drag.pot.classList.contains('end-pot')) {
+        drag.pot.classList.remove('end-pot');
+        drag.pot.removeAttribute('style');
+        drag.pot.style.setProperty('--w', drag.ghost.style.width);
+        drag.pot.closest('.case-row').insertBefore(drag.pot, $('.add-slot', drag.pot.closest('.case-row')));
+      }
+    } else if (drag.drape) {
+      const row = drag.drape.closest('.case-row'), d = row._drapes[Number(drag.drape.dataset.i)];
+      const b = row.getBoundingClientRect(), all = edges();
+      const r = Math.min(d.row, all.filter(x => x.row === row).length - 1);
+      drag.from = { row, d, i: Number(drag.drape.dataset.i), x: b.left + d.x * row.clientWidth, y: all.find(x => x.row === row && x.i === r).y };
+      drag.ghost = document.createElement('div');
+      drag.ghost.className = 'green-ghost drape-ghost';
+      const svg = drag.drape.closest('svg');
+      Object.assign(drag.ghost.style, { left: `${b.left}px`, top: `${b.top}px` });
+      drag.ghost.innerHTML = `<svg width="${svg.getAttribute('width')}" height="${svg.getAttribute('height')}" style="overflow:visible">${drag.drape.outerHTML}</svg>`;
+      document.body.appendChild(drag.ghost);
+      drag.drape.style.opacity = '.2';
+    }
+  }
+  function move(e) {
+    if (!drag) return;
+    if (!drag.moved) { if (Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 6 || drag.side) return; start(); }
+    if (drag.pot) {
+      drag.ghost.style.left = `${e.clientX - drag.off.x}px`;
+      drag.ghost.style.top = `${e.clientY - drag.off.y}px`;
+      const over = document.elementFromPoint(e.clientX, e.clientY);
+      const row = over && over.closest('.case-row');
+      if (!row) return;
+      const item = over.closest('.case-row > *');
+      if (item && item !== drag.pot && !item.classList.contains('greenery')) {
+        if (item.classList.contains('add-slot')) row.insertBefore(drag.pot, item);
+        else { const r = item.getBoundingClientRect(); row.insertBefore(drag.pot, e.clientX > r.left + r.width / 2 ? item.nextSibling : item); }
+      } else if (!item) row.insertBefore(drag.pot, $('.add-slot', row));
+    } else if (drag.drape) {
+      // Height locked to a shelf's top edge: slides along it, or snaps to another shelf's.
+      const want = drag.from.y + (e.clientY - drag.y);
+      const edge = edges().reduce((a, b) => (Math.abs(b.y - want) < Math.abs(a.y - want) ? b : a));
+      const x = Math.max(edge.l + 14, Math.min(edge.l + edge.w - 10, drag.from.x + (e.clientX - drag.x)));
+      drag.to = { edge, x };
+      $('.drape', drag.ghost).setAttribute('transform', `translate(${(x - drag.from.x).toFixed(1)} ${(edge.y - drag.from.y).toFixed(1)})`);
+    }
+  }
+  function up() {
+    document.removeEventListener('pointermove', move);
+    const d = drag;
+    drag = null;
+    if (!d) return;
+    spineSorting = false;
+    caseEl.classList.remove('green-dragging');
+    if (d.ghost) d.ghost.remove();
+    if (!d.moved) {
+      if (d.pot) potMenu(d.pot);
+      else if (d.side) { const shelf = d.side.closest('.case').dataset.shelf, kept = keepShelf(shelf); saveGreens({ [shelf]: { ...kept, side: kept.side === 'left' ? 'right' : 'left' } }); }
+      return;
+    }
+    if (d.pot) {
+      d.pot.classList.remove('pot-holding');
+      // Only the shelf it left and the shelf it landed on are saved; the rest stay as they were.
+      const changes = {};
+      new Set([d.src, d.pot.closest('.case').dataset.shelf]).forEach(id => { changes[id] = keepShelf(id); });
+      saveGreens(changes);
+    } else if (d.drape && d.to) {
+      const src = d.from.row.closest('.case').dataset.shelf, dst = d.to.edge.row.closest('.case').dataset.shelf;
+      const keepSrc = keepShelf(src);
+      const moved = { ...d.from.d, row: d.to.edge.i, x: +((d.to.x - d.to.edge.l) / d.to.edge.w).toFixed(3) };
+      keepSrc.drapes = keepSrc.drapes.filter((_, k) => k !== d.from.i);
+      if (src === dst) saveGreens({ [src]: { ...keepSrc, drapes: [...keepSrc.drapes, moved] } });
+      else { const keepDst = keepShelf(dst); saveGreens({ [src]: keepSrc, [dst]: { ...keepDst, drapes: [...(keepDst.drapes || []), moved] } }); }
+    } else growGreenery(view);
+  }
+}
 
 // ---------- the date calendar ----------
 // Every date in Books (Started, Finished, a note's date, "Pick a date") uses this
@@ -765,7 +963,7 @@ function renderBooks() {
   const caseHtml = sh => {
     const list = booksOn(sh.id);
     return `<section class="case" data-shelf="${esc(sh.id)}">
-      <header class="case-head"><h2 class="case-name">${esc(sh.name)}</h2></header>
+      <header class="case-head"><h2 class="case-name">${esc(sh.name)}</h2>${arranging ? arrangeBtns() : ''}</header>
       <div class="case-row">${shelfRowHtml(list)}
         <div class="slot add-slot" style="--w:30px;--h:110px"><button class="spine add-spine" data-add="${esc(sh.id)}" aria-label="Add a book to ${esc(sh.name)}">+</button></div></div>
     </section>`;
@@ -777,7 +975,8 @@ function renderBooks() {
       <a class="goal-line" href="#/books/stats">${goal
         ? `<span>${year} · ${done} of ${goal} books</span><span class="goal-bar"><span style="width:${Math.min(100, Math.round((done / goal) * 100))}%"></span></span>`
         : `<span>${done ? `${done} finished in ${year} · ` : ''}Set a ${year} reading goal ›</span>`}</a></header>
-    <div class="bookcase" id="case">${shelvesOf().map(caseHtml).join('')}</div>
+    <div class="bookcase${arranging ? ' arranging' : ''}" id="case">${shelvesOf().map(caseHtml).join('')}</div>
+    ${arranging ? `<div class="arrange-bar"><span>Drag the pots and vines. Tap a pot to change it, or the side vine to flip it.</span><button class="btn primary" id="adone">Done</button></div>` : ''}
     ${state.books.length ? '' : `<div class="side-empty"><p class="empty">No books yet</p>
       <div class="side-empty-btns">${isOwner() ? '' : '<a class="btn" href="#/books/pick">Browse the library</a>'}<button class="btn ghost" id="e-add">Add a book</button></div></div>`}
   </div>`;
@@ -799,7 +998,10 @@ function renderBooks() {
   fitSpines(view);
   fitPlates(view);
   growGreenery(view);
-  enableSpineDrag($('#case'));
+  if (arranging) {
+    wireArrange($('#case'));
+    $('#adone').onclick = () => { arranging = false; renderBooks(); toast('Greenery saved'); };
+  } else enableSpineDrag($('#case'));
   maybeTour('books');
 }
 
@@ -815,7 +1017,8 @@ function shelvesForm() {
     <button type="button" class="btn small" id="sadd">+ Add a shelf</button>
     <label class="switch ribbon-switch"><input type="checkbox" id="ribbons" ${state.settings && state.settings.ribbons ? 'checked' : ''}><span class="track"></span><span>Bookmark ribbons show how far I’ve read</span></label>
     <div class="field greenery-pick"><span class="field-label">Greenery on the bookcase</span>
-      <div class="chips bot-chips" id="greens">${GREENERY.map(([k, l]) => `<button type="button" class="chip${k === greeneryOf() ? ' on' : ''}" data-g="${k}">${l}</button>`).join('')}</div></div>
+      <div class="chips bot-chips" id="greens">${GREENERY.map(([k, l]) => `<button type="button" class="chip${k === greeneryOf() ? ' on' : ''}" data-g="${k}">${l}</button>`).join('')}</div>
+      <button type="button" class="btn small arrange-open" id="garr" ${greeneryOf() === 'none' ? 'disabled' : ''}>Arrange greenery</button></div>
     <label class="switch ribbon-switch"><input type="checkbox" id="confetti" ${!state.settings || state.settings.confetti !== false ? 'checked' : ''}><span class="track"></span><span>Confetti when I finish a book</span></label>
     <p class="muted small">With My order, hold a book on the shelf to drag it. Books in a series always stand together, in order. A hidden shelf keeps its name and settings for later. Removing a shelf moves its books to the first one showing.</p>
     <div class="actions"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="ssave">Save</button></div>`, (root, close) => {
@@ -839,7 +1042,10 @@ function shelvesForm() {
     $('#greens', root).onclick = e => {
       const c = e.target.closest('[data-g]');
       if (c) $$('#greens .chip', root).forEach(x => x.classList.toggle('on', x === c));
+      if (c) $('#garr', root).disabled = c.dataset.g === 'none';
     };
+    // Saves these settings, then opens the bookcase for arranging.
+    $('#garr', root).onclick = () => { arranging = true; $('#ssave', root).click(); };
     $('#ssave', root).onclick = e => busy(e.target, async () => {
       list = list.map(s => ({ ...s, name: s.name.trim() }));
       if (list.some(s => !s.name)) throw new Error('Give every shelf a name.');

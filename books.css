@@ -561,3 +561,25 @@
 .plant-slot { width: var(--w); margin: 0 3px; }
 .plant-slot svg { display: block; overflow: visible; filter: drop-shadow(0 1.5px 1.5px rgba(0,0,0,.35)); }
 .bookcase.sorting .plant-slot { opacity: .35; }
+
+/* ---------- arranging the greenery ---------- */
+.greenery .hit { pointer-events: none; }
+.arrange-open { margin-top: 10px; }
+.bookcase.arranging .slot:not(.plant-slot), .bookcase.arranging .ser-grp, .bookcase.arranging .ser-plate { opacity: .5; }
+.bookcase.arranging .spine, .bookcase.arranging .ser-plate, .bookcase.arranging .add-spine { pointer-events: none; }
+.bookcase.arranging .plant-slot { cursor: grab; touch-action: none; }
+.bookcase.arranging .plant-slot::after { content: ''; position: absolute; inset: auto -3px var(--plank) -3px; height: calc(100% - var(--plank) - 30px); max-height: 100px; border: 1.5px dashed rgba(242,213,138,.55); border-radius: 10px; pointer-events: none; }
+.bookcase.arranging .greenery .hit { pointer-events: all; cursor: grab; touch-action: none; }
+.bookcase.arranging .greenery .drape .hit { stroke: rgba(242,213,138,.45); stroke-width: 1.5; stroke-dasharray: 4 4; rx: 10px; }
+.bookcase.arranging.green-dragging .greenery .hit { pointer-events: none; }
+.pot-holding { opacity: .25; }
+.green-ghost { position: fixed; z-index: 60; pointer-events: none; margin: 0; filter: drop-shadow(0 10px 16px rgba(0,0,0,.5)); }
+.drape-ghost svg { display: block; overflow: visible; }
+.arrange-btns { display: flex; flex-wrap: wrap; gap: 6px; justify-content: flex-end; }
+.arrange-btns .chip { font-size: .78rem; padding: 5px 10px; border-color: rgba(236,217,174,.35); color: #ecd9ae; background: rgba(255,255,255,.05); }
+.arrange-bar { position: fixed; left: 12px; right: 12px; bottom: calc(env(safe-area-inset-bottom) + 12px); z-index: 40; display: flex; align-items: center; gap: 12px;
+  padding: 10px 10px 10px 16px; border-radius: 16px; background: #f6ecd4; color: #2b221a; box-shadow: 0 10px 30px rgba(0,0,0,.5); font: 400 .88rem/1.35 'Lora', Georgia, serif; max-width: 640px; margin: 0 auto; }
+.arrange-bar span { flex: 1; }
+.books-home:has(.arrange-bar) { padding-bottom: 90px; }
+.plant-slot.end-pot { position: absolute; margin: 0; pointer-events: none; }
+.bookcase.arranging .plant-slot.end-pot { pointer-events: auto; }
