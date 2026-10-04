@@ -558,3 +558,6 @@
 .greenery svg { display: block; overflow: visible; filter: drop-shadow(0 1.5px 1.5px rgba(0,0,0,.35)); }
 .bookcase.sorting .greenery { opacity: 0; transition: opacity .15s; }
 .greenery-pick { margin: 14px 0 4px; }
+.plant-slot { width: var(--w); margin: 0 3px; }
+.plant-slot svg { display: block; overflow: visible; filter: drop-shadow(0 1.5px 1.5px rgba(0,0,0,.35)); }
+.bookcase.sorting .plant-slot { opacity: .35; }

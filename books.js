@@ -479,24 +479,48 @@ function growGreenery(root = document) {
   $$('.case', root).forEach(caseEl => {
     const row = $('.case-row', caseEl);
     if (!row) return;
-    const old = $('.greenery', row);
-    if (old) old.remove();
+    $$('.greenery, .plant-slot', row).forEach(el => el.remove());
     if (mode === 'none') return;
     const R = parseFloat(getComputedStyle(row).getPropertyValue('--row')) || 196;
     const P = parseFloat(getComputedStyle(row).getPropertyValue('--plank')) || 16;
-    const W = row.clientWidth, H = row.scrollHeight, rows = Math.max(1, Math.round(H / R));
     const rnd = seeded(`greens:${caseEl.dataset.shelf}`);
+    const pots = mode === 'pots' || mode === 'both';
+    const potSize = () => [0.75, 1.1, 1.55][Math.floor(rnd() * 3)]; // small, medium, large
+    const potKind = () => ['succulent', 'flowers', 'pothos'][Math.floor(rnd() * 3)];
+    // Pots between books: on about every other row (at random), between two books or
+    // sets (never inside a series). They take up shelf space like a book would.
+    if (pots) {
+      const list = [...row.children].filter(el => el.classList.contains('slot') || el.classList.contains('ser-grp'))
+        .filter(el => !el.classList.contains('add-slot'));
+      const rowOf = el => Math.round(el.offsetTop / R);
+      const spots = [];
+      const rowsNow = new Set(list.map(rowOf));
+      rowsNow.forEach(r => {
+        if (rnd() >= 0.5) return;
+        const between = list.filter((el, i) => i > 0 && rowOf(el) === r && rowOf(list[i - 1]) === r);
+        if (between.length) spots.push(between[Math.floor(rnd() * between.length)]);
+      });
+      spots.forEach(before => {
+        const k = potSize(), w = Math.round(46 * k);
+        const el = document.createElement('div');
+        el.className = 'slot plant-slot';
+        el.setAttribute('aria-hidden', 'true');
+        el.style.setProperty('--w', `${w}px`);
+        el.innerHTML = `<svg width="${w}" height="${Math.round(60 * k)}" viewBox="0 0 46 60">${potSvg(potKind(), rnd)}</svg>`;
+        row.insertBefore(el, before);
+      });
+    }
+    const W = row.clientWidth, H = row.scrollHeight, rows = Math.max(1, Math.round(H / R));
     let svg = '';
     // A pot in the empty space after the last book, if there's room for one.
-    if (mode === 'pots' || mode === 'both') {
+    if (pots) {
       const items = [...row.children].filter(el => !el.classList.contains('greenery'));
       const lastTop = (rows - 1) * R;
       const right = Math.max(14, ...items.filter(el => el.offsetTop >= lastTop - 2).map(el => el.offsetLeft + el.offsetWidth));
-      const free = W - 16 - right;
-      if (free >= 64) {
-        const x = W - 16 - 46 - Math.floor(rnd() * Math.min(70, free - 58));
-        const kinds = ['succulent', 'flowers', 'pothos'];
-        svg += `<g transform="translate(${x} ${rows * R - P - 60})">${potSvg(kinds[Math.floor(rnd() * 3)], rnd)}</g>`;
+      const free = W - 16 - right, k = potSize(), w = 46 * k;
+      if (free >= w + 18) {
+        const x = W - 16 - w - Math.floor(rnd() * Math.min(70, free - w - 12));
+        svg += `<g transform="translate(${x.toFixed(0)} ${rows * R - P - 60 * k}) scale(${k})">${potSvg(potKind(), rnd)}</g>`;
       }
     }
     if (mode === 'vines' || mode === 'both') {
