@@ -10,6 +10,12 @@ any you add) has its own look and these sections:
 - **Fics**: saved AO3 links with ship and a note to self
 - **Rewatch**: where you are, and it stops at your canon ending
 
+**From a photo** (scan.js, books only): in a book's Quote and Note forms, take a
+picture of the page; the phone reads it (Tesseract, loaded from jsDelivr the
+first time) and you drag across the words you want. A page number it spots fills
+Page only if Page is empty. The photo is never saved. Quotes on both sides also
+have an optional "Said to".
+
 **Take the tour** (tour.js + tour.css): a guided tour on a pretend phone (sample
 doors and books, a glowing spot, an arrow and an info bubble). Everyone sees
 both sides' tours once (settings.tourSeen), starting with the side they're on;

@@ -241,6 +241,7 @@ img { display: block; max-width: 100%; }
 .quote-text { display: block; font-family: var(--font-quote, var(--font-body)); font-size: 1.12rem; line-height: 1.45; white-space: pre-line; }
 .quote-text::before { content: '“'; }
 .quote-text::after { content: '”'; }
+.quote-text.own-marks::before, .quote-text.own-marks::after { content: none; }
 .quote-by { display: block; margin-top: 10px; font-size: .88rem; color: var(--muted); }
 
 /* favorites */

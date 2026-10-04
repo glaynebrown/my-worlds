@@ -91,7 +91,8 @@ function confirmBox(title, body, yes, onYes) {
 /* One pop-up form for every kind of entry.
    fields: [{ key, label, type: 'text'|'textarea'|'url'|'photo'|'colors', placeholder, big }]
    onSave(values, { photo: prepared|null, dropPhoto }) ; onDelete optional. */
-function formModal({ title, fields, values = {}, onSave, onDelete, deleteLabel = 'Delete', extra = '' }) {
+// onMount(root): extra wiring once the form is showing (e.g. books' From a photo button).
+function formModal({ title, fields, values = {}, onSave, onDelete, deleteLabel = 'Delete', extra = '', onMount }) {
   let prepared = null, dropPhoto = false;
   const fieldHtml = f => {
     const v = values[f.key];
@@ -168,6 +169,7 @@ function formModal({ title, fields, values = {}, onSave, onDelete, deleteLabel =
     };
     const first = $('input:not([type=file]):not([type=date]),textarea', root);
     if (first && !values[first.name]) setTimeout(() => first.focus(), 60);
+    if (onMount) onMount(root);
   });
 }
 

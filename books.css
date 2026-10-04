@@ -488,3 +488,24 @@
 .fav-pick .fin { width: 100%; border: 0; text-align: left; color: var(--ink); }
 .fav-pick .fin.on { box-shadow: inset 0 0 0 2px var(--accent); }
 .fav-pick .mini-stars { margin-top: 3px; }
+
+/* ---------- From a photo (scan.js) ---------- */
+.scan-btn { display: inline-flex; align-items: center; gap: 6px; margin: 2px 0 8px; }
+.scan { position: fixed; inset: 0; z-index: 300; display: flex; flex-direction: column; gap: 10px;
+  padding: calc(env(safe-area-inset-top) + 10px) 14px calc(env(safe-area-inset-bottom) + 12px);
+  background: #120e0b; color: #ecd9ae; font-family: 'Lora', Georgia, serif; }
+.scan-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.scan-title { font-family: 'Cormorant Garamond', Georgia, serif; font-style: italic; font-size: 1.25rem; }
+.scan-cancel, .scan-all { background: none; border: 0; color: #d9c9a8; font: 600 .95rem/1 system-ui, sans-serif; padding: 8px 4px; cursor: pointer; }
+.scan-all:disabled { opacity: .3; }
+.scan-stage { position: relative; flex: 1; min-height: 0; display: grid; place-items: center; }
+.scan-page { position: relative; max-width: 100%; max-height: 100%; width: 100%; aspect-ratio: 3 / 4; }
+@supports (height: 1cqh) { .scan-stage { container-type: size; } .scan-page { width: auto; height: auto; max-width: 100cqw; max-height: 100cqh; } }
+.scan-page canvas { display: block; width: 100%; height: 100%; border-radius: 6px; }
+.scan-words { position: absolute; inset: 0; touch-action: none; -webkit-user-select: none; user-select: none; cursor: text; }
+.scan-word { position: absolute; border-radius: 3px; background: rgba(242,213,138,.10); box-shadow: inset 0 -1.5px 0 rgba(242,213,138,.35); }
+.scan-word.on { background: rgba(242,193,78,.5); box-shadow: none; }
+.scan-status { position: absolute; left: 50%; bottom: 14px; transform: translateX(-50%); padding: 8px 14px; border-radius: 999px; background: rgba(18,14,11,.85); font-size: .92rem; white-space: nowrap; max-width: 92%; overflow: hidden; text-overflow: ellipsis; }
+.scan-hint { margin: 0; text-align: center; font-size: .88rem; color: #bfae8d; }
+.scan-bottom { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.scan-picked { font-size: .9rem; color: #bfae8d; }

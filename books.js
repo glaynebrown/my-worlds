@@ -862,6 +862,7 @@ function bookNoteForm(book, n) {
         : { key: 'page', label: 'Page', type: 'number', placeholder: book.page ? String(book.page) : '142' },
       { key: 'text', label: 'Thoughts', type: 'textarea', big: true, placeholder: 'What just happened…' },
     ],
+    onMount: root => addScanButton(root, { page: !audio }),
     onSave: async v => {
       if (!v.text) throw new Error('Write your thoughts first.');
       const data = { text: v.text, date: v.date || today(), page: audio ? null : (Number(v.page) || null), chapter: audio ? (v.chapter || '') : '' };
@@ -905,18 +906,20 @@ function drawNotes(book, body) {
 
 // ----- Quotes (page optional) -----
 function bookQuoteForm(book, q) {
-  if (q && !canEdit(q)) return viewOnly(q, `<h2>Quote</h2><p class="quote-text" style="margin-top:8px">${esc(q.text)}</p>${q.who || q.page ? `<p class="muted small">— ${esc([q.who, q.page ? `p. ${q.page}` : ''].filter(Boolean).join(', '))}</p>` : ''}`);
+  if (q && !canEdit(q)) return viewOnly(q, `<h2>Quote</h2><p class="${quoteCls(q.text)}" style="margin-top:8px">${esc(q.text)}</p>${q.who || q.to || q.page ? `<p class="muted small">— ${esc([saidLine(q), q.page ? `p. ${q.page}` : ''].filter(Boolean).join(', '))}</p>` : ''}`);
   formModal({
     title: q ? 'Edit quote' : 'Add a quote',
     values: q ? { ...q, page: q.page || '' } : {},
     fields: [
       { key: 'text', label: 'Quote', type: 'textarea' },
       { key: 'who', label: 'Who said it (optional)' },
+      { key: 'to', label: 'Said to (optional)' },
       { key: 'page', label: 'Page (optional)', type: 'number' },
     ],
+    onMount: root => addScanButton(root, { page: true }),
     onSave: async v => {
       if (!v.text) throw new Error('Type the quote first.');
-      const data = { text: v.text, who: v.who, page: Number(v.page) || null };
+      const data = { text: v.text, who: v.who, to: v.to, page: Number(v.page) || null };
       if (q) await updateItemFor(q, data); else await addItemFor(book, { world: book.id, kind: 'quote', ...data });
     },
     onDelete: q && (() => confirmBox('Delete this quote?', '', 'Delete', () => deleteItemFor(q))),
@@ -929,8 +932,8 @@ function drawBookQuotes(book, body) {
   const list = pick ? all.filter(q => q.who === pick) : all;
   body.innerHTML = `${addBtn('addq', 'Add a quote')}${html}
     ${list.length ? `<div class="quotes">${list.map(q => `<button class="quote card" data-id="${esc(q.id)}">
-      <span class="quote-text">${esc(q.text)}</span>
-      ${q.who || q.page ? `<span class="quote-by">— ${esc([q.who, q.page ? `p. ${q.page}` : ''].filter(Boolean).join(', '))}</span>` : ''}${byLine(q)}</button>`).join('')}</div>`
+      <span class="${quoteCls(q.text)}">${esc(q.text)}</span>
+      ${q.who || q.to || q.page ? `<span class="quote-by">— ${esc([saidLine(q), q.page ? `p. ${q.page}` : ''].filter(Boolean).join(', '))}</span>` : ''}${byLine(q)}</button>`).join('')}</div>`
       : '<p class="empty">No quotes yet. Save the lines you want to remember.</p>'}`;
   $('#addq').onclick = () => bookQuoteForm(book);
   wireChips(body, () => drawBookQuotes(book, body));
@@ -967,7 +970,7 @@ function reviewPrompt(book) {
   } else lines.push('- (no notes yet)');
   if (quotes.length) {
     lines.push('', 'Quotes I saved:');
-    quotes.forEach(q => lines.push(`- "${q.text.replace(/\s*\n\s*/g, ' / ')}"${q.who ? ` (${q.who}${q.page ? `, p. ${q.page}` : ''})` : q.page ? ` (p. ${q.page})` : ''}`));
+    quotes.forEach(q => lines.push(`- "${q.text.replace(/\s*\n\s*/g, ' / ')}"${saidLine(q) ? ` (${saidLine(q)}${q.page ? `, p. ${q.page}` : ''})` : q.page ? ` (p. ${q.page})` : ''}`));
   }
   if (book.review || book.reviewSafe) lines.push('', 'What I’ve written so far (build on it):', book.review || '', book.reviewSafe || '');
   return lines.join('\n');

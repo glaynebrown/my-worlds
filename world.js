@@ -12,6 +12,10 @@ const worldHref = w => `${w._book ? '#/b/' : '#/w/'}${w.id}`;
 const byNewest = (a, b) => (b.t || 0) - (a.t || 0);
 const byOldest = (a, b) => (a.t || 0) - (b.t || 0);
 const empty = (world, text) => `<p class="empty">${esc(text || Themes.info(world).empty)}</p>`;
+// Who said it, and to whom: "Rhysand to Feyre" (either part can be blank).
+const saidLine = q => (q.who && q.to ? `${q.who} to ${q.to}` : q.who || (q.to ? `To ${q.to}` : ''));
+// A quote that already has its own quote marks (typed, or from a photo) doesn't get a second pair.
+const quoteCls = t => (/^\s*["“„'‘]/.test(t || '') && /["”'’]\s*$/.test(t || '') ? 'quote-text own-marks' : 'quote-text');
 const addBtn = (id, label) => `<button class="btn primary add-btn" id="${id}"><span aria-hidden="true">+</span> ${esc(label)}</button>`;
 
 function renderWorld(world, section) {
@@ -119,13 +123,14 @@ function drawBoard(world, body) {
 
 // ---------- Quotes ----------
 function quoteForm(world, q) {
-  if (q && !canEdit(q)) return viewOnly(q, `<h2>Quote</h2><p class="quote-text" style="margin-top:8px">${esc(q.text)}</p>${q.who || q.where ? `<p class="muted small">— ${esc([q.who, q.where].filter(Boolean).join(', '))}</p>` : ''}`);
+  if (q && !canEdit(q)) return viewOnly(q, `<h2>Quote</h2><p class="${quoteCls(q.text)}" style="margin-top:8px">${esc(q.text)}</p>${q.who || q.to || q.where ? `<p class="muted small">— ${esc([saidLine(q), q.where].filter(Boolean).join(', '))}</p>` : ''}`);
   formModal({
     title: q ? 'Edit quote' : 'Add a quote',
     values: q || {},
     fields: [
       { key: 'text', label: 'Quote', type: 'textarea' },
       { key: 'who', label: 'Who said it', placeholder: world.theme === 'twd' ? 'Daryl' : '' },
+      { key: 'to', label: 'Said to (optional)', placeholder: world.theme === 'twd' ? 'Carol' : '' },
       { key: 'where', label: 'Where (optional)', placeholder: world.track && world.track.type === 'list' ? 'Which film' : 'S2 E5' },
     ],
     onSave: async v => {
@@ -142,8 +147,8 @@ function drawQuotes(world, body) {
   const list = pick ? all.filter(q => q.who === pick) : all;
   body.innerHTML = `${addBtn('addq', 'Add a quote')}${html}
     ${list.length ? `<div class="quotes">${list.map(q => `<button class="quote card" data-id="${q.id}">
-      <span class="quote-text">${esc(q.text)}</span>
-      ${q.who || q.where ? `<span class="quote-by">— ${esc([q.who, q.where].filter(Boolean).join(', '))}</span>` : ''}${byLine(q)}</button>`).join('')}</div>` : empty(world)}`;
+      <span class="${quoteCls(q.text)}">${esc(q.text)}</span>
+      ${q.who || q.to || q.where ? `<span class="quote-by">— ${esc([saidLine(q), q.where].filter(Boolean).join(', '))}</span>` : ''}${byLine(q)}</button>`).join('')}</div>` : empty(world)}`;
   $('#addq').onclick = () => quoteForm(world);
   wireChips(body, () => drawQuotes(world, body));
   $$('.quote', body).forEach(el => { el.onclick = () => quoteForm(world, findItem(el.dataset.id)); });
