@@ -378,13 +378,175 @@ function sortBooks(list, sort) {
 const booksOn = shelfId => sortBooks(state.books.filter(b => shelfOf(b) === shelfId), (shelvesOf().find(s => s.id === shelfId) || {}).sort || 'drag');
 
 // Moving a book onto Currently reading / Read fills in today's date if it has none yet.
-function shelfMovePatch(b, shelfId) {
+// end: the finish date from askFinish, for a move onto Read ('' or none = no date).
+function shelfMovePatch(b, shelfId, end) {
   const patch = { shelf: shelfId };
   const reads = readsOf(b).map(r => ({ ...r }));
   const cur = reads[reads.length - 1];
   if (shelfId === 'reading' && !cur.start) { cur.start = today(); patch.reads = reads; }
-  if (shelfId === 'read' && !cur.end) { cur.end = today(); patch.reads = reads; }
+  if (shelfId === 'read' && end && !cur.end) { cur.end = end; patch.reads = reads; }
   return patch;
+}
+
+// ---------- the date calendar ----------
+// Every date in Books (Started, Finished, a note's date, "Pick a date") uses this
+// instead of the phone's own picker, so it wears the book's look. The real
+// <input type="date"> stays (hidden) and keeps the value, so saving is unchanged.
+const CAL_ICON = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" aria-hidden="true"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg>';
+const MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+const isoOf = (y, m, d) => `${y}-${pad2(m + 1)}-${pad2(d)}`;
+const niceDate = iso => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso || '')) return '';
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+};
+
+// opts: { value, max (default today), clear (show Clear), title, onPick(iso or '') }
+function openCalendar({ value = '', max = today(), clear = true, title = '', onPick }) {
+  const [ty, tm] = (value || max).split('-').map(Number);
+  let y = ty, m = tm - 1, years = false;
+  const maxY = Number(max.slice(0, 4));
+  openModal(`<div class="cal" role="group" aria-label="${esc(title || 'Pick a date')}">
+      ${title ? `<p class="cal-title">${esc(title)}</p>` : ''}
+      <div class="cal-head"><button type="button" class="cal-arrow" data-step="-1" aria-label="Previous month">‹</button>
+        <button type="button" class="cal-month"></button>
+        <button type="button" class="cal-arrow" data-step="1" aria-label="Next month">›</button></div>
+      <div class="cal-body"></div>
+      <div class="cal-foot">${clear ? '<button type="button" class="btn small ghost" data-cal="clear">Clear</button>' : '<span></span>'}
+        <button type="button" class="btn small" data-cal="today">Today</button></div></div>`, (root, close) => {
+    const pick = v => { close(); onPick(v); };
+    const body = $('.cal-body', root);
+    const draw = () => {
+      const head = $('.cal-month', root);
+      $$('.cal-arrow', root).forEach(a => { a.style.visibility = years ? 'hidden' : ''; });
+      if (years) {
+        head.innerHTML = `Pick a year <span class="cal-caret">▴</span>`;
+        const list = Array.from({ length: 40 }, (_, k) => maxY - k);
+        body.innerHTML = `<div class="cal-years">${list.map(v => `<button type="button" class="cal-year${v === y ? ' on' : ''}" data-y="${v}">${v}</button>`).join('')}</div>`;
+        const on = $('.cal-year.on', body);
+        if (on) on.scrollIntoView({ block: 'center' });
+        return;
+      }
+      head.innerHTML = `${MONTHS[m]} <span class="cal-y">${y}</span> <span class="cal-caret">▾</span>`;
+      const first = new Date(y, m, 1).getDay(), days = new Date(y, m + 1, 0).getDate();
+      const now = today();
+      let cells = '';
+      for (let i = 0; i < first; i++) cells += '<span></span>';
+      for (let d = 1; d <= days; d++) {
+        const iso = isoOf(y, m, d);
+        cells += `<button type="button" class="cal-day${iso === value ? ' on' : ''}${iso === now ? ' now' : ''}" data-d="${iso}" ${iso > max ? 'disabled' : ''}>${d}</button>`;
+      }
+      body.innerHTML = `<div class="cal-week">${['S', 'M', 'T', 'W', 'T', 'F', 'S'].map(w => `<span>${w}</span>`).join('')}</div><div class="cal-grid">${cells}</div>`;
+      $('[data-step="1"]', root).disabled = isoOf(y, m, 1) >= `${max.slice(0, 8)}01`; // nothing to pick past max's month
+    };
+    $$('.cal-arrow', root).forEach(a => {
+      a.onclick = () => { m += Number(a.dataset.step); if (m < 0) { m = 11; y--; } if (m > 11) { m = 0; y++; } draw(); };
+    });
+    $('.cal-month', root).onclick = () => { years = !years; draw(); };
+    body.onclick = e => {
+      const yr = e.target.closest('[data-y]');
+      if (yr) { y = Number(yr.dataset.y); years = false; if (isoOf(y, m, 1) > max) m = Number(max.slice(5, 7)) - 1; draw(); return; }
+      const day = e.target.closest('[data-d]');
+      if (day && !day.disabled) pick(day.dataset.d);
+    };
+    $('[data-cal="today"]', root).onclick = () => pick(today() > max ? max : today());
+    const c = $('[data-cal="clear"]', root);
+    if (c) c.onclick = () => pick('');
+    draw();
+  }, 'cal-modal');
+}
+
+// Turns each date box in root into a button that opens the calendar.
+function fancyDates(root, label = 'Add a date') {
+  $$('input[type="date"]:not([data-fancy])', root).forEach(inp => {
+    inp.dataset.fancy = '1';
+    inp.hidden = true;
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'date-btn';
+    const show = () => { btn.innerHTML = `<span class="date-txt${inp.value ? '' : ' blank'}">${esc(niceDate(inp.value) || label)}</span>${CAL_ICON}`; };
+    show();
+    inp.after(btn);
+    inp.addEventListener('change', show);
+    btn.onclick = e => {
+      e.preventDefault();
+      const name = inp.closest('label, .field');
+      openCalendar({
+        value: inp.value, max: inp.max || today(), clear: !inp.required,
+        title: name ? ($('span', name) || {}).textContent || '' : '',
+        onPick: v => { if (v === inp.value) return; inp.value = v; inp.dispatchEvent(new Event('change')); },
+      });
+    };
+  });
+}
+
+// ---------- finishing a book ----------
+// Landing on Read asks when you finished it (today, another date, or "I don't
+// remember"): only dated finishes count toward a year's goal, and Cancel puts it
+// back. A dated finish gets confetti (Edit shelves can turn it off), and a bigger
+// burst when it reaches that year's reading goal.
+const finishedNow = b => !!(readsOf(b)[curReadIdx(b)] || {}).end;
+const asksFinish = (b, shelfId) => shelfId === 'read' && !finishedNow(b);
+
+// Resolves the finish date ('' = I don't remember) or null (cancelled).
+function askFinish(titles) {
+  return new Promise(resolve => {
+    let answer = null;
+    const one = titles.length === 1;
+    openModal(`<h2 class="finish-h">When did you finish ${one ? `<em>${esc(titles[0])}</em>` : `these ${titles.length} books`}?</h2>
+      <div class="finish-btns">
+        <button type="button" class="btn primary block" data-when="today">Today</button>
+        <button type="button" class="btn block" id="fpick">Pick a date</button>
+        <button type="button" class="btn block ghost" data-when="">I don’t remember</button>
+      </div>
+      <p class="muted small finish-note">Only books with a finish date count toward that year’s reading goal.</p>
+      <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-close>Cancel</button></div>`, (root, close) => {
+      const done = v => { answer = v; close(); };
+      $$('[data-when]', root).forEach(b => { b.onclick = () => done(b.dataset.when === 'today' ? today() : ''); });
+      $('#fpick', root).onclick = () => openCalendar({ value: today(), clear: false, title: 'Finished', onPick: v => { if (v) done(v); } });
+    }, 'small-modal', () => resolve(answer));
+  });
+}
+
+// Call just BEFORE saving (it compares with the goal as things stand).
+function celebrateFinish(books, end) {
+  if (!end || (state.settings && state.settings.confetti === false)) return;
+  const year = end.slice(0, 4), goal = goalFor(year);
+  const before = finishesIn(year).length;
+  const reached = !!goal && before < goal && before + books.length >= goal;
+  confetti(books.map(b => cssColor(spineStyle(b).bg)), reached);
+  if (reached) setTimeout(() => toast(`Goal reached! ${goal} book${goal === 1 ? '' : 's'} in ${year}.`), 300);
+}
+
+// Paper flecks drifting down for a couple of seconds, in gold, cream and the book's own colors.
+function confetti(colors = [], big = false) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  const c = document.createElement('canvas');
+  c.className = 'confetti';
+  const dpr = Math.min(2, window.devicePixelRatio || 1), W = innerWidth, H = innerHeight;
+  c.width = W * dpr; c.height = H * dpr;
+  document.body.appendChild(c);
+  const g = c.getContext('2d');
+  g.scale(dpr, dpr);
+  const pal = ['#e2c27a', '#c9a35a', '#f6ecd4', '#fff7e6', ...colors, ...colors];
+  const rnd = (a, b) => a + Math.random() * (b - a);
+  const bits = Array.from({ length: big ? 220 : 110 }, () => ({
+    x: rnd(0, W), y: rnd(-H * (big ? 0.6 : 0.35), -10), w: rnd(5, 9), h: rnd(8, 14),
+    vx: rnd(-0.6, 0.6), vy: rnd(1.6, big ? 3.6 : 3), r: rnd(0, Math.PI * 2), vr: rnd(-0.12, 0.12),
+    sway: rnd(0, Math.PI * 2), flip: rnd(0.05, 0.14), col: pal[Math.floor(Math.random() * pal.length)],
+  }));
+  const life = big ? 3400 : 2400, t0 = performance.now();
+  (function frame(now) {
+    const t = now - t0;
+    g.clearRect(0, 0, W, H);
+    g.globalAlpha = Math.max(0, Math.min(1, (life - t) / 600));
+    bits.forEach(p => {
+      p.sway += 0.04; p.x += p.vx + Math.sin(p.sway) * 0.7; p.y += p.vy; p.r += p.vr;
+      g.save(); g.translate(p.x, p.y); g.rotate(p.r); g.scale(1, Math.cos(t * p.flip / 16));
+      g.fillStyle = p.col; g.fillRect(-p.w / 2, -p.h / 2, p.w, p.h); g.restore();
+    });
+    if (t < life) requestAnimationFrame(frame); else c.remove();
+  })(t0);
 }
 
 // ---------- the bookcase ----------
@@ -455,6 +617,7 @@ function shelvesForm() {
   openModal(`<h2>Shelves</h2><div id="slist" class="shelf-edits"></div>
     <button type="button" class="btn small" id="sadd">+ Add a shelf</button>
     <label class="switch ribbon-switch"><input type="checkbox" id="ribbons" ${state.settings && state.settings.ribbons ? 'checked' : ''}><span class="track"></span><span>Bookmark ribbons show how far I’ve read</span></label>
+    <label class="switch ribbon-switch"><input type="checkbox" id="confetti" ${!state.settings || state.settings.confetti !== false ? 'checked' : ''}><span class="track"></span><span>Confetti when I finish a book</span></label>
     <p class="muted small">With My order, hold a book on the shelf to drag it. Books in a series always stand together, in order. A hidden shelf keeps its name and settings for later. Removing a shelf moves its books to the first one showing.</p>
     <div class="actions"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="ssave">Save</button></div>`, (root, close) => {
     const draw = () => {
@@ -495,6 +658,8 @@ function shelvesForm() {
       await saveShelves(list);
       const ribbons = $('#ribbons', root).checked;
       if (ribbons !== !!state.settings.ribbons) { await DB.saveSettings({ ribbons }); state.settings.ribbons = ribbons; }
+      const confettiOn = $('#confetti', root).checked;
+      if (confettiOn !== (state.settings.confetti !== false)) { await DB.saveSettings({ confetti: confettiOn }); state.settings.confetti = confettiOn; }
       await Promise.all(moving.map(b => DB.updateBook(b, { shelf: firstOn.id })));
       close();
       toast(moving.length ? `Shelves saved. ${moving.length} book${moving.length === 1 ? '' : 's'} moved to ${firstOn.name}.` : 'Shelves saved');
@@ -565,19 +730,30 @@ function enableSpineDrag(caseEl) {
     const shelfId = row.closest('.case').dataset.shelf;
     const sh = shelvesOf().find(s => s.id === shelfId);
     const book = bookById($('.spine', slot).dataset.book);
-    const patches = {};
-    const add = (b, p) => { patches[b.id] = { b, p: { ...(patches[b.id] || {}).p, ...p } }; };
-    if (book && shelfOf(book) !== shelfId) add(book, shelfMovePatch(book, shelfId));
-    if ((sh.sort || 'drag') === 'drag') {
-      $$('.spine[data-book]', row).forEach((el, k) => { const b = bookById(el.dataset.book); if (b && (b.order !== k || patches[b.id])) add(b, { order: k }); });
-    } else if (from === shelfId) {
-      toast(`“${sh.name}” is sorted by ${SORT_SHORT[sh.sort].toLowerCase()}. To arrange it by hand, pick My order for it in Edit shelves.`);
-    }
-    const list = Object.values(patches);
-    if (list.length) {
-      Promise.all(list.map(({ b, p }) => DB.updateBook(b, p)))
-        .then(() => { if (book && from !== shelfId) toast(`Moved to ${sh.name}`); }, e => { toast(friendlyError(e), true); refresh(); });
-    } else setTimeout(refresh, 0);
+    const order = $$('.spine[data-book]', row).map(el => bookById(el.dataset.book));
+    const commit = end => {
+      const patches = {};
+      const add = (b, p) => { patches[b.id] = { b, p: { ...(patches[b.id] || {}).p, ...p } }; };
+      if (book && shelfOf(book) !== shelfId) add(book, shelfMovePatch(book, shelfId, end));
+      if ((sh.sort || 'drag') === 'drag') {
+        order.forEach((b, k) => { if (b && (b.order !== k || patches[b.id])) add(b, { order: k }); });
+      } else if (from === shelfId) {
+        toast(`“${sh.name}” is sorted by ${SORT_SHORT[sh.sort].toLowerCase()}. To arrange it by hand, pick My order for it in Edit shelves.`);
+      }
+      const list = Object.values(patches);
+      if (list.length) {
+        Promise.all(list.map(({ b, p }) => DB.updateBook(b, p)))
+          .then(() => { if (book && from !== shelfId) toast(`Moved to ${sh.name}`); }, e => { toast(friendlyError(e), true); refresh(); });
+      } else setTimeout(refresh, 0);
+    };
+    // Onto Read: when did you finish it? (Cancel puts it back where it was.)
+    if (book && shelfOf(book) !== shelfId && asksFinish(book, shelfId)) {
+      askFinish([book.title]).then(end => {
+        if (end === null) { refresh(); return; }
+        celebrateFinish([book], end);
+        commit(end);
+      });
+    } else commit();
     if (missedRefresh) { missedRefresh = false; setTimeout(refresh, 0); }
   }
   const end = () => { cancelHold(); if (dragging) drop(); };
@@ -746,8 +922,8 @@ function readHtml(r, i, n) {
   return `<div class="card read" data-r="${i}">
     <div class="read-head"><span class="read-n">${readName(i, n)}</span>${i > 0 ? `<button class="linkish danger-text" data-delread="${i}">Remove</button>` : ''}</div>
     <div class="read-dates">
-      <label class="mini-field"><span>Started</span><input type="date" data-k="start" value="${esc(r.start || '')}"></label>
-      <label class="mini-field"><span>Finished</span><input type="date" data-k="end" value="${esc(r.end || '')}"></label>
+      <label class="mini-field"><span>Started</span><span class="date-wrap"><input type="date" data-k="start" max="${today()}" value="${esc(r.start || '')}">${r.start ? '<button type="button" class="date-x" data-clear="start" aria-label="Clear the start date">×</button>' : ''}</span></label>
+      <label class="mini-field"><span>Finished</span><span class="date-wrap"><input type="date" data-k="end" max="${today()}" value="${esc(r.end || '')}">${r.end ? '<button type="button" class="date-x" data-clear="end" aria-label="Clear the finish date">×</button>' : ''}</span></label>
     </div>
     <div class="read-format">
       <label class="check"><input type="checkbox" data-k="physical" ${r.physical ? 'checked' : ''}><span>Physical book</span></label>
@@ -782,9 +958,15 @@ function drawAbout(book, body) {
   $$('#stars [data-v]', body).forEach(b => {
     b.onclick = () => { const v = Number(b.dataset.v); save({ rating: v === book.rating ? 0 : v }); };
   });
-  $('#shelf', body).onchange = e => {
+  $('#shelf', body).onchange = async e => {
     const id = e.target.value;
-    save(shelfMovePatch(book, id), `Moved to ${shelvesOf().find(s => s.id === id).name}`);
+    let end;
+    if (asksFinish(book, id)) {
+      end = await askFinish([book.title]);
+      if (end === null) { e.target.value = shelfOf(book); return; }
+      celebrateFinish([book], end);
+    }
+    save(shelfMovePatch(book, id, end), `Moved to ${shelvesOf().find(s => s.id === id).name}`);
   };
   $('#cover', body).onclick = () => {
     const src = coverOf(book);
@@ -816,12 +998,23 @@ function drawAbout(book, body) {
         const patch = { reads: list };
         let msg = null;
         const last = i === list.length - 1;
+        if (last && inp.dataset.k === 'end' && inp.value && !reads[i].end) celebrateFinish([book], inp.value);
         if (last && inp.dataset.k === 'end' && inp.value && shelfOf(book) === 'reading' && hasShelf('read')) { patch.shelf = 'read'; msg = 'Finished! It’s on your Read shelf.'; }
         if (last && inp.dataset.k === 'start' && inp.value && shelfOf(book) === 'want' && hasShelf('reading')) { patch.shelf = 'reading'; msg = 'Moved to Currently reading'; }
         save(patch, msg);
       };
     });
   });
+  // The × beside a date empties it (an iPhone's date picker can't).
+  $$('[data-clear]', body).forEach(x => {
+    x.onclick = e => {
+      e.preventDefault();
+      const inp = $(`[data-k="${x.dataset.clear}"]`, x.closest('.read'));
+      inp.value = '';
+      inp.dispatchEvent(new Event('change'));
+    };
+  });
+  fancyDates(body);
   $$('[data-delread]', body).forEach(b => {
     b.onclick = () => confirmBox('Remove this re-read?', 'Its dates go away. Notes you wrote during it stay.', 'Remove', () => {
       const list = reads.filter((_, k) => k !== Number(b.dataset.delread));
@@ -866,7 +1059,7 @@ function bookNoteForm(book, n) {
         : { key: 'page', label: 'Page', type: 'number', placeholder: book.page ? String(book.page) : '142' },
       { key: 'text', label: 'Thoughts', type: 'textarea', big: true, placeholder: 'What just happened…' },
     ],
-    onMount: root => addScanButton(root, { page: !audio }),
+    onMount: root => { fancyDates(root); addScanButton(root, { page: !audio }); },
     onSave: async v => {
       if (!v.text) throw new Error('Write your thoughts first.');
       const data = { text: v.text, date: v.date || today(), page: audio ? null : (Number(v.page) || null), chapter: audio ? (v.chapter || '') : '' };
@@ -1550,6 +1743,12 @@ function renderBookForm(book) {
       if (isNew) {
         const onShelf = state.books.filter(x => shelfOf(x) === c.shelf);
         const read = { start: c.shelf === 'reading' ? today() : '', end: '', physical: true, audio: false };
+        if (c.shelf === 'read') {
+          const end = await askFinish([c.title]);
+          if (end === null) return;
+          celebrateFinish([data], end);
+          read.end = end;
+        }
         Object.assign(data, {
           reads: [read], rating: 0, page: 0, chapter: '', review: '', reviewSafe: '', ending: '',
           order: Math.max(-1, ...onShelf.map(x => x.order ?? 0)) + 1,
@@ -1559,7 +1758,15 @@ function renderBookForm(book) {
         location.hash = `#/b/${id}`;
         return;
       }
-      if (data.shelf !== shelfOf(b)) Object.assign(data, shelfMovePatch(b, data.shelf));
+      if (data.shelf !== shelfOf(b)) {
+        let end;
+        if (asksFinish(b, data.shelf)) {
+          end = await askFinish([c.title]);
+          if (end === null) return;
+          celebrateFinish([b], end);
+        }
+        Object.assign(data, shelfMovePatch(b, data.shelf, end));
+      }
       await DB.updateBook(b, data, lookPrepared, lookDrop);
       if (coverMode === 'upload') await DB.setBookPhoto(b, 'cover', coverPrepared);
       else if ((coverMode === 'none' || coverMode === 'found') && b.cover) await DB.setBookPhoto(b, 'cover', null);
@@ -1948,7 +2155,8 @@ function paintLibCovers(root, entries) {
 
 // Puts a library book on this person's shelf (their own copy of every picture).
 // worldIds: { theme: id } for worlds added a moment ago (sign-up), to link the book to.
-async function addFromLibrary(e, shelf, worldIds = {}) {
+// end: the finish date for a book going onto Read (asked once by whoever calls this).
+async function addFromLibrary(e, shelf, worldIds = {}, end = '') {
   const onShelf = state.books.filter(x => shelfOf(x) === shelf);
   const data = {
     title: e.title, author: e.author, series: e.series, seriesNo: e.seriesNo, pages: e.pages || null, totalChapters: e.totalChapters || null,
@@ -1960,7 +2168,7 @@ async function addFromLibrary(e, shelf, worldIds = {}) {
     reviewsOn: e.reviewsOn !== false, ficsOn: false, fromLib: e.id,
     worldId: (e.worldTheme && (worldIds[e.worldTheme] || (state.worlds.find(w => w.theme === e.worldTheme) || {}).id)) || null,
     shelf, order: Math.max(-1, ...onShelf.map(x => x.order ?? 0)) + 1, rating: 0, page: 0, chapter: '', review: '', reviewSafe: '', ending: '',
-    reads: [{ start: shelf === 'reading' ? today() : '', end: shelf === 'read' ? today() : '', physical: true, audio: false }],
+    reads: [{ start: shelf === 'reading' ? today() : '', end: shelf === 'read' ? end : '', physical: true, audio: false }],
   };
   checkPhotoRoom((e.cover ? 1 : 0) + (e.map ? 1 : 0) + (e.look && e.look.photo ? 1 : 0));
   const id = await DB.addBook(data);
@@ -2032,10 +2240,18 @@ function drawBookPick(lib) {
   $('#skip').onclick = () => busy($('#skip'), async () => { await finish(); location.hash = !picked.size && state.worlds.length && firstTime ? '#/' : '#/books'; }, '…');
   if (go) {
     go.onclick = () => busy(go, async () => {
+      // Any going onto Read: one question for all of them.
+      const toRead = [...picked].filter(([, sh]) => sh === 'read').map(([id]) => choices.find(x => x.id === id));
+      let end = '';
+      if (toRead.length) {
+        end = await askFinish(toRead.map(e => e.title));
+        if (end === null) return;
+        celebrateFinish(toRead, end);
+      }
       let n = 0;
       for (const [id, shelf] of picked) {
         go.textContent = `Shelving ${++n} of ${picked.size}…`;
-        await addFromLibrary(choices.find(x => x.id === id), shelf);
+        await addFromLibrary(choices.find(x => x.id === id), shelf, {}, end);
       }
       await finish();
       toast(picked.size === 1 ? 'It’s on your shelf' : `${picked.size} books on your shelves`);
@@ -2067,7 +2283,14 @@ function fillFromLibrary(defShelf) {
         (root, close) => {
           paintLibCovers(root, [e]);
           $('#ladd', root).onclick = ev => busy(ev.target, async () => {
-            const id = await addFromLibrary(e, $('#lshelf', root).value);
+            const shelf = $('#lshelf', root).value;
+            let end = '';
+            if (shelf === 'read') {
+              end = await askFinish([e.title]);
+              if (end === null) return;
+              celebrateFinish([e], end);
+            }
+            const id = await addFromLibrary(e, shelf, {}, end);
             close();
             location.hash = `#/b/${id}`;
           }, 'Adding…');

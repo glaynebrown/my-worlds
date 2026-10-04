@@ -63,7 +63,8 @@ async function busy(btn, fn, text = 'Saving…') {
 // catches up when the pop-up closes.
 let modalOpen = 0, missedRefresh = false;
 
-function openModal(html, onMount, extraClass = '') {
+// onClose: called once when it closes, however it was closed.
+function openModal(html, onMount, extraClass = '', onClose) {
   const bg = document.createElement('div');
   bg.className = 'modal-bg';
   bg.innerHTML = `<div class="modal ${extraClass}" role="dialog" aria-modal="true">${html}</div>`;
@@ -75,6 +76,7 @@ function openModal(html, onMount, extraClass = '') {
     bg.remove();
     modalOpen--;
     if (!modalOpen && missedRefresh) { missedRefresh = false; refresh(); }
+    if (onClose) onClose();
   };
   bg.addEventListener('click', e => { if (e.target === bg || e.target.closest('[data-close]')) close(); });
   document.body.appendChild(bg);

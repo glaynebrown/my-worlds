@@ -167,17 +167,22 @@ function renderStart() {
       $$('.start-door').forEach(b => { b.disabled = true; });
       const note = $('#startnote');
       try {
+        const choices = o.books.size ? libChoices(await bookLibrary()) : [];
+        // Books picked for Read: one "when did you finish?" for all of them.
+        const toRead = [...o.books].filter(([, sh]) => sh === 'read').map(([id]) => choices.find(x => x.id === id)).filter(Boolean);
+        let end = '';
+        if (toRead.length) {
+          end = await askFinish(toRead.map(e => e.title));
+          if (end === null) { $$('.start-door').forEach(b => { b.disabled = false; }); return; }
+          celebrateFinish(toRead, end);
+        }
         note.textContent = o.worlds.size ? 'Opening your doors…' : 'Getting things ready…';
         const ids = await addLibraryWorlds(o.worlds);
-        if (o.books.size) {
-          const lib = await bookLibrary();
-          const choices = libChoices(lib);
-          let n = 0;
-          for (const [id, shelf] of o.books) {
-            const e = choices.find(x => x.id === id);
-            note.textContent = `Shelving ${++n} of ${o.books.size}…`;
-            if (e) await addFromLibrary(e, shelf, ids);
-          }
+        let n = 0;
+        for (const [id, shelf] of o.books) {
+          const e = choices.find(x => x.id === id);
+          note.textContent = `Shelving ${++n} of ${o.books.size}…`;
+          if (e) await addFromLibrary(e, shelf, ids, end);
         }
         await DB.saveSettings({ seeded: true, booksPicked: true });
         Object.assign(state.settings, { seeded: true, booksPicked: true });
