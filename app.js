@@ -694,9 +694,19 @@ function enableTileDrag(shelf) {
   shelf.addEventListener('contextmenu', e => { if (e.target.closest('.tile')) e.preventDefault(); }, opts);
 }
 
+// '#1a120c' → [hue, saturation %, lightness %]
+function hexToHsl(hex) {
+  const n = parseInt((hex || '#000').replace('#', '').replace(/^(.)(.)(.)$/, '$1$1$2$2$3$3'), 16);
+  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
+  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
+  if (!d) return [0, 0, Math.round(l * 100)];
+  const s = d / (1 - Math.abs(2 * l - 1));
+  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
+  return [Math.round((h * 60 + 360) % 360), Math.round(s * 100), Math.round(l * 100)];
+}
 // Stepping into a world (like a book opening): the door comes to the middle of the
-// screen, swings open on its hinge, warm light pours out, and the world's colors fill
-// the screen as its page appears. (A tap skips ahead; reduce-motion just goes.)
+// screen, swings open on its hinge, a glow in the world's own color pours out, and
+// it fills the screen as the world's page appears. (A tap skips ahead; reduce-motion just goes.)
 function openDoor(tile) {
   const id = tile.dataset.world, w = worldById(id), href = `#/w/${id}`;
   const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -708,6 +718,19 @@ function openDoor(tile) {
   const ov = document.createElement('div');
   ov.className = 'door-open';
   ov.style.setProperty('--wc', color);
+  // The glow: the world's page background, brightened (same hue) toward the middle,
+  // so Disney glows a soft blue, Lord of the Rings green, Harry Potter amber-brown.
+  const [h, sat, lit] = hexToHsl(color);
+  const s2 = Math.max(sat, 38);
+  if (lit >= 70) {
+    // A light world (Avatar's parchment): a soft white middle, deepening a little at the edges.
+    ov.style.setProperty('--wg', `hsl(${h} ${s2}% 97%)`);
+    ov.style.setProperty('--wm', color);
+    ov.style.setProperty('--we', `hsl(${h} ${s2}% ${lit - 16}%)`);
+  } else {
+    ov.style.setProperty('--wg', `hsl(${h} ${s2}% 82%)`);
+    ov.style.setProperty('--wm', `hsl(${h} ${s2}% 56%)`);
+  }
   ov.innerHTML = `<div class="do-frame" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px">
       <div class="do-light"></div><div class="do-door"><div class="do-back"></div></div></div><div class="do-flood"></div>`;
   const face = tile.cloneNode(true);
@@ -737,7 +760,7 @@ function openDoor(tile) {
     .then(() => wait(140))
     .then(() => {
       // The door swings in on its left hinge, and the doorway glows brighter as it opens.
-      frame.animate([{ boxShadow: '0 0 0 0 rgba(255,214,130,0)' }, { boxShadow: '0 0 60px 18px rgba(255,214,130,.55)' }], { duration: 760, fill: 'forwards' });
+      frame.animate([{ boxShadow: '0 0 0 0 rgba(255,244,222,0)' }, { boxShadow: '0 0 50px 14px rgba(255,244,222,.32)' }], { duration: 760, fill: 'forwards' });
       return door.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(-108deg)' }],
         { duration: 760, easing: 'cubic-bezier(.45,.05,.3,1)', fill: 'forwards' }).finished;
     })
