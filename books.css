@@ -551,3 +551,10 @@
 .cal-year { padding: 10px 0; border-radius: 10px; border: 1.5px solid var(--line); background: transparent; color: var(--ink); font: 500 .95rem/1 var(--font-body); cursor: pointer; }
 .cal-year.on { background: var(--accent); border-color: transparent; color: var(--on-accent, #fff); font-weight: 700; }
 .cal-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; }
+
+/* ---------- greenery (books.js growGreenery) ---------- */
+.case-row { position: relative; }
+.greenery { position: absolute; left: 0; top: 0; z-index: 3; pointer-events: none; }
+.greenery svg { display: block; overflow: visible; filter: drop-shadow(0 1.5px 1.5px rgba(0,0,0,.35)); }
+.bookcase.sorting .greenery { opacity: 0; transition: opacity .15s; }
+.greenery-pick { margin: 14px 0 4px; }
