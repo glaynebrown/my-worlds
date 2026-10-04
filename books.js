@@ -1790,6 +1790,28 @@ const BOOK_STARTERS = [
     theme: 'custom', look: { bg: '#0b0d17', card: '#1a1d30', ink: '#e7e9f3', accent: '#5fc4e8', font: 'Orbitron' },
     spineFont: 'Orbitron', spineInk: '#e8edf2', spineBg: '#16181d', spineOrn: 'star',
   },
+  // The rest of The 100 (each spine the color of its cover).
+  {
+    title: 'Day 21', author: 'Kass Morgan', series: 'The 100', seriesNo: '2', pages: 320,
+    coverUrl: 'https://covers.openlibrary.org/b/id/8999988-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/8999988-M.jpg',
+    blurb: 'Twenty-one days after landing, the hundred are still fighting to survive, and when one of them goes missing they start to suspect they aren’t alone on Earth. Up on the Colony, Glass and Luke race against an air supply that is running out.',
+    theme: 'custom', look: { bg: '#0b0d17', card: '#1a1d30', ink: '#e7e9f3', accent: '#5fc4e8', font: 'Orbitron' },
+    spineFont: 'Orbitron', spineInk: '#1d2328', spineBg: '#b9c6cc', spineOrn: 'star',
+  },
+  {
+    title: 'Homecoming', author: 'Kass Morgan', series: 'The 100', seriesNo: '3', pages: 352,
+    coverUrl: 'https://covers.openlibrary.org/b/id/10372364-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/10372364-M.jpg',
+    blurb: 'Ships from the Colony finally reach the ground, but the reunion is anything but peaceful. As the newcomers try to take charge, Clarke, Wells and Bellamy have to decide who they can trust, while Earth’s other survivors make a move of their own.',
+    theme: 'custom', look: { bg: '#0b0d17', card: '#1a1d30', ink: '#e7e9f3', accent: '#5fc4e8', font: 'Orbitron' },
+    spineFont: 'Orbitron', spineInk: '#e8edf2', spineBg: '#3a3029', spineOrn: 'star',
+  },
+  {
+    title: 'Rebellion', author: 'Kass Morgan', series: 'The 100', seriesNo: '4', pages: 305,
+    coverUrl: 'https://covers.openlibrary.org/b/id/8453489-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/8453489-M.jpg',
+    blurb: 'The hundred have finally made a home on Earth, until strangers attack the camp and carry some of them off. Clarke and Bellamy set out to bring their friends back and find a group with its own plans for the land and everyone on it.',
+    theme: 'custom', look: { bg: '#0b0d17', card: '#1a1d30', ink: '#e7e9f3', accent: '#5fc4e8', font: 'Orbitron' },
+    spineFont: 'Orbitron', spineInk: '#e8edf2', spineBg: '#4a5a3c', spineOrn: 'star',
+  },
   // The Lord of the Rings and The Hobbit (the black ring editions; linked to the Lord of the Rings world).
   {
     title: 'The Hobbit', author: 'J.R.R. Tolkien', series: '', seriesNo: '', pages: 300,
