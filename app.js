@@ -680,7 +680,7 @@ function enableTileDrag(shelf) {
   window.addEventListener('pointerup', e => { if (e.pointerType === 'mouse') end(); }, opts);
 
   // ----- opening a world -----
-  const open = t => openDoor(t);
+  const open = t => vhsOpen(t);
   shelf.addEventListener('click', e => {
     const t = e.target.closest('.tile[data-world]');
     if (!t) return;
@@ -694,79 +694,45 @@ function enableTileDrag(shelf) {
   shelf.addEventListener('contextmenu', e => { if (e.target.closest('.tile')) e.preventDefault(); }, opts);
 }
 
-// '#1a120c' → [hue, saturation %, lightness %]
-function hexToHsl(hex) {
-  const n = parseInt((hex || '#000').replace('#', '').replace(/^(.)(.)(.)$/, '$1$1$2$2$3$3'), 16);
-  const r = (n >> 16 & 255) / 255, g = (n >> 8 & 255) / 255, b = (n & 255) / 255;
-  const max = Math.max(r, g, b), min = Math.min(r, g, b), l = (max + min) / 2, d = max - min;
-  if (!d) return [0, 0, Math.round(l * 100)];
-  const s = d / (1 - Math.abs(2 * l - 1));
-  const h = max === r ? ((g - b) / d) % 6 : max === g ? (b - r) / d + 2 : (r - g) / d + 4;
-  return [Math.round((h * 60 + 360) % 360), Math.round(s * 100), Math.round(l * 100)];
-}
-// Stepping into a world (like a book opening): the door comes to the middle of the
-// screen, swings open on its hinge, a glow in the world's own color pours out, and
-// it fills the screen as the world's page appears. (A tap skips ahead; reduce-motion just goes.)
-function openDoor(tile) {
-  const id = tile.dataset.world, w = worldById(id), href = `#/w/${id}`;
-  const still = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if (still || !w || !Element.prototype.animate) { location.hash = href; return; }
-  if ($('.door-open')) return;
-  const r = tile.getBoundingClientRect();
-  const k = Math.min((window.innerHeight * 0.62) / r.height, (window.innerWidth * 0.7) / r.width);
-  const color = w.theme === 'custom' ? (w.look || Themes.BOOK_PRESETS[0]).bg : THEME_COLOR[w.theme] || THEME_COLOR.library;
+// Opening a world, VHS style (Accessories → "VHS tape transition", on unless turned off). The door pushes in like a tape going into the VCR, the
+// screen cuts to static with ▶ PLAY in the corner, and the world comes up with
+// scanlines, a rolling tracking bar and a little wobble before it settles.
+function vhsOpen(tile) {
+  const href = `#/w/${tile.dataset.world}`;
+  const off = state.settings && state.settings.vhs === false;
+  if (off || matchMedia('(prefers-reduced-motion: reduce)').matches || !Element.prototype.animate) { location.hash = href; return; }
+  if ($('.vhs')) return;
   const ov = document.createElement('div');
-  ov.className = 'door-open';
-  ov.style.setProperty('--wc', color);
-  // The glow: the world's page background, brightened (same hue) toward the middle,
-  // so Disney glows a soft blue, Lord of the Rings green, Harry Potter amber-brown.
-  const [h, sat, lit] = hexToHsl(color);
-  const s2 = Math.max(sat, 38);
-  if (lit >= 70) {
-    // A light world (Avatar's parchment): a soft white middle, deepening a little at the edges.
-    ov.style.setProperty('--wg', `hsl(${h} ${s2}% 97%)`);
-    ov.style.setProperty('--wm', color);
-    ov.style.setProperty('--we', `hsl(${h} ${s2}% ${lit - 16}%)`);
-  } else {
-    ov.style.setProperty('--wg', `hsl(${h} ${s2}% 82%)`);
-    ov.style.setProperty('--wm', `hsl(${h} ${s2}% 56%)`);
-  }
-  ov.innerHTML = `<div class="do-frame" style="left:${r.left}px;top:${r.top}px;width:${r.width}px;height:${r.height}px">
-      <div class="do-light"></div><div class="do-door"><div class="do-back"></div></div></div><div class="do-flood"></div>`;
-  const face = tile.cloneNode(true);
-  face.removeAttribute('data-world');
-  face.classList.add('do-face');
-  $('.do-door', ov).prepend(face);
-  document.body.appendChild(ov);
-  tile.style.visibility = 'hidden';
-  const frame = $('.do-frame', ov), door = $('.do-door', ov), flood = $('.do-flood', ov);
-  const dx = window.innerWidth / 2 - (r.left + r.width / 2), dy = window.innerHeight / 2 - (r.top + r.height / 2);
-
-  let done = false;
-  const finish = () => {
-    if (done) return;
-    done = true;
-    location.hash = href;
-    const fade = ov.animate([{ opacity: 1 }, { opacity: 0 }], { duration: 320, fill: 'forwards' });
-    fade.onfinish = () => ov.remove();
-    setTimeout(() => ov.remove(), 700);
+  ov.className = 'vhs';
+  ov.innerHTML = '<canvas width="120" height="210"></canvas><div class="vhs-lines"></div><div class="vhs-bar"></div><div class="vhs-osd">▶ PLAY</div><div class="vhs-time">SP&nbsp;&nbsp;0:00:00</div>';
+  const cv = $('canvas', ov), g = cv.getContext('2d'), img = g.createImageData(cv.width, cv.height);
+  let noise = true;
+  const snow = () => {
+    if (!noise) return;
+    for (let i = 0; i < img.data.length; i += 4) { const v = Math.random() * 255 | 0; img.data[i] = img.data[i + 1] = img.data[i + 2] = v; img.data[i + 3] = 255; }
+    g.putImageData(img, 0, 0);
+    requestAnimationFrame(snow);
   };
-  ov.addEventListener('click', finish);
-  setTimeout(finish, 4000); // never stuck
-
-  ov.animate([{ backgroundColor: 'rgba(10,8,6,0)' }, { backgroundColor: 'rgba(10,8,6,.8)' }], { duration: 420, fill: 'forwards' });
-  frame.animate([{ transform: 'translate(0, 0) scale(1)' }, { transform: `translate(${dx}px, ${dy}px) scale(${k})` }],
-    { duration: 560, easing: 'cubic-bezier(.2,.75,.25,1)', fill: 'forwards' }).finished
-    .then(() => wait(140))
-    .then(() => {
-      // The door swings in on its left hinge, and the doorway glows brighter as it opens.
-      frame.animate([{ boxShadow: '0 0 0 0 rgba(255,244,222,0)' }, { boxShadow: '0 0 50px 14px rgba(255,244,222,.32)' }], { duration: 760, fill: 'forwards' });
-      return door.animate([{ transform: 'rotateY(0deg)' }, { transform: 'rotateY(-108deg)' }],
-        { duration: 760, easing: 'cubic-bezier(.45,.05,.3,1)', fill: 'forwards' }).finished;
-    })
-    .then(() => flood.animate([{ opacity: 0, transform: 'scale(.35)' }, { opacity: 1, transform: 'scale(1.6)' }],
-      { duration: 460, easing: 'ease-in', fill: 'forwards' }).finished)
-    .then(finish, finish);
+  // 1. The tape goes in.
+  tile.animate([{ transform: 'scale(1)', filter: 'brightness(1)' }, { transform: 'scale(.94) translateY(6px)', filter: 'brightness(.7)' }],
+    { duration: 220, easing: 'ease-in', fill: 'forwards' }).finished.then(() => {
+    // 2. Static, with PLAY.
+    document.body.appendChild(ov);
+    snow();
+    return wait(620);
+  }).then(() => {
+    // 3. The world comes up through the tracking lines.
+    location.hash = href;
+    noise = false;
+    ov.classList.add('vhs-on');
+    $('#view').animate([
+      { transform: 'translateX(-3px) skewX(-1deg)', filter: 'contrast(1.25) saturate(1.5) hue-rotate(-8deg) blur(.6px)' },
+      { transform: 'translateX(2px)', filter: 'contrast(1.15) saturate(1.3) blur(.3px)', offset: .3 },
+      { transform: 'translateX(-1px)', filter: 'contrast(1.05) saturate(1.1)', offset: .65 },
+      { transform: 'none', filter: 'none' },
+    ], { duration: 900, easing: 'steps(9, end)' });
+    return ov.animate([{ opacity: 1 }, { opacity: 1, offset: .55 }, { opacity: 0 }], { duration: 1100, fill: 'forwards' }).finished;
+  }).then(() => ov.remove(), () => ov.remove());
 }
 
 // The world name's color on its home card (null = the theme's own, or white on a photo).

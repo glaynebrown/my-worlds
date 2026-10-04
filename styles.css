@@ -462,15 +462,15 @@ body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
 .sub-check:has(input:disabled) { opacity: .5; }
 .share-secs > label:first-child { grid-column: 1 / -1; }
 
-/* ---------- stepping into a world (app.js openDoor) ---------- */
-.door-open { position: fixed; inset: 0; z-index: 70; overflow: hidden; background: rgba(10,8,6,0); }
-.do-frame { position: absolute; transform-origin: 50% 50%; perspective: 900px; border-radius: 16px 16px 10px 10px; will-change: transform; }
-/* The doorway: a glow in the world's background hue (--wg bright middle, --wm, then the background itself --wc). */
-.do-light { position: absolute; inset: 0; border-radius: inherit;
-  background: radial-gradient(ellipse at 50% 62%, var(--wg) 0%, var(--wm) 40%, var(--we, var(--wc)) 100%); }
-.do-door { position: absolute; inset: 0; transform-style: preserve-3d; transform-origin: 0 50%; border-radius: inherit; }
-.do-door > .do-face { position: absolute; inset: 0; width: 100%; height: 100%; aspect-ratio: auto; margin: 0; backface-visibility: hidden; -webkit-backface-visibility: hidden; transition: none; }
-.do-back { position: absolute; inset: 0; border-radius: inherit; transform: rotateY(180deg); backface-visibility: hidden; -webkit-backface-visibility: hidden;
-  background: linear-gradient(90deg, color-mix(in srgb, var(--wc) 55%, #000), color-mix(in srgb, var(--wc) 80%, #000)); box-shadow: inset 0 0 0 1px rgba(255,255,255,.08); }
-.do-flood { position: absolute; inset: -20%; opacity: 0; pointer-events: none;
-  background: radial-gradient(circle at 50% 50%, var(--wg) 0%, var(--wm) 28%, var(--we, var(--wc)) 70%); }
+/* ---------- opening a world, VHS style (app.js vhsOpen) ---------- */
+.vhs { position: fixed; inset: 0; z-index: 70; background: #111; overflow: hidden; pointer-events: none; }
+.vhs canvas { position: absolute; inset: 0; width: 100%; height: 100%; image-rendering: pixelated; opacity: .85; }
+.vhs.vhs-on { background: transparent; }
+.vhs.vhs-on canvas { display: none; }
+.vhs-lines { position: absolute; inset: 0; background: repeating-linear-gradient(to bottom, rgba(0,0,0,.28) 0 1px, transparent 1px 3px); mix-blend-mode: multiply; }
+.vhs-bar { position: absolute; left: 0; right: 0; height: 70px; top: -80px; background: linear-gradient(transparent, rgba(255,255,255,.18) 40%, rgba(255,255,255,.28) 50%, rgba(255,255,255,.12) 60%, transparent); filter: blur(1px); animation: vhs-roll 1.1s linear infinite; }
+@keyframes vhs-roll { to { transform: translateY(calc(100vh + 160px)); } }
+.vhs-osd, .vhs-time { position: absolute; color: #f2f2f2; font: 700 22px/1 'Courier New', ui-monospace, monospace; letter-spacing: .08em; text-shadow: 2px 0 0 rgba(255,0,80,.6), -2px 0 0 rgba(0,200,255,.6), 0 0 6px rgba(255,255,255,.5); }
+.vhs-osd { top: calc(env(safe-area-inset-top) + 40px); left: 22px; }
+.vhs-time { bottom: calc(env(safe-area-inset-bottom) + 36px); right: 22px; font-size: 18px; }
+.vhs.vhs-on .vhs-time { display: none; }
