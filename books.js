@@ -1697,7 +1697,7 @@ function drawReviews(book, body) {
         ${copied ? '' : `<label class="field"><textarea rows="8" readonly>${esc(text)}</textarea></label>`}
         <ol class="rv-steps"><li>Open Claude, paste it, and send.</li><li>Copy Claude’s whole reply.</li><li>Come back and tap <b>Paste Claude’s reply</b>. It fills in both reviews.</li></ol>
         <div class="actions"><button type="button" class="btn" data-close>Close</button><span class="spacer"></span>
-          <a class="btn" href="https://claude.ai/new" target="_blank" rel="noopener">Open Claude ↗</a>
+          <a class="btn ext-link" href="https://claude.ai/new" target="_blank" rel="noopener">Open Claude</a>
           <button type="button" class="btn primary" id="topaste">Paste Claude’s reply</button></div>`,
       (root, close) => { $('#topaste', root).onclick = () => { close(); pasteReply(); }; });
     };

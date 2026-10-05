@@ -533,7 +533,7 @@ function tidyLink(url) {
 }
 
 function ficForm(world, f) {
-  if (f && !canEdit(f)) return viewOnly(f, `<h2>${esc(f.title)}</h2>${f.author ? `<p class="muted small">by ${esc(f.author)}</p>` : ''}${f.note ? `<p style="margin-top:8px">${esc(f.note)}</p>` : ''}${f.url ? `<p style="margin-top:10px"><a class="btn small" href="${esc(f.url)}" target="_blank" rel="noopener">Open on AO3 ↗</a></p>` : ''}`);
+  if (f && !canEdit(f)) return viewOnly(f, `<h2>${esc(f.title)}</h2>${f.author ? `<p class="muted small">by ${esc(f.author)}</p>` : ''}${f.note ? `<p style="margin-top:8px">${esc(f.note)}</p>` : ''}${f.url ? `<p style="margin-top:10px"><a class="btn small ext-link" href="${esc(f.url)}" target="_blank" rel="noopener">Open on AO3</a></p>` : ''}`);
   const ships = [...new Set(itemsFor(world, 'ship').map(s => s.name).concat(itemsFor(world, 'fic').map(x => x.ship)).filter(Boolean))];
   formModal({
     title: f ? 'Edit fic' : 'Save a fic',
