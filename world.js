@@ -96,6 +96,28 @@ const askAgain = n => new Promise(res => {
     <div class="actions"><button class="btn" data-close>Don’t add</button><button class="btn primary" id="yes">Add again</button></div>`,
   (root, close) => { $('#yes', root).onclick = () => { yes = true; close(); }; }, 'small-modal', () => res(yes));
 });
+// The staggered wall, laid out here rather than with CSS columns (an iPhone
+// can skip drawing a photo at the top of a CSS column). Each photo goes into
+// whichever column is shortest, so the wall reads left to right, top to bottom.
+// board._order = the photos (and an uploading card) in order.
+function layoutBoard(board) {
+  if (!board || !board.isConnected) return;
+  if (!board._order) board._order = [...board.querySelectorAll(':scope > .pin, :scope > .board-col > .pin')];
+  const n = board.clientWidth >= 520 ? 3 : 2;
+  const cols = Array.from({ length: n }, () => Object.assign(document.createElement('div'), { className: 'board-col' }));
+  const heights = cols.map(() => 0);
+  board._order.forEach(el => {
+    const img = el.querySelector('img');
+    const tall = el.classList.contains('pin-uploading') ? 0.5
+      : img && +img.getAttribute('width') ? +img.getAttribute('height') / +img.getAttribute('width') : 0.75;
+    const k = heights.indexOf(Math.min(...heights));
+    cols[k].appendChild(el);
+    heights[k] += tall + (el.querySelector('.pin-cap') ? 0.15 : 0) + 0.06;
+  });
+  board.replaceChildren(...cols);
+  board._cols = n;
+}
+window.addEventListener('resize', () => $$('.board').forEach(b => { if ((b.clientWidth >= 520 ? 3 : 2) !== b._cols) layoutBoard(b); }));
 const uploadingHtml = text => `<div class="pin pin-uploading" aria-live="polite"><span class="spin" aria-hidden="true"></span><span class="pin-uploading-text">${esc(text)}</span></div>`;
 
 function photoBoard(world, body, pins, newItem, emptyText) {
@@ -103,6 +125,8 @@ function photoBoard(world, body, pins, newItem, emptyText) {
   const busyNow = !!uploads[key];
   body.insertAdjacentHTML('beforeend', `<label class="btn primary add-btn${busyNow ? ' is-busy' : ''}"><span aria-hidden="true">+</span> Add photos<input type="file" accept="image/*" multiple hidden class="pinfile" ${busyNow ? 'disabled' : ''}></label>
     ${pins.length || busyNow ? `<div class="board">${busyNow ? uploadingHtml(uploads[key]) : ''}${pins.map(pinHtml).join('')}</div>` : empty(world, emptyText)}`);
+
+  layoutBoard($('.board', body));
 
   $('.pinfile', body).onchange = async e => {
     const files = [...e.target.files];
@@ -117,10 +141,15 @@ function photoBoard(world, body, pins, newItem, emptyText) {
     lastPicked[key] = { at: Date.now(), sigs: files.map(sig) };
     const show = text => {
       uploads[key] = text;
-      const card = $('.pin-uploading-text');
+      const card = $('.pin-uploading-text'), b = $('.board', body);
       if (card && text) card.textContent = text;
-      else if (!card && text) { const b = $('.board', body); if (b) b.insertAdjacentHTML('afterbegin', uploadingHtml(text)); }
-      if (!text) $$('.pin-uploading').forEach(c => c.remove());
+      else if (!card && text && b) {
+        const tmp = document.createElement('div');
+        tmp.innerHTML = uploadingHtml(text);
+        b._order.unshift(tmp.firstElementChild);
+        layoutBoard(b);
+      }
+      if (!text) $$('.pin-uploading').forEach(c => { const ob = c.closest('.board'); c.remove(); if (ob && ob._order) ob._order = ob._order.filter(x => x !== c); });
       const btn = $('.add-btn', body), inp = $('.pinfile', body);
       if (btn) btn.classList.toggle('is-busy', !!text);
       if (inp) inp.disabled = !!text;
@@ -177,7 +206,7 @@ function enablePinDrag(board, getPins) {
   if (!board) return;
   const HOLD_MS = 450, SLOP = 10;
   let timer = null, start = null, pin = null, ghost = null, offset = null, dragging = false, scroll = null, last = null;
-  const pinsNow = () => $$('.pin[data-id]', board);
+  const pinsNow = () => (board._order || []).filter(el => el.dataset.id);
   const cancelHold = () => { clearTimeout(timer); timer = null; };
   const begin = (p, x, y) => { pin = p; start = { x, y }; cancelHold(); timer = setTimeout(pickUp, HOLD_MS); };
 
@@ -209,8 +238,11 @@ function enablePinDrag(board, getPins) {
     const over = document.elementFromPoint(x, y);
     const target = over && over.closest('.pin[data-id]');
     if (!target || target === pin || !board.contains(target)) return;
-    const list = pinsNow();
-    board.insertBefore(pin, list.indexOf(target) > list.indexOf(pin) ? target.nextSibling : target);
+    const order = board._order.filter(el => el !== pin);
+    const at = order.indexOf(target);
+    order.splice(board._order.indexOf(target) > board._order.indexOf(pin) ? at + 1 : at, 0, pin);
+    board._order = order;
+    layoutBoard(board);
   }
   function moveTo(x, y) {
     if (!ghost) return;

@@ -228,9 +228,9 @@ img { display: block; max-width: 100%; }
 .tag { display: inline-block; font-size: .75rem; font-weight: 600; padding: 2px 9px; border-radius: 999px; background: color-mix(in srgb, var(--tab, var(--accent)) 16%, var(--card)); color: var(--ink); }
 
 /* mood board: a masonry collage */
-.board { columns: 2; column-gap: 10px; }
-@media (min-width: 560px) { .board { columns: 3; } }
-.pin { break-inside: avoid; display: block; width: 100%; margin: 0 0 10px; padding: 0; border: 0; background: var(--card); border-radius: var(--pin-radius, 10px); overflow: hidden; position: relative; box-shadow: var(--card-shadow); }
+.board { display: flex; align-items: flex-start; column-gap: 10px; }
+.board-col { flex: 1 1 0; min-width: 0; display: flex; flex-direction: column; }
+.pin { display: block; width: 100%; margin: 0 0 10px; padding: 0; border: 0; background: var(--card); border-radius: var(--pin-radius, 10px); overflow: hidden; position: relative; box-shadow: var(--card-shadow); }
 .pin img { width: 100%; height: auto; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; pointer-events: none; }
 .pin { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .pin-cap { display: block; padding: 7px 10px; font-size: .85rem; text-align: left; color: var(--ink); }
