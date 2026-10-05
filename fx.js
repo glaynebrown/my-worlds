@@ -14,7 +14,9 @@ const fxOf = () => {
 };
 const fxStill = () => matchMedia('(prefers-reduced-motion: reduce)').matches || !Element.prototype.animate;
 const fxWait = ms => new Promise(r => setTimeout(r, ms));
-const fxPlay = (el, frames, opts) => el.animate(frames, { fill: 'forwards', ...opts }).finished.catch(() => {});
+// Resolves when the animation ends, or soon after it should have (a phone that
+// pauses animations in the background never leaves an effect stuck).
+const fxPlay = (el, frames, opts) => Promise.race([el.animate(frames, { fill: 'forwards', ...opts }).finished.catch(() => {}), fxWait((opts.duration || 0) + 250)]);
 
 // The full-screen layer an effect plays on. ov.go() changes the page (once);
 // a tap goes there right away and clears the effect.
@@ -53,14 +55,96 @@ document.addEventListener('click', e => {
 }, true);
 
 // ---------- theater curtains ----------
-const CURTAINS = '<div class="cur-panel cur-l"></div><div class="cur-panel cur-r"></div><div class="cur-top"></div>';
+// Deep burgundy velvet drawn fresh each time (so the folds are never quite the
+// same): two main curtains, draped swags across the top, and a tied-back drape
+// at each edge. Swags and side drapes come in first and lift away last.
+const VELVET = { deep: '#2a0306', dark: '#45070d', mid: '#650c15', light: '#78111a', shine: '#8c1a23' };
+
+// Uneven vertical folds as gradient stops across 0–100%.
+function velvetStops(folds) {
+  const out = [];
+  let x = 0;
+  const widths = Array.from({ length: folds }, () => .6 + Math.random() * .8);
+  const sum = widths.reduce((a, b) => a + b, 0);
+  widths.forEach(w => {
+    const f = (w / sum) * 100, top = Math.random() < .3 ? VELVET.shine : VELVET.light;
+    out.push([x, VELVET.deep], [x + f * .18, VELVET.dark], [x + f * .42, VELVET.mid], [x + f * .62, top], [x + f * .84, VELVET.mid]);
+    x += f;
+  });
+  out.push([100, VELVET.deep]);
+  return out.map(([o, c]) => `<stop offset="${Math.min(o, 100).toFixed(2)}%" stop-color="${c}"/>`).join('');
+}
+const fxId = () => 'v' + Math.random().toString(36).slice(2, 8);
+
+function curtainPanel(cls) {
+  const id = fxId();
+  return `<div class="cur-panel ${cls}"><svg viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="${id}">${velvetStops(4 + Math.floor(Math.random() * 2))}</linearGradient></defs>
+    <rect width="100" height="100" fill="url(#${id})"/></svg></div>`;
+}
+
+// Draped swags across the top: a gathered band, then 2–3 swags that dip in the middle.
+function curtainSwags(W) {
+  const H = 96, n = W < 520 ? 2 : 3, sw = W / n, id = fxId();
+  let swags = '';
+  for (let i = 0; i < n; i++) {
+    const x0 = i * sw - 14, x1 = (i + 1) * sw + 14, mx = (x0 + x1) / 2, d = 70 + Math.random() * 10, cid = `${id}c${i}`;
+    const edge = `M${x0},0 H${x1} V20 Q${mx},${2 * d - 20} ${x0},20 Z`;
+    let lines = '';
+    for (let j = 1; j <= 5; j++) {
+      const y = 20 - j * 2.5, dip = d - (6 - j) * 10;
+      const path = `M${x0 + j * 6},${y} Q${mx},${2 * dip - y} ${x1 - j * 6},${y}`;
+      lines += `<path d="${path}" fill="none" stroke="${VELVET.shine}" stroke-opacity=".16" stroke-width="6"/><path d="${path}" transform="translate(0 4)" fill="none" stroke="#000" stroke-opacity=".26" stroke-width="3"/>`;
+    }
+    swags += `<clipPath id="${cid}"><path d="${edge}"/></clipPath><g clip-path="url(#${cid})"><path d="${edge}" fill="url(#${id}g)"/>${lines}</g>
+      <path d="M${x0},20 Q${mx},${2 * d - 20} ${x1},20" fill="none" stroke="#000" stroke-opacity=".5" stroke-width="2"/>`;
+  }
+  let knots = '';
+  for (let i = 1; i < n; i++) knots += `<ellipse cx="${i * sw}" cy="18" rx="13" ry="20" fill="url(#${id}k)"/>`;
+  return `<svg class="cur-swags" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" aria-hidden="true"><defs>
+      <linearGradient id="${id}g" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${VELVET.deep}"/><stop offset=".45" stop-color="${VELVET.mid}"/><stop offset=".8" stop-color="${VELVET.light}"/><stop offset="1" stop-color="${VELVET.dark}"/></linearGradient>
+      <linearGradient id="${id}b" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${VELVET.deep}"/><stop offset=".6" stop-color="${VELVET.dark}"/><stop offset="1" stop-color="${VELVET.mid}"/></linearGradient>
+      <radialGradient id="${id}k"><stop offset="0" stop-color="${VELVET.deep}"/><stop offset="1" stop-color="${VELVET.deep}" stop-opacity="0"/></radialGradient>
+    </defs><rect width="${W}" height="22" fill="url(#${id}b)"/>${swags}${knots}</svg>`;
+}
+
+// A narrow drape at the edge, cinched with a dark tie a little below the middle.
+function curtainSide(cls, W, Hs) {
+  const w = Math.round(Math.min(120, Math.max(50, W * .15))), tx = w * .36, ty = Hs * .58, id = fxId();
+  const shape = `M0,0 H${w} C${w * .95},${Hs * .26} ${w * .62},${Hs * .5} ${tx},${ty} C${w * .6},${Hs * .66} ${w * .88},${Hs * .86} ${w},${Hs} H0 Z`;
+  let lines = '';
+  for (let k = 1; k <= 4; k++) {
+    const xt = (w * k) / 5, xm = (tx * k) / 5, xb = (w * k) / 5;
+    const path = `M${xt},0 C${xt},${Hs * .3} ${xm + 2},${ty * .8} ${xm},${ty} C${xm},${ty + Hs * .12} ${xb},${Hs * .8} ${xb},${Hs}`;
+    lines += `<path d="${path}" fill="none" stroke="${VELVET.shine}" stroke-opacity=".14" stroke-width="6"/><path d="${path}" transform="translate(3 0)" fill="none" stroke="#000" stroke-opacity=".28" stroke-width="3"/>`;
+  }
+  return `<div class="cur-side ${cls}" style="width:${w}px"><svg width="${w}" height="${Hs}" viewBox="0 0 ${w} ${Hs}" aria-hidden="true"><defs>
+      <linearGradient id="${id}">${velvetStops(4)}</linearGradient><clipPath id="${id}c"><path d="${shape}"/></clipPath></defs>
+    <g clip-path="url(#${id}c)"><path d="${shape}" fill="url(#${id})"/>${lines}</g>
+    <rect x="-4" y="${ty - 6}" width="${tx + 10}" height="12" rx="6" fill="#1a0204"/><rect x="-4" y="${ty - 5}" width="${tx + 8}" height="3" rx="1.5" fill="#5a1a1e" opacity=".7"/>
+    <path d="M${tx + 4},${ty + 5} q3,14 -1,26" fill="none" stroke="#1a0204" stroke-width="3" stroke-linecap="round"/><circle cx="${tx + 3}" cy="${ty + 32}" r="4" fill="#1a0204"/>
+  </svg></div>`;
+}
+
+const curtainsHtml = () => curtainPanel('cur-l') + curtainPanel('cur-r') + curtainSide('cur-side-l', innerWidth, innerHeight) + curtainSide('cur-side-r', innerWidth, innerHeight)
+  + `<div class="cur-top">${curtainSwags(innerWidth)}</div>`;
+
+// The swags drop and the side drapes come in (or the reverse, on the way out).
+function curtainFrame(ov, show, duration) {
+  const opts = { duration, easing: show ? 'ease-out' : 'ease-in' };
+  const off = { top: 'translateY(-110%)', sl: 'translateX(-105%)', sr: 'translateX(105%)' };
+  const kf = k => (show ? [{ transform: off[k] }, { transform: 'none' }] : [{ transform: 'none' }, { transform: off[k] }]);
+  fxPlay($('.cur-side-l', ov), kf('sl'), opts);
+  fxPlay($('.cur-side-r', ov), kf('sr'), opts);
+  return fxPlay($('.cur-top', ov), kf('top'), opts);
+}
 
 async function curtainsOpen(tile, href) {
   fxPush(tile);
-  const ov = fxLayer('curtains', CURTAINS, href);
-  const l = $('.cur-l', ov), r = $('.cur-r', ov), top = $('.cur-top', ov);
-  // The valance drops and the curtains swing shut over the doors…
-  fxPlay(top, [{ transform: 'translateY(-110%)' }, { transform: 'none' }], { duration: 300, easing: 'ease-out' });
+  const ov = fxLayer('curtains', curtainsHtml(), href);
+  const l = $('.cur-l', ov), r = $('.cur-r', ov);
+  // The swags drop and the curtains swing shut over the doors…
+  curtainFrame(ov, true, 320);
   fxPlay(l, [{ transform: 'translateX(-101%)' }, { transform: 'none' }], { duration: 480, easing: 'cubic-bezier(.5,0,.3,1)' });
   await fxPlay(r, [{ transform: 'translateX(101%)' }, { transform: 'none' }], { duration: 480, easing: 'cubic-bezier(.5,0,.3,1)' });
   await fxWait(160);
@@ -72,15 +156,15 @@ async function curtainsOpen(tile, href) {
   fxPlay(l, [{ transform: 'none' }, { transform: 'translateX(-60%) scaleX(.75)', offset: .55 }, { transform: 'translateX(-101%) scaleX(.6)' }], part);
   fxPlay(r, [{ transform: 'none' }, { transform: 'translateX(60%) scaleX(.75)', offset: .55 }, { transform: 'translateX(101%) scaleX(.6)' }], part);
   await fxWait(800);
-  await fxPlay(top, [{ transform: 'none' }, { transform: 'translateY(-110%)' }], { duration: 380, easing: 'ease-in' });
+  await curtainFrame(ov, false, 420);
   ov.done();
 }
 
 async function curtainsExit() {
-  const ov = fxLayer('curtains', CURTAINS, '#/');
-  const l = $('.cur-l', ov), r = $('.cur-r', ov), top = $('.cur-top', ov);
+  const ov = fxLayer('curtains', curtainsHtml(), '#/');
+  const l = $('.cur-l', ov), r = $('.cur-r', ov);
   const shut = { duration: 750, easing: 'cubic-bezier(.5,0,.3,1)' };
-  fxPlay(top, [{ transform: 'translateY(-110%)' }, { transform: 'none' }], { duration: 300, easing: 'ease-out' });
+  curtainFrame(ov, true, 320);
   fxPlay(l, [{ transform: 'translateX(-101%) scaleX(.6)' }, { transform: 'none' }], shut);
   await fxPlay(r, [{ transform: 'translateX(101%) scaleX(.6)' }, { transform: 'none' }], shut);
   await fxWait(200);

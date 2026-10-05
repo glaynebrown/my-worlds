@@ -465,23 +465,27 @@ body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
 /* ---------- opening a world / going back to the doors (fx.js) ---------- */
 .fx { position: fixed; inset: 0; z-index: 70; overflow: hidden; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
-/* theater curtains: deep red velvet folds, a scalloped valance with gold trim */
-.cur-panel { position: absolute; top: 0; bottom: 0; width: 52%;
+/* theater curtains (fx.js draws the velvet): deep burgundy, swags across the top, tied-back side drapes */
+.cur-panel { position: absolute; top: 0; bottom: 0; width: 52%; box-shadow: 0 0 40px rgba(0,0,0,.7); will-change: transform; }
+.cur-panel svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+/* lighting: shadow under the swags and at the floor, a soft glow in the middle, a fine velvet pile */
+.cur-panel::before { content: ''; position: absolute; inset: 0; z-index: 1;
   background:
-    linear-gradient(to bottom, rgba(0,0,0,.45), transparent 22%, transparent 78%, rgba(0,0,0,.55)),
-    repeating-linear-gradient(90deg, #4a0710 0, #74101d 10px, #a81d2c 20px, #c7333f 25px, #a01a2a 31px, #6a0d19 40px, #4a0710 46px);
-  box-shadow: 0 0 40px rgba(0,0,0,.65); will-change: transform; }
+    linear-gradient(to bottom, rgba(0,0,0,.6), rgba(0,0,0,.1) 22%, transparent 45%, rgba(0,0,0,.15) 75%, rgba(0,0,0,.6)),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.035) 0 1px, transparent 1px 3px); }
 .cur-l { left: 0; transform-origin: left center; transform: translateX(-101%); }
 .cur-r { right: 0; transform-origin: right center; transform: translateX(101%); }
-.cur-l::after, .cur-r::after { content: ''; position: absolute; top: 0; bottom: 0; width: 26px; }
-.cur-l::after { right: 0; background: linear-gradient(90deg, transparent, rgba(0,0,0,.4)); }
-.cur-r::after { left: 0; background: linear-gradient(-90deg, transparent, rgba(0,0,0,.4)); }
-.cur-top { position: absolute; left: 0; right: 0; top: 0; z-index: 1; height: calc(env(safe-area-inset-top) + 58px); transform: translateY(-110%);
-  background: linear-gradient(to bottom, rgba(0,0,0,.35), transparent 60%), repeating-linear-gradient(90deg, #6a0d19 0, #a81d2c 14px, #c7333f 20px, #8a1424 30px, #6a0d19 36px);
-  border-bottom: 3px solid #d4a640; box-shadow: 0 6px 14px rgba(0,0,0,.45); }
-.cur-top::after { content: ''; position: absolute; left: 0; right: 0; top: 100%; height: 22px;
-  background: radial-gradient(circle at 50% 0, #9b1828 0 18px, #d4a640 18px 21px, transparent 22px) 0 0 / 44px 22px repeat-x;
-  filter: drop-shadow(0 4px 4px rgba(0,0,0,.4)); }
+.cur-l::after, .cur-r::after { content: ''; position: absolute; top: 0; bottom: 0; width: 30px; z-index: 1; }
+.cur-l::after { right: 0; background: linear-gradient(90deg, transparent, rgba(0,0,0,.5)); }
+.cur-r::after { left: 0; background: linear-gradient(-90deg, transparent, rgba(0,0,0,.5)); }
+.cur-side { position: absolute; top: 0; bottom: 0; z-index: 1; filter: drop-shadow(0 0 10px rgba(0,0,0,.7)); }
+.cur-side svg { display: block; }
+.cur-side-l { left: 0; transform: translateX(-105%); }
+.cur-side-r { right: 0; transform: translateX(105%) ; }
+.cur-side-r svg { transform: scaleX(-1); }
+.cur-top { position: absolute; left: 0; right: 0; top: 0; z-index: 2; padding-top: env(safe-area-inset-top); background: linear-gradient(#2a0306, #2a0306) top / 100% calc(env(safe-area-inset-top) + 2px) no-repeat; transform: translateY(-110%);
+  filter: drop-shadow(0 8px 10px rgba(0,0,0,.65)); }
+.cur-swags { display: block; }
 
 /* old TV: black halves that open from (or close to) a bright line */
 .tv { background: transparent; }
