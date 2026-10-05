@@ -1146,6 +1146,17 @@ function drawOffline() { $('#offline-bar').hidden = navigator.onLine; }
 window.addEventListener('online', () => { drawOffline(); savePhotosForOffline(); uploadWaitingPhotos(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') uploadWaitingPhotos(); });
 
+// ---------- outside links ----------
+// In the iPhone app, links to other sites (AO3, Claude…) open in a browser sheet
+// over the app; Done brings you straight back. The website keeps its new tabs.
+const InAppBrowser = isNativeApp ? window.Capacitor.registerPlugin('Browser') : null;
+if (InAppBrowser) document.addEventListener('click', e => {
+  const a = e.target.closest && e.target.closest('a[href]');
+  if (!a || !/^https?:/i.test(a.href) || new URL(a.href).origin === location.origin) return;
+  e.preventDefault();
+  InAppBrowser.open({ url: a.href, presentationStyle: 'popover' }).catch(() => window.open(a.href, '_blank'));
+}, true);
+
 // Photos added with no signal show from the phone. On the website the service
 // worker answers their pending-photo/… links; the App Store app has no service
 // worker, so those links are swapped here for copies made from the phone's store.
