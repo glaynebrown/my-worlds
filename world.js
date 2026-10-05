@@ -10,6 +10,14 @@ const SECTIONS = [
 // A world's address, or a book's (books borrow My Canon and ship pages; see books.js).
 const worldHref = w => `${w._book ? '#/b/' : '#/w/'}${w.id}`;
 const byNewest = (a, b) => (b.t || 0) - (a.t || 0);
+// Photo boards: the order you dragged them into (item.order), newest first
+// before anything's been moved. A photo with no order yet (just added) goes on top.
+const byBoard = (a, b) => {
+  const ao = typeof a.order === 'number', bo = typeof b.order === 'number';
+  if (ao && bo) return a.order - b.order || byNewest(a, b);
+  if (ao !== bo) return ao ? 1 : -1;
+  return byNewest(a, b);
+};
 const byOldest = (a, b) => (a.t || 0) - (b.t || 0);
 const empty = (world, text) => `<p class="empty">${esc(text || Themes.info(world).empty)}</p>`;
 // Who said it, and to whom: "Kael to Wren" (either part can be blank).
@@ -66,31 +74,67 @@ function wireChips(body, redraw) {
 }
 
 // ---------- Mood board ----------
-// A photo board: used for the world's mood board and for each ship's page.
+// A photo board: used for the world's mood board, each ship's page, and books.
 // newItem = the fields every added photo gets ({ world, kind, ... }).
 // The page redraws as each photo arrives, so upload progress lives out here.
+// Hold a photo (about half a second) and drag it to move it (enablePinDrag).
 const uploads = {};
+const lastPicked = {}; // board key -> what was just added, to catch the same photo twice
+const pinHtml = p => `<button class="pin" data-id="${p.id}"><img src="${esc(p.photo && p.photo.thumbUrl)}" data-full="${esc(p.photo && p.photo.url)}" alt="${esc(p.caption || 'Photo')}" draggable="false" onerror="pinImgFail(this)" ${p.photo ? `width="${p.photo.w}" height="${p.photo.h}"` : ''}>${waitingBadge(p.photo)}${p.caption || byLine(p) ? `<span class="pin-cap">${esc(p.caption || '')}${byLine(p)}</span>` : ''}</button>`;
+// A board photo that won't load tries the full-size copy, then says so (never a blank gap).
+function pinImgFail(img) {
+  const full = img.dataset.full;
+  if (full && img.getAttribute('src') !== full && !img.dataset.tried) { img.dataset.tried = '1'; img.src = full; return; }
+  img.onerror = null;
+  img.replaceWith(Object.assign(document.createElement('span'), { className: 'pin-failed', textContent: 'Couldn’t load this photo. Tap to open it.' }));
+}
+// "Add it again?" -> true to add, false to skip.
+const askAgain = n => new Promise(res => {
+  let yes = false;
+  openModal(`<h2>${n === 1 ? 'Add this photo again?' : 'Add these again?'}</h2>
+    <p>${n === 1 ? 'You just added this one. It may still be on its way.' : 'Some of these were just added.'}</p>
+    <div class="actions"><button class="btn" data-close>Don’t add</button><button class="btn primary" id="yes">Add again</button></div>`,
+  (root, close) => { $('#yes', root).onclick = () => { yes = true; close(); }; }, 'small-modal', () => res(yes));
+});
+const uploadingHtml = text => `<div class="pin pin-uploading" aria-live="polite"><span class="spin" aria-hidden="true"></span><span class="pin-uploading-text">${esc(text)}</span></div>`;
+
 function photoBoard(world, body, pins, newItem, emptyText) {
   const key = `${newItem.kind}:${newItem.ship || world.id}`;
-  body.insertAdjacentHTML('beforeend', `<label class="btn primary add-btn"><span aria-hidden="true">+</span> Add photos<input type="file" accept="image/*" multiple hidden class="pinfile"></label>
-    <p class="muted small progress" ${uploads[key] ? '' : 'hidden'}>${esc(uploads[key] || '')}</p>
-    ${pins.length ? `<div class="board">${pins.map(p => `<button class="pin" data-id="${p.id}"><img src="${esc(p.photo && p.photo.thumbUrl)}" alt="${esc(p.caption || 'Photo')}" loading="lazy" ${p.photo ? `width="${p.photo.w}" height="${p.photo.h}"` : ''}>${waitingBadge(p.photo)}${p.caption || byLine(p) ? `<span class="pin-cap">${esc(p.caption || '')}${byLine(p)}</span>` : ''}</button>`).join('')}</div>` : empty(world, emptyText)}`);
+  const busyNow = !!uploads[key];
+  body.insertAdjacentHTML('beforeend', `<label class="btn primary add-btn${busyNow ? ' is-busy' : ''}"><span aria-hidden="true">+</span> Add photos<input type="file" accept="image/*" multiple hidden class="pinfile" ${busyNow ? 'disabled' : ''}></label>
+    ${pins.length || busyNow ? `<div class="board">${busyNow ? uploadingHtml(uploads[key]) : ''}${pins.map(pinHtml).join('')}</div>` : empty(world, emptyText)}`);
 
   $('.pinfile', body).onchange = async e => {
     const files = [...e.target.files];
     e.target.value = '';
-    if (!files.length) return;
+    if (!files.length || uploads[key]) return;
     try { checkPhotoRoom(files.length); } catch (x) { toast(x.message, true); return; }
+    // The same photo picked again right after it went up: probably a double tap.
+    const sig = f => `${f.name}|${f.size}|${f.lastModified}`;
+    const prev = lastPicked[key];
+    const again = prev && Date.now() - prev.at < 10 * 60e3 && files.some(f => prev.sigs.includes(sig(f)));
+    if (again && !(await askAgain(files.length))) return;
+    lastPicked[key] = { at: Date.now(), sigs: files.map(sig) };
     const show = text => {
       uploads[key] = text;
-      const prog = $('.progress');
-      if (prog) { prog.textContent = text || ''; prog.hidden = !text; }
+      const card = $('.pin-uploading-text');
+      if (card && text) card.textContent = text;
+      else if (!card && text) { const b = $('.board', body); if (b) b.insertAdjacentHTML('afterbegin', uploadingHtml(text)); }
+      if (!text) $$('.pin-uploading').forEach(c => c.remove());
+      const btn = $('.add-btn', body), inp = $('.pinfile', body);
+      if (btn) btn.classList.toggle('is-busy', !!text);
+      if (inp) inp.disabled = !!text;
     };
     let done = 0;
+    show(files.length === 1 ? 'Uploading your photo…' : `Uploading 1 of ${files.length}…`);
+    // New photos go on top: just above whatever's first now.
+    const tops = pins.filter(x => typeof x.order === 'number').map(x => x.order);
+    let top = tops.length ? Math.min(...tops) : null;
     try {
       for (const f of files) {
-        show(`Adding ${done + 1} of ${files.length}…`);
-        await addItemFor(world, { ...newItem, caption: '' }, await Photos.prepare(f));
+        if (files.length > 1) show(`Uploading ${done + 1} of ${files.length}…`);
+        const order = top == null ? {} : { order: (top -= 1) };
+        await addItemFor(world, { ...newItem, caption: '', ...order }, await Photos.prepare(f));
         done++;
       }
       toast(done === 1 ? 'Photo added' : `${done} photos added`);
@@ -98,8 +142,10 @@ function photoBoard(world, body, pins, newItem, emptyText) {
     show(null);
   };
 
-  $$('.pin', body).forEach(el => {
+  enablePinDrag($('.board', body), () => pins);
+  $$('.pin[data-id]', body).forEach(el => {
     el.onclick = () => {
+      if (pinDragged) return;
       const pin = findItem(el.dataset.id);
       // Offline, the full-size photo may not be saved on the phone yet; the small one always is.
       if (!canEdit(pin)) {
@@ -120,7 +166,107 @@ function photoBoard(world, body, pins, newItem, emptyText) {
 
 function drawBoard(world, body) {
   body.innerHTML = '';
-  photoBoard(world, body, itemsFor(world, 'pin').sort(byNewest), { world: world.id, kind: 'pin' });
+  photoBoard(world, body, itemsFor(world, 'pin').sort(byBoard), { world: world.id, kind: 'pin' });
+}
+
+// Hold a photo to pick it up, drag it, let go to drop. Works with the staggered
+// wall: photos flow down the columns, so the photo under your finger is the spot.
+// Anyone in a shared world may reorder (firestore.rules lets them change 'order').
+let pinSorting = false, pinDragged = false;
+function enablePinDrag(board, getPins) {
+  if (!board) return;
+  const HOLD_MS = 450, SLOP = 10;
+  let timer = null, start = null, pin = null, ghost = null, offset = null, dragging = false, scroll = null, last = null;
+  const pinsNow = () => $$('.pin[data-id]', board);
+  const cancelHold = () => { clearTimeout(timer); timer = null; };
+  const begin = (p, x, y) => { pin = p; start = { x, y }; cancelHold(); timer = setTimeout(pickUp, HOLD_MS); };
+
+  function pickUp() {
+    timer = null;
+    if (!pin || !pin.isConnected) return;
+    dragging = pinSorting = true;
+    const r = pin.getBoundingClientRect();
+    offset = { x: start.x - r.left, y: start.y - r.top };
+    ghost = pin.cloneNode(true);
+    ghost.classList.add('pin-ghost');
+    Object.assign(ghost.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px` });
+    document.body.appendChild(ghost);
+    pin.classList.add('pin-placeholder');
+    board.classList.add('sorting');
+    if (navigator.vibrate) navigator.vibrate(10);
+  }
+  // Near the top or bottom of the screen, the page scrolls along.
+  function edgeScroll() {
+    if (!dragging || !last) { scroll = null; return; }
+    const zone = 70, y = last.y;
+    const dy = y < zone ? -(zone - y) / 5 : y > innerHeight - zone ? (y - (innerHeight - zone)) / 5 : 0;
+    if (dy) { window.scrollBy(0, dy); place(last.x, last.y); }
+    scroll = requestAnimationFrame(edgeScroll);
+  }
+  function place(x, y) {
+    ghost.style.left = `${x - offset.x}px`;
+    ghost.style.top = `${y - offset.y}px`;
+    const over = document.elementFromPoint(x, y);
+    const target = over && over.closest('.pin[data-id]');
+    if (!target || target === pin || !board.contains(target)) return;
+    const list = pinsNow();
+    board.insertBefore(pin, list.indexOf(target) > list.indexOf(pin) ? target.nextSibling : target);
+  }
+  function moveTo(x, y) {
+    if (!ghost) return;
+    last = { x, y };
+    place(x, y);
+    if (!scroll) scroll = requestAnimationFrame(edgeScroll);
+  }
+  function drop() {
+    if (ghost) ghost.remove();
+    ghost = null;
+    cancelAnimationFrame(scroll); scroll = null; last = null;
+    if (pin) pin.classList.remove('pin-placeholder');
+    board.classList.remove('sorting');
+    dragging = pinSorting = false;
+    pinDragged = true;
+    setTimeout(() => { pinDragged = false; }, 350);
+    const byId = Object.fromEntries(getPins().map(x => [x.id, x]));
+    const changed = pinsNow().map((el, k) => [byId[el.dataset.id], k]).filter(([x, k]) => x && x.order !== k);
+    if (changed.length) {
+      Promise.all(changed.map(([x, k]) => updateItemFor(x, { order: k })))
+        .catch(e => { toast(friendlyError(e), true); refresh(); });
+    }
+    if (missedRefresh) { missedRefresh = false; setTimeout(refresh, 0); }
+  }
+  const end = () => { cancelHold(); if (dragging) drop(); };
+
+  board.addEventListener('touchstart', e => {
+    const p = e.target.closest('.pin[data-id]');
+    if (!p || e.touches.length > 1) return;
+    begin(p, e.touches[0].clientX, e.touches[0].clientY);
+  }, { passive: true });
+  board.addEventListener('touchmove', e => {
+    const t = e.touches[0];
+    if (dragging) { e.preventDefault(); moveTo(t.clientX, t.clientY); return; }
+    if (timer && Math.hypot(t.clientX - start.x, t.clientY - start.y) > SLOP) cancelHold();
+  }, { passive: false });
+  board.addEventListener('touchend', end);
+  board.addEventListener('touchcancel', end);
+  board.addEventListener('contextmenu', e => { if (e.target.closest('.pin')) e.preventDefault(); });
+  board.addEventListener('pointerdown', e => {
+    if (e.pointerType !== 'mouse' || e.button > 0) return;
+    const p = e.target.closest('.pin[data-id]');
+    if (p) begin(p, e.clientX, e.clientY);
+  });
+  const mm = e => {
+    if (!board.isConnected) return window.removeEventListener('pointermove', mm);
+    if (e.pointerType !== 'mouse') return;
+    if (dragging) { moveTo(e.clientX, e.clientY); return; }
+    if (timer && Math.hypot(e.clientX - start.x, e.clientY - start.y) > SLOP) cancelHold();
+  };
+  const mu = e => {
+    if (!board.isConnected) return window.removeEventListener('pointerup', mu);
+    if (e.pointerType === 'mouse') end();
+  };
+  window.addEventListener('pointermove', mm);
+  window.addEventListener('pointerup', mu);
 }
 
 // ---------- Quotes ----------
@@ -211,7 +357,7 @@ function drawFavs(world, body) {
 const canonParts = world => ({ ending: true, ships: true, headcanons: true, ...(world.canonParts || {}) });
 const shipPhotos = ship => (ship._sid
   ? ((state.shared[ship._sid] || {}).items || []).map(i => ({ ...i, world: ship.world, _sid: ship._sid }))
-  : state.items).filter(i => i.kind === 'shippic' && i.ship === ship.id).sort(byNewest);
+  : state.items).filter(i => i.kind === 'shippic' && i.ship === ship.id).sort(byBoard);
 
 function endingForm(world) {
   formModal({
@@ -323,7 +469,7 @@ function drawCanon(world, body) {
       const [a, b] = s.colors || Themes.palette(world).map(p => p[1]);
       const pics = shipPhotos(s);
       return `<a class="ship" href="${worldHref(world)}/ship/${s.id}" style="--a:${a};--b:${b}"><span class="ship-name">${esc(s.name)}</span>${s.note ? `<span class="ship-note">${esc(s.note)}</span>` : ''}${byLine(s)}
-        ${pics.length ? `<span class="ship-strip">${pics.slice(0, 4).map(p => `<img src="${esc(p.photo.thumbUrl)}" alt="" loading="lazy">`).join('')}${pics.length > 4 ? `<span class="ship-more">+${pics.length - 4}</span>` : ''}</span>` : '<span class="ship-hint">Tap to add photos</span>'}</a>`;
+        ${pics.length ? `<span class="ship-strip">${pics.slice(0, 4).map(p => `<img src="${esc(p.photo.thumbUrl)}" alt="">`).join('')}${pics.length > 4 ? `<span class="ship-more">+${pics.length - 4}</span>` : ''}</span>` : '<span class="ship-hint">Tap to add photos</span>'}</a>`;
     }).join('')}</div>` : ''}
     <button class="btn small" id="adds">+ Add a ship</button>` : ''}
 

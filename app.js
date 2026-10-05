@@ -284,7 +284,7 @@ function route() {
 // Re-draw from fresh data, but never while a form is being filled in.
 function refresh() {
   const [page, id, sub] = parseHash();
-  if (modalOpen || tileSorting || spineSorting) { missedRefresh = true; return; }
+  if (modalOpen || tileSorting || spineSorting || pinSorting) { missedRefresh = true; return; }
   if (page === 'new' || page === 'start' || sub === 'settings' || (page === 'books' && (id === 'new' || id === 'pick')) || mapBusy()) return;
   const y = window.scrollY;
   route();
@@ -301,8 +301,8 @@ window.addEventListener('hashchange', () => {
   lastHash = location.hash;
   $$('.modal-bg').forEach(m => m.remove());
   modalOpen = 0;
-  $$('.tile-ghost, .spine-ghost').forEach(g => g.remove());
-  tileSorting = spineSorting = false;
+  $$('.tile-ghost, .spine-ghost, .pin-ghost').forEach(g => g.remove());
+  tileSorting = spineSorting = pinSorting = false;
   route();
   const tabs = $('.w-tabs');
   window.scrollTo(0, sameWorld && tabs ? Math.min(y, tabs.offsetTop) : 0);
@@ -1143,6 +1143,33 @@ function renderWorldForm(world) {
 function drawOffline() { $('#offline-bar').hidden = navigator.onLine; }
 window.addEventListener('online', () => { drawOffline(); savePhotosForOffline(); uploadWaitingPhotos(); });
 document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') uploadWaitingPhotos(); });
+
+// Photos added with no signal show from the phone. On the website the service
+// worker answers their pending-photo/… links; the App Store app has no service
+// worker, so those links are swapped here for copies made from the phone's store.
+const waitingUrls = {};
+async function waitingUrl(link) {
+  const m = /pending-photo\/(.+?)(-thumb)?\.jpg/.exec(link);
+  if (!m) return null;
+  const key = m[1] + (m[2] || '');
+  if (!(key in waitingUrls)) {
+    const rec = (await PendingPhotos.all().catch(() => [])).find(r => r.pid === m[1]);
+    waitingUrls[key] = rec ? URL.createObjectURL(m[2] ? rec.thumb : rec.full) : null;
+  }
+  return waitingUrls[key];
+}
+function showWaitingPhotos(root) {
+  $$('img[src*="pending-photo/"]', root).forEach(async img => { const u = await waitingUrl(img.getAttribute('src')); if (u) img.src = u; });
+  $$('[style*="pending-photo/"]', root).forEach(async el => {
+    const css = el.getAttribute('style'), link = /pending-photo\/[^'")]+/.exec(css);
+    const u = link && await waitingUrl(link[0]);
+    if (u) el.setAttribute('style', css.split(link[0]).join(u));
+  });
+}
+if (!('serviceWorker' in navigator) || location.protocol !== 'https:') {
+  new MutationObserver(list => list.forEach(m => m.target.nodeType === 1 && showWaitingPhotos(m.target.parentNode || m.target)))
+    .observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['src', 'style'] });
+}
 
 // Photos added with no signal (store.js) upload once there's signal again.
 async function uploadWaitingPhotos() {

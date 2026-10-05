@@ -1717,7 +1717,7 @@ function drawReviews(book, body) {
 // ----- Board -----
 function drawBookBoard(book, body) {
   body.innerHTML = '';
-  photoBoard(book, body, itemsFor(book, 'pin').sort(byNewest), { world: book.id, kind: 'pin' }, 'No pictures yet. Add the vibe: characters, places, aesthetics.');
+  photoBoard(book, body, itemsFor(book, 'pin').sort(byBoard), { world: book.id, kind: 'pin' }, 'No pictures yet. Add the vibe: characters, places, aesthetics.');
 }
 
 // ----- Map: a picture you can zoom, with pins -----

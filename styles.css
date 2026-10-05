@@ -231,7 +231,8 @@ img { display: block; max-width: 100%; }
 .board { columns: 2; column-gap: 10px; }
 @media (min-width: 560px) { .board { columns: 3; } }
 .pin { break-inside: avoid; display: block; width: 100%; margin: 0 0 10px; padding: 0; border: 0; background: var(--card); border-radius: var(--pin-radius, 10px); overflow: hidden; position: relative; box-shadow: var(--card-shadow); }
-.pin img { width: 100%; height: auto; }
+.pin img { width: 100%; height: auto; -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; pointer-events: none; }
+.pin { -webkit-touch-callout: none; -webkit-user-select: none; user-select: none; }
 .pin-cap { display: block; padding: 7px 10px; font-size: .85rem; text-align: left; color: var(--ink); }
 .viewer-img { width: 100%; max-height: 62vh; object-fit: contain; border-radius: 10px; background: rgba(0,0,0,.2); }
 
@@ -544,3 +545,13 @@ body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
 .unlock .lib-crest { color: var(--accent); margin: 0 auto 4px; }
 .unlock-list { text-align: left; margin: 14px auto 18px; padding-left: 20px; max-width: 290px; line-height: 1.7; }
 .unlock .linkish { display: block; margin: 12px auto 0; }
+
+/* photo boards: dragging (world.js enablePinDrag), uploading, a photo that won't load */
+.pin-ghost { position: fixed; z-index: 40; margin: 0; pointer-events: none; transform: scale(1.05) rotate(-1.5deg); box-shadow: 0 18px 40px rgba(0,0,0,.5); transition: none; }
+.pin-placeholder { opacity: .25; }
+.board.sorting .pin { transition: none; }
+.pin-uploading { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; min-height: 120px; padding: 16px; color: var(--muted); font-size: .9rem; text-align: center; }
+.spin { width: 22px; height: 22px; border-radius: 50%; border: 2.5px solid currentColor; border-right-color: transparent; animation: spin .8s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.add-btn.is-busy { opacity: .55; pointer-events: none; }
+.pin-failed { display: block; padding: 28px 12px; font-size: .85rem; color: var(--muted); text-align: center; }
