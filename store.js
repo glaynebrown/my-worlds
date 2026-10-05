@@ -203,6 +203,13 @@ const Store = (() => {
       const snap = await userDoc().get();
       return snap.exists ? snap.data() : null;
     },
+    // A new account in the App Store app: the free trial (firestore.rules lets
+    // it start only as a trial, and never lets the app change trial/unlocked).
+    async startTrial() {
+      const data = { trial: true, seeded: true, booksPicked: true };
+      await userDoc().set({ ...data, joinedAt: firebase.firestore.FieldValue.serverTimestamp() });
+      return data;
+    },
     // Joining needs the invite code (checked by firestore.rules, not just here).
     async join(invite) {
       const data = { invite, libraryMode: true, joinedAt: firebase.firestore.FieldValue.serverTimestamp() };

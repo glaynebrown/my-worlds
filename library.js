@@ -11,7 +11,8 @@
 const PHOTO_CAP = 500;
 
 // Your account: the original one (not joined by invite, not made from a share).
-const isOwner = () => !!(state.settings && state.settings.seeded && !state.settings.libraryMode && !state.settings.sharedFrom);
+// (Accounts made in the App Store app have settings.trial and are never the owner.)
+const isOwner = () => !!(state.settings && state.settings.seeded && !state.settings.libraryMode && !state.settings.sharedFrom && !state.settings.trial);
 
 function photoCount() {
   return state.items.filter(i => i.photo).length
@@ -19,16 +20,107 @@ function photoCount() {
     + state.worlds.filter(w => w.look && w.look.photo).length
     + state.books.reduce((n, b) => n + (b.cover ? 1 : 0) + (b.map ? 1 : 0) + (b.look && b.look.photo ? 1 : 0), 0);
 }
+// ---------- the free trial (accounts made in the App Store app) ----------
+// 3 worlds, 3 books and 10 photos (card photos and backgrounds count too), then
+// "Unlock everything" ($4.99, once): any number of worlds and books, 250 photos.
+// Accounts from before (your family's) have no trial. settings.trial and
+// settings.unlocked can't be changed from the app (firestore.rules).
+const TRIAL = { worlds: 3, books: 3, photos: 10 };
+const UNLOCKED_PHOTOS = 250;
+const onTrial = () => !!(state.settings && state.settings.trial && !state.settings.unlocked);
+function photoCap() {
+  const s = state.settings || {};
+  if (isOwner() || (DB.demo && !s.trial)) return Infinity;
+  if (s.trial) return s.unlocked ? UNLOCKED_PHOTOS : TRIAL.photos;
+  return PHOTO_CAP;
+}
+// A limit reached on the trial: says so, and offers the unlock. Its message
+// still shows wherever the error lands (a form, a toast).
+function trialLimit(what) {
+  setTimeout(() => showUnlock(what), 50);
+  return new Error(`The free version holds ${what}.`);
+}
+function checkWorldRoom(n = 1) {
+  if (onTrial() && state.worlds.length + n > TRIAL.worlds) throw trialLimit(`${TRIAL.worlds} worlds`);
+}
+function checkBookRoom(n = 1) {
+  if (onTrial() && state.books.length + n > TRIAL.books) throw trialLimit(`${TRIAL.books} books`);
+}
 // Throws a friendly message when adding n photos would pass the limit.
 function checkPhotoRoom(n = 1) {
-  if (isOwner() || DB.demo) return;
+  const cap = photoCap();
+  if (cap === Infinity || !n) return;
   const have = photoCount();
-  if (have + n > PHOTO_CAP) {
-    const left = Math.max(0, PHOTO_CAP - have);
-    throw new Error(left
-      ? `You can add ${left} more photo${left === 1 ? '' : 's'} (the limit is ${PHOTO_CAP}).`
-      : `You’ve reached ${PHOTO_CAP} photos. Delete a few to add more.`);
-  }
+  if (have + n <= cap) return;
+  if (onTrial()) throw trialLimit(`${TRIAL.photos} photos`);
+  const left = Math.max(0, cap - have);
+  throw new Error(left
+    ? `You can add ${left} more photo${left === 1 ? '' : 's'} (the limit is ${cap}).`
+    : `You’ve reached ${cap} photos. Delete a few to add more.`);
+}
+
+// "Unlock everything": the one-time purchase (wired to the App Store in Phase 3).
+function showUnlock(reason) {
+  if ($('.unlock-modal')) return;
+  openModal(`<div class="unlock">
+      <div class="lib-crest" aria-hidden="true">${CREST}</div>
+      <h2>Unlock everything</h2>
+      ${reason ? `<p class="muted small">The free version holds ${esc(reason)}.</p>` : ''}
+      <ul class="unlock-list">
+        <li>As many worlds and books as you like</li>
+        <li>Up to ${UNLOCKED_PHOTOS} photos</li>
+        <li>One time. No subscription, no ads, ever.</li>
+      </ul>
+      <button type="button" class="btn primary block" id="buy">Unlock for $4.99</button>
+      <button type="button" class="linkish" id="restore">Restore purchase</button>
+      <p class="error" id="uerr" hidden></p>
+      <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-close>Not now</button></div></div>`, (root, close) => {
+    const fail = m => { $('#uerr', root).textContent = m; $('#uerr', root).hidden = false; };
+    $('#buy', root).onclick = () => busy($('#buy', root), async () => {
+      if (!DB.buyUnlock) return fail('Purchases work in the App Store app.');
+      if (await DB.buyUnlock()) { close(); toast('Everything’s unlocked. Thank you!'); refresh(); }
+    }, 'Opening the App Store…');
+    $('#restore', root).onclick = () => busy($('#restore', root), async () => {
+      if (!DB.restoreUnlock) return fail('Purchases work in the App Store app.');
+      if (await DB.restoreUnlock()) { close(); toast('Your purchase is restored'); refresh(); } else fail('No purchase found for this Apple ID.');
+    }, 'Checking…');
+  }, 'small-modal unlock-modal');
+}
+
+// ---------- the App Store app's "Add a world": built-in looks, under their own names ----------
+// Tapping a look asks for the world's name (you type it), then makes the world
+// with that look and no tracker yet (set one up in its settings).
+function renderLooksPick() {
+  const looks = Object.entries(Themes.BUILT_IN);
+  view.innerHTML = `<div class="library">
+    <header class="w-head"><a class="back" href="#/">‹ Worlds</a></header>
+    <header class="lib-head"><div class="lib-crest" aria-hidden="true">${CREST}</div>
+      <h1 class="lib-title">Add a world</h1>
+      <p class="lib-sub">Pick a look for its door and pages, or build your own.</p></header>
+    <div class="shelf"><a class="tile add-tile" href="#/new"><span class="plus" aria-hidden="true">+</span><span class="tile-name">Build your own</span></a>
+      ${looks.map(([k, b]) => `<div class="tile pickable" role="button" tabindex="0" data-look="${k}"><span class="tile-art" aria-hidden="true"></span>
+        <span class="tile-name">${esc(b.label)}</span></div>`).join('')}</div>
+  </div>`;
+  $$('[data-look]').forEach(el => {
+    const theme = el.dataset.look;
+    Themes.apply(el, { theme });
+    const pick = () => {
+      try { checkWorldRoom(1); } catch (e) { return; }
+      formModal({
+        title: `${Themes.BUILT_IN[theme].label}`,
+        fields: [{ key: 'name', label: 'Name your world', placeholder: 'The show, movie or series' }],
+        onSave: async v => {
+          if (!v.name) throw new Error('Give your world a name.');
+          checkWorldRoom(1);
+          const order = Math.max(-1, ...state.worlds.map(w => w.order ?? 0)) + 1;
+          const id = await DB.addWorld({ ...neutralWorld({ name: v.name, theme, track: null }, order), canonOn: false });
+          location.hash = `#/w/${id}`;
+        },
+      });
+    };
+    el.onclick = pick;
+    el.onkeydown = e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); pick(); } };
+  });
 }
 
 // Your home-card photos and name colors, for everyone else's new worlds.

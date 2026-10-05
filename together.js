@@ -350,6 +350,7 @@ async function offerJoins() {
 }
 
 async function joinSharedWorld(d, me) {
+  checkWorldRoom(1);
   await DB.joinShared(d.id, me);
   const from = (d.names || {})[d.owner] || '';
   const L = d.look || {};

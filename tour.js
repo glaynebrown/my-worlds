@@ -38,15 +38,35 @@ const TOUR_STEPS = {
     { scene: 'bookNotes', target: '.bnote', text: 'Add notes as you read. Each one gets the date and your page.' },
     { scene: 'bookPhoto', target: '.scan-btn', text: 'No typing needed: take a picture of the page, then drag across the words you want for a quote or a note.' },
     { scene: 'bookReviews', target: '.icon-btn', text: 'Done reading? Copy your notes for Claude, then paste the review it writes back here.' },
-    { scene: 'book', target: '.gear', text: 'Change a book’s look and spine, or start a buddy read and share it with your sister.' },
+    { scene: 'book', target: '.gear', text: `Change a book’s look and spine, or start a buddy read and share it with ${STORE ? 'a friend' : 'your sister'}.` },
     { scene: 'booksHome', target: '.side-flip', flip: true, text: 'Your worlds are on the other side. Tap here anytime to flip over.', bridge: 'Now tap here to flip over to your worlds.' },
   ],
 };
 
 // ---------- the pretend screens ----------
-const TOUR_DOORS = ['avatar', 'hp', 'lotr', 'twd'];
+// Sample content: your family's (family-data.js), or made-up worlds and books
+// in the App Store app.
+const sampleLook = (bg, card, ink, accent, font, spineBg, spineInk) => ({ theme: 'custom', look: { bg, card, ink, accent, font }, spineFont: font, spineBg, spineInk });
+const TOUR_SAMPLE = (self.FAMILY && self.FAMILY.TOUR) || {
+  doors: ['avatar', 'hp', 'lotr', 'twd'],
+  names: { avatar: 'The Four Kingdoms', hp: 'Moonlight Academy', lotr: 'The Ancient Wood', twd: 'After the Fall' },
+  tracks: { avatar: { type: 'episodes', seasons: [20, 20, 21] }, twd: { type: 'episodes', seasons: [6, 13, 16, 16, 16] } },
+  world: { theme: 'avatar', now: 'The Mountain Temple', at: 'Season 1, Episode 3', total: 61 },
+  canon: { theme: 'twd', endAt: 'S5 E1 · The Long Road', ending: 'They walk out of the city together, and nobody else gets left behind.', headcanon: 'Jonah keeps every one of the kids’ drawings in his saddlebag.' },
+  books: [
+    { title: 'The Ember Crown', author: 'Mara Ellis', series: 'The Ember Court', seriesNo: '1', pages: 448, ...sampleLook('#2a1215', '#f6ece2', '#2a1a17', '#c9973f', 'Cinzel', '#5e1820', '#e6c27a') },
+    { title: 'The Smoke Throne', author: 'Mara Ellis', series: 'The Ember Court', seriesNo: '2', pages: 512, ...sampleLook('#1d1a24', '#f1edf6', '#221d2b', '#9a7bc8', 'Cinzel', '#2f2742', '#d9c7f2') },
+    { title: 'The Ash Queen', author: 'Mara Ellis', series: 'The Ember Court', seriesNo: '3', pages: 560, ...sampleLook('#2b2620', '#f3eee6', '#2b2620', '#b0823c', 'Cinzel', '#4a4036', '#efd9a8') },
+    { title: 'Tides of Glass', author: 'June Hartley', pages: 384, ...sampleLook('#d9e8ee', '#fbfdfd', '#1f3a48', '#3d7f99', 'Playfair Display', '#2f6f86', '#f2efe6') },
+    { title: 'Starfall Academy', author: 'Theo Vance', pages: 420, ...sampleLook('#1c1a17', '#ebe3d3', '#231e18', '#7a2e2e', 'IM Fell English SC', '#232a3f', '#e9d9b0') },
+  ],
+  quote: { text: '“Even the dark keeps a little starlight for the ones who look up.”', by: 'Kael to Wren, p. 312' },
+  notes: [['Sep 28', 'p. 112', 'The masked ball!! And the library scene was so creepy.'], ['Sep 30', 'p. 241', 'Not sure how I feel about this bargain.'], ['Oct 2', 'p. 356', 'Kael stealing every scene he’s in.']],
+};
+const TOUR_DOORS = TOUR_SAMPLE.doors;
 function tourWorld(theme) {
-  const s = Themes.STARTERS.find(x => x.theme === theme) || { name: theme, theme };
+  const s = Themes.STARTERS.find(x => x.theme === theme)
+    || { name: (TOUR_SAMPLE.names || {})[theme] || theme, theme, track: (TOUR_SAMPLE.tracks || {})[theme] || { type: 'episodes', seasons: [10] } };
   // Your own door photos if you have that world (or the library's), so it looks like yours.
   const mine = state.worlds.find(w => w.theme === theme);
   const wall = (state.wallpapers || {})[theme] || {};
@@ -57,8 +77,8 @@ function tourWorld(theme) {
     cardShade: mine ? mine.cardShade : wall.shade,
   };
 }
-const TOUR_BOOK_TITLES = ['A Court of Thorns and Roses', 'A Court of Mist and Fury', 'A Court of Wings and Ruin', 'Fourth Wing', 'House of Earth and Blood'];
-const tourBooks = () => TOUR_BOOK_TITLES.map((t, i) => ({ ...(BOOK_STARTERS.find(b => b.title === t) || { title: t }), id: `tour-b${i}` }));
+const tourBooks = () => (TOUR_SAMPLE.books || TOUR_SAMPLE.bookTitles.map(t => BOOK_STARTERS.find(b => b.title === t) || { title: t }))
+  .map((b, i) => ({ ...b, id: `tour-b${i}` }));
 
 const tourHomeHead = (side, sub) => `${homeGearMock()}<header class="lib-head">
     <span class="lib-crest crest-link side-flip"><span class="flip-front">${side === 'worlds' ? CREST : BOOK_CREST}</span></span>
@@ -86,7 +106,7 @@ const TOUR_SCENES = {
   worldsLights(el) { TOUR_SCENES.worldsHome(el); hangDecor($('.library', el), true); },
 
   world(el) {
-    const w = tourWorld('avatar');
+    const w = tourWorld(TOUR_SAMPLE.world.theme);
     Themes.apply(el, w);
     const colors = Themes.info(w).tabColors || {};
     const tabs = [['board', 'Board'], ['quotes', 'Quotes'], ['favs', 'Favorites'], ['canon', 'My Canon'], ['fics', 'Fics'], ['rewatch', 'Rewatch']];
@@ -103,19 +123,20 @@ const TOUR_SCENES = {
         <div class="card rw-hero">
           <span class="rw-round">First watch</span>
           <div class="rw-nav"><span class="rw-arrow">‹</span>
-            <div class="rw-now"><span class="rw-next">The Southern Air Temple</span><span class="muted small">Book One, Episode 3</span></div>
+            <div class="rw-now"><span class="rw-next">${esc(TOUR_SAMPLE.world.now)}</span><span class="muted small">${esc(TOUR_SAMPLE.world.at)}</span></div>
             <span class="rw-arrow">›</span></div>
           <div class="rw-actions"><span class="btn watch-btn">Watched it</span><span class="note-btn">${NOTE_ICON}</span></div>
           <div class="rw-bar"><span style="width:3%"></span></div>
-          <span class="muted small">2 of 61 watched</span>
+          <span class="muted small">2 of ${TOUR_SAMPLE.world.total} watched</span>
         </div>
         <div class="rw-grid">${grid}</div>
       </section></div>`;
   },
 
-  // My Canon on a Walking Dead page: where the story ends, your ending, a headcanon.
+  // My Canon on a sample page: where the story ends, your ending, a headcanon.
   worldCanon(el) {
-    const w = tourWorld('twd');
+    const c = TOUR_SAMPLE.canon;
+    const w = tourWorld(c.theme);
     Themes.apply(el, w);
     const info = Themes.info(w), colors = info.tabColors || {};
     const tabs = [['board', 'Board'], ['quotes', 'Quotes'], ['favs', 'Favorites'], ['canon', 'My Canon'], ['fics', 'Fics'], ['rewatch', 'Rewatch']];
@@ -124,18 +145,18 @@ const TOUR_SCENES = {
       <div class="w-hero"><h1 class="w-title">${esc(w.name)}</h1><div class="w-flourish" aria-hidden="true"></div></div>
       <nav class="w-tabs">${tabs.map(([k, label]) => `<a class="tab-mock" style="${colors[k] ? `--tab:${colors[k]}` : ''}" ${k === 'canon' ? 'aria-current="page"' : ''}>${label}</a>`).join('')}</nav>
       <section class="w-body" style="${colors.canon ? `--tab:${colors.canon}` : ''}">
-        <div class="card canon-end"><div class="the-end"><span class="the-end-word">${esc(info.theEnd || 'The End')}</span><span class="the-end-at">S5 E1 · No Sanctuary</span></div>
-          <div class="ending-text">They walk out of Terminus together, and nobody else gets left behind.</div>
+        <div class="card canon-end"><div class="the-end"><span class="the-end-word">${esc(info.theEnd || 'The End')}</span><span class="the-end-at">${esc(c.endAt)}</span></div>
+          <div class="ending-text">${esc(c.ending)}</div>
           <span class="btn small">Edit my ending</span></div>
         <h2 class="sec-h">Headcanons</h2>
-        <div class="heads"><span class="head card">Daryl keeps every one of the kids’ drawings in his saddlebag.</span></div>
+        <div class="heads"><span class="head card">${esc(c.headcanon)}</span></div>
       </section></div>`;
   },
-  // The Avatar page with the Share pop-up up.
+  // A world page with the Share pop-up up.
   worldShare(el) {
     TOUR_SCENES.world(el);
     const secs = [['Rewatch', true], ['Board', false], ['Quotes', true], ['Favorites', false], ['My Canon', false], ['Fics', false]];
-    el.insertAdjacentHTML('beforeend', `<div class="modal-bg tour-modal"><div class="modal"><h2>Share Avatar: The Last Airbender</h2>
+    el.insertAdjacentHTML('beforeend', `<div class="modal-bg tour-modal"><div class="modal"><h2>Share ${esc(tourWorld(TOUR_SAMPLE.world.theme).name)}</h2>
       <span class="field-label" style="margin-top:12px">What to share</span>
       <div class="share-secs">${secs.map(([l, on]) => `<label class="check"><input type="checkbox" ${on ? 'checked' : ''}><span>${l}</span></label>${l === 'Rewatch' ? '<label class="check sub-check"><input type="checkbox" checked><span>Share watched marks too</span></label>' : ''}`).join('')}</div>
       <label class="field"><span class="field-label">Their email (the one they sign in with)</span><span class="tour-box"></span></label>
@@ -163,7 +184,7 @@ const TOUR_SCENES = {
     const flecks = ['#e2c27a', '#f6ecd4', '#8f1426', '#c9a35a', '#127a70'];
     const bits = Array.from({ length: 26 }, (_, i) => `<span class="tour-fleck" style="left:${(i * 37) % 100}%;top:${(i * 53) % 40 + 4}%;background:${flecks[i % 5]};transform:rotate(${(i * 47) % 180}deg)"></span>`).join('');
     el.insertAdjacentHTML('beforeend', `${bits}<div class="modal-bg tour-modal"><div class="modal small-modal">
-      <h2 class="finish-h">When did you finish <em>A Court of Mist and Fury</em>?</h2>
+      <h2 class="finish-h">When did you finish <em>${esc(tourBooks()[1].title)}</em>?</h2>
       <div class="finish-btns"><span class="btn primary block" data-when="today">Today</span><span class="btn block">Pick a date</span><span class="btn block ghost">I don’t remember</span></div>
       <div class="actions"><span class="spacer"></span><span class="btn">Cancel</span></div></div></div>`);
   },
@@ -186,10 +207,9 @@ const TOUR_SCENES = {
       body = `<div class="card about"><div class="about-top"><span class="about-cover">${coverHtml(b, '', true)}</span>
           <div class="about-info"><span class="about-series">${esc(b.series)} · Book 1&nbsp;›</span>${starsHtml(4.5, 'tour-stars')}<p class="muted small">${b.pages} pages</p></div></div></div>`;
     } else if (tab === 'quotes') {
-      body = `${addBtn('tour-addq', 'Add a quote')}<span class="quote card"><span class="quote-text own-marks">“To the stars who listen, and the dreams that are answered.”</span><span class="quote-by">— Rhysand to Feyre, p. 312</span></span>`;
+      body = `${addBtn('tour-addq', 'Add a quote')}<span class="quote card"><span class="quote-text own-marks">${esc(TOUR_SAMPLE.quote.text)}</span><span class="quote-by">— ${esc(TOUR_SAMPLE.quote.by)}</span></span>`;
     } else if (tab === 'notes') {
-      const notes = [['Sep 28', 'p. 112', 'Tamlin’s masks!! And the Suriel scene was so creepy.'], ['Sep 30', 'p. 241', 'Calanmai… not sure how I feel about this.'], ['Oct 2', 'p. 356', 'Rhysand stealing every scene he’s in.']];
-      body = `${addBtn('tour-addn', 'Add a note')}<div class="bnotes">${notes.map(([d, p, t]) => `<span class="bnote card"><span class="bnote-at">${d} · ${p}</span><span class="bnote-text">${t}</span></span>`).join('')}</div>`;
+      body = `${addBtn('tour-addn', 'Add a note')}<div class="bnotes">${TOUR_SAMPLE.notes.map(([d, p, t]) => `<span class="bnote card"><span class="bnote-at">${esc(d)} · ${esc(p)}</span><span class="bnote-text">${esc(t)}</span></span>`).join('')}</div>`;
     } else {
       const card = (title, tag) => `<div class="card review"><div class="rv-head"><h3 class="rv-title">${title}</h3><span class="tag">${tag}</span></div>
           <p class="muted small">Not written yet.</p><div class="row-btns"><span class="btn small icon-btn">${COPY_ICON}</span><span class="btn small">Write it myself</span></div></div>`;

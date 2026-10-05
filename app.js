@@ -202,7 +202,7 @@ function wireFlip(to) {
   };
 }
 // The bottom of both sides' gear menus: your name, sign out, delete.
-const accountRows = nick => `<button class="btn block ghost name-row" id="nick"><span class="muted small">Your name</span><span>${esc(nick || 'Add your name')}</span></button>
+const accountRows = nick => `${onTrial() ? '<button class="btn block primary" id="m-unlock">Unlock everything</button>' : ''}<button class="btn block ghost name-row" id="nick"><span class="muted small">Your name</span><span>${esc(nick || 'Add your name')}</span></button>
   <button class="btn block ghost" id="m-backup">Backup &amp; restore</button>
   <button class="btn block ghost" id="out">Sign out</button>
   <button class="linkish danger-text" id="gone">Delete my account</button>`;
@@ -211,6 +211,7 @@ function wireAccount(root, close, keeps) {
   $('#gone', root).onclick = () => { close(); deleteAccountFlow(); };
   $('#nick', root).onclick = () => { close(); nicknameForm(); };
   $('#m-backup', root).onclick = () => { close(); backupMenu(); }; // backup.js
+  if ($('#m-unlock', root)) $('#m-unlock', root).onclick = () => { close(); showUnlock(); }; // library.js
 }
 
 const THEME_COLOR = { library: '#16110e', avatar: '#efe3c8', twd: '#1f1e1a', hp: '#1a120c', disney: '#171a3d', lotr: '#121812', narnia: '#16222f', got: '#14161a', firefly: '#141a26', tlou: '#1b211c', potc: '#0f1f26' };
@@ -274,8 +275,8 @@ function route() {
   if (page !== 'new') wishToOpen = null;
   if (page === 'new') return renderWorldForm(null);
   if (page === 'wishlist') return renderWishlist();
-  if (page === 'share') return renderShare();
-  if (page === 'library') return renderLibraryPick();
+  if (page === 'share' && !STORE) return renderShare();
+  if (page === 'library') return STORE && !isOnboarding() ? renderLooksPick() : renderLibraryPick();
   if (page === 'start') return renderStart();
   renderLibrary();
 }
@@ -329,7 +330,9 @@ async function openAccount(user) {
     if (!user) return route();
     route();
     try { state.settings = await DB.loadSettings(); } catch (e) { console.error(e); toast(friendlyError(e), true); state.settings = {}; }
-    // A login that hasn't joined yet needs the invite code once.
+    // A brand-new login: in the App Store app it starts the free trial; on the
+    // website it needs the invite code once.
+    if (state.settings === null && STORE) state.settings = await DB.startTrial().catch(e => { console.error(e); return null; });
     if (state.settings === null) {
       const code = savedInvite();
       state.settings = code ? await DB.join(code).catch(() => null) : null;
@@ -351,6 +354,7 @@ async function openAccount(user) {
         setTimeout(savePhotosForOffline, 3000);
         state.loaded = true;
         setTimeout(uploadWaitingPhotos, 2000);
+        setTimeout(keepEpisodeTitles, 4000);
         firstRun();
         route();
         setTimeout(assignOrnaments, 2500); // books.js: save a spine design on older books
@@ -371,6 +375,7 @@ async function openAccount(user) {
 // over the built-in starters.
 async function firstRun() {
   const s = state.settings;
+  if (STORE) return; // the App Store app starts empty: no built-in worlds or books
   if (!s.seeded && !state.worlds.length && DB.loadShare) {
     const share = await DB.loadShare().catch(e => { console.error(e); return null; });
     if (share) return importShare(share);
@@ -386,15 +391,35 @@ async function firstRun() {
   }
 }
 
+// Built-in episode titles (family-data.js) become each world's own
+// (track.titles), so the App Store app, which doesn't carry them, still shows
+// them. Only for worlds that don't have titles of their own yet.
+async function keepEpisodeTitles() {
+  if (STORE || !self.FAMILY || DB.demo) return;
+  for (const w of state.worlds) {
+    const names = self.FAMILY.EPISODE_TITLES[w.theme];
+    const shared = !!(w.sharedId && sectionShared(w, 'rewatch'));
+    if (shared && !(state.shared[w.sharedId] && state.shared[w.sharedId].doc && !state.shared[w.sharedId].doc.gone)) continue;
+    const track = shared ? withShared(w).track : w.track;
+    if (!names || !track || track.type !== 'episodes' || (track.titles && track.titles.some(Boolean))) continue;
+    if (names.length !== track.seasons.length || !names.every((ss, k) => ss.length === track.seasons[k])) continue;
+    const titles = names.flat();
+    try {
+      if (shared) await DB.updateShared(w.sharedId, { 'track.titles': titles });
+      else await DB.updateWorld(w, { 'track.titles': titles });
+    } catch (e) { console.warn('Episode titles not saved for', w.name, e); }
+  }
+}
+
 // The built-in worlds (themes.js STARTERS). The first sign-in gets all of
-// them; a built-in added later (like Lord of the Rings) shows up once in an
+// them; a built-in added later shows up once in an
 // existing account. settings.seededThemes remembers which were given, so one
 // you delete doesn't come back.
 let seeding = false;
 async function seedStarters() {
   if (seeding) return;
   const s = state.settings;
-  if (s.libraryMode) return; // they add built-in worlds from the Library instead
+  if (s.libraryMode || s.trial || STORE) return; // the Library instead (or the App Store app: no built-ins)
   const given = s.seededThemes || (s.seeded || state.worlds.length ? ['avatar', 'twd', 'hp'] : []);
   const todo = Themes.STARTERS.map((w, i) => [w, i]).filter(([w]) => !given.includes(w.theme) && !state.worlds.some(x => x.theme === w.theme));
   if (!todo.length && s.seededThemes) return;
@@ -442,7 +467,7 @@ function renderLogin() {
     <p class="error" id="err" hidden></p>
     <button class="btn primary block" style="margin-top:18px">Enter</button>
     <p class="center" style="margin-top:14px"><a class="small muted" href="#/reset">Forgot password?</a></p>
-    ${savedInvite() ? '<p class="center" style="margin-top:22px"><a class="btn block" href="#/signup">New here? Create an account</a></p>' : ''}</form>`);
+    ${STORE || savedInvite() ? '<p class="center" style="margin-top:22px"><a class="btn block" href="#/signup">New here? Create an account</a></p>' : ''}</form>`);
   $('#f').onsubmit = e => {
     e.preventDefault();
     const email = $('#email').value.trim(), pw = $('#pw').value, err = $('#err');
@@ -459,19 +484,19 @@ function renderSignup() {
     <p class="muted small">Make your own account. Everything you add stays private to you.</p>
     <label class="field"><span class="field-label">Email</span><input type="email" id="email" autocomplete="username"></label>
     <label class="field"><span class="field-label">Password (at least 6 characters)</span><input type="password" id="pw" autocomplete="new-password"></label>
-    <label class="field"><span class="field-label">Invite code</span><input id="code" value="${esc(savedInvite())}" autocapitalize="off" autocomplete="off"></label>
+    ${STORE ? '' : `<label class="field"><span class="field-label">Invite code</span><input id="code" value="${esc(savedInvite())}" autocapitalize="off" autocomplete="off"></label>`}
     <p class="error" id="err" hidden></p>
     <button class="btn primary block" style="margin-top:18px">Create account</button>
     <p class="center" style="margin-top:14px"><a class="small muted" href="#/login">I already have an account</a></p></form>`);
   $('#f').onsubmit = e => {
     e.preventDefault();
-    const email = $('#email').value.trim(), pw = $('#pw').value, code = $('#code').value.trim(), err = $('#err');
+    const email = $('#email').value.trim(), pw = $('#pw').value, code = STORE ? '' : $('#code').value.trim(), err = $('#err');
     const fail = msg => { err.textContent = msg; err.hidden = false; };
-    if (!email || !pw || !code) return fail('Fill in your email, a password and the invite code.');
+    if (!email || !pw || (!STORE && !code)) return fail(STORE ? 'Fill in your email and a password.' : 'Fill in your email, a password and the invite code.');
     if (pw.length < 6) return fail('Pick a password with at least 6 characters.');
     err.hidden = true;
     busy($('button', e.target), async () => {
-      try { localStorage.setItem('fw-invite', code); } catch {}
+      if (code) try { localStorage.setItem('fw-invite', code); } catch {}
       try {
         await DB.createAccount(email, pw);
         location.hash = '#/';
@@ -542,7 +567,7 @@ function renderLibrary() {
       <h1 class="lib-title">My Worlds</h1><p class="lib-sub">Pick a door and step inside — there’s no knowing where you might be swept off to.</p></header>
     <div class="shelf">${worlds.map(tileHtml).join('')}</div>
     ${worlds.length ? '' : `<div class="side-empty"><p class="empty">No worlds yet</p>
-      <div class="side-empty-btns"><a class="btn" href="#/library">Browse the library</a><a class="btn ghost" href="#/new">Build your own</a></div></div>`}</div>`;
+      <div class="side-empty-btns"><a class="btn" href="#/library">${STORE ? 'Add a world' : 'Browse the library'}</a><a class="btn ghost" href="#/new">Build your own</a></div></div>`}</div>`;
   // Each tile wears its own world's look.
   $$('.tile[data-world]', view).forEach(el => {
     const w = worldById(el.dataset.world);
@@ -905,7 +930,7 @@ function renderWorldForm(world) {
     <header class="w-head"><a class="back" href="${isNew ? '#/' : `#/w/${world.id}`}">‹ ${isNew ? 'Worlds' : 'Back'}</a></header>
     <h1 class="w-title small-title">${isNew ? 'Add a world' : 'World settings'}</h1>
     <form id="wf" novalidate class="card form-card">
-      <label class="field"><span class="field-label">Name</span><input id="name" value="${esc(world ? world.name : (fromWish && fromWish.text) || '')}" placeholder="Narnia, Bridgerton, Star Wars…"></label>
+      <label class="field"><span class="field-label">Name</span><input id="name" value="${esc(world ? world.name : (fromWish && fromWish.text) || '')}" placeholder="The show, movie or series"></label>
       ${lookHtml}
       ${isNew ? '' : `<h2 class="form-h">Home page card</h2>
       <div class="card-pick">
@@ -1058,6 +1083,7 @@ function renderWorldForm(world) {
     busy($('#save'), async () => {
       const name = $('#name').value.trim();
       if (!name) throw new Error('Give your world a name.');
+      if (isNew) checkWorldRoom(1);
       const track = lockTrack ? withShared(world).track : readTrack(root, world && withShared(world).track);
       checkPhotoRoom((prepared && !(look.photo) ? 1 : 0) + (cardPrepared && !(world && world.cardPhoto) ? 1 : 0));
       const canonPicked = Object.fromEntries($$('[data-part]', root).map(c => [c.dataset.part, c.checked]));

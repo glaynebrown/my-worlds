@@ -21,6 +21,16 @@ doors and books, a glowing spot, an arrow and an info bubble). Everyone sees
 both sides' tours once (settings.tourSeen), starting with the side they're on;
 after that, "Take the tour" in each side's gear menu replays that side.
 
+**Two editions, one app** (edition.js): the website is the "family" edition
+(built-in looks under their show names, starter worlds and books, the invite
+code). The App Store app is the "store" edition: generic look names ("Candlelit
+castle", "Four elements", …), open sign-up, and a free trial (3 worlds, 3 books,
+10 photos) before "Unlock everything" ($4.99 once: unlimited worlds and books,
+250 photos; library.js). Same Firebase and logins, so family accounts (made
+before the trial existed) are never limited. All show and book names, episode
+titles, starters and the tour's family samples live in family-data.js, which
+the App Store build leaves out. Preview the store edition: add ?edition=store.
+
 **Backup & restore** (backup.js; gear menu on both sides): "Download my data"
 saves one .zip on the phone (backup.json, a readable "My Worlds.html", and
 photos/ if "Include photos" is ticked). Nothing goes to Firebase. "Restore from
@@ -88,7 +98,7 @@ S5 E1, Zutara is on the Avatar ships list, Daryl/Rick/Glenn/Maggie are TWD favor
 
 ## Site files (upload these to GitHub)
 
-index.html, styles.css, themes.css, books.css, tour.css, decor.css, themes.js, app.js, world.js, share.js, library.js, together.js, books.js, tour.js, scan.js, decor.js, fx.js, backup.js, store.js,
+index.html, styles.css, themes.css, books.css, tour.css, decor.css, edition.js, family-data.js, themes.js, app.js, world.js, share.js, library.js, together.js, books.js, tour.js, scan.js, decor.js, fx.js, backup.js, store.js,
 demo.js, photos.js, firebase-config.js, sw.js, manifest.json,
 icon-192.png, icon-512.png, apple-touch-icon.png
 

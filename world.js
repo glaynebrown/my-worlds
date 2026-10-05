@@ -12,7 +12,7 @@ const worldHref = w => `${w._book ? '#/b/' : '#/w/'}${w.id}`;
 const byNewest = (a, b) => (b.t || 0) - (a.t || 0);
 const byOldest = (a, b) => (a.t || 0) - (b.t || 0);
 const empty = (world, text) => `<p class="empty">${esc(text || Themes.info(world).empty)}</p>`;
-// Who said it, and to whom: "Rhysand to Feyre" (either part can be blank).
+// Who said it, and to whom: "Kael to Wren" (either part can be blank).
 const saidLine = q => (q.who && q.to ? `${q.who} to ${q.to}` : q.who || (q.to ? `To ${q.to}` : ''));
 // A quote that already has its own quote marks (typed, or from a photo) doesn't get a second pair.
 const quoteCls = t => (/^\s*["“„'‘]/.test(t || '') && /["”'’]\s*$/.test(t || '') ? 'quote-text own-marks' : 'quote-text');
@@ -131,7 +131,7 @@ function quoteForm(world, q) {
     values: q || {},
     fields: [
       { key: 'text', label: 'Quote', type: 'textarea' },
-      { key: 'who', label: 'Who said it', placeholder: world.theme === 'twd' ? 'Daryl' : '' },
+      { key: 'who', label: 'Who said it', placeholder: '' },
       { key: 'to', label: 'Said to (optional)', placeholder: world.theme === 'twd' ? 'Carol' : '' },
       { key: 'where', label: 'Where (optional)', placeholder: world.track && world.track.type === 'list' ? 'Which film' : 'S2 E5' },
     ],
@@ -228,7 +228,7 @@ function shipForm(world, s) {
     title: s ? `Edit ${s.name}` : 'Add a ship',
     values: s || {},
     fields: [
-      { key: 'name', label: 'Ship name', placeholder: 'Zutara' },
+      { key: 'name', label: 'Ship name', placeholder: (self.FAMILY && self.FAMILY.SHIP_HINT) || 'Your two favorites' },
       { key: 'colors', label: 'Colors', type: 'colors', palette: Themes.palette(world) },
       { key: 'note', label: 'Notes (optional)', type: 'textarea', placeholder: 'Endgame.' },
     ],
@@ -431,7 +431,7 @@ function epNoteForm(world, step, note) {
   });
 }
 
-// Folded Disney-style sections, remembered on this phone only.
+// Folded list sections, remembered on this phone only.
 function foldedSections(worldId) {
   try { return (JSON.parse(localStorage.getItem('fw-folded') || '{}')[worldId]) || []; } catch { return []; }
 }

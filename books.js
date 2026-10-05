@@ -67,7 +67,7 @@ const lookOf = b => ({ ...Themes.BOOK_PRESETS[0], ...(b.look || {}) });
 const seriesKey = b => (b.series || '').trim().toLowerCase();
 // A series' short name, for a shelf plate too short for the full one (series page:
 // "Short name for the shelf"). Kept in settings.seriesShort by series; '' = none.
-const SERIES_SHORT = { 'a court of thorns and roses': 'ACOTAR', 'the lord of the rings': 'LOTR' };
+const SERIES_SHORT = (self.FAMILY && self.FAMILY.SERIES_SHORT) || {};
 const seriesShortOf = key => { const mine = (state.settings && state.settings.seriesShort) || {}; return key in mine ? mine[key] : SERIES_SHORT[key] || ''; };
 const titleKey = t => (t || '').toLowerCase().replace(/^(the|a|an)\s+/, '');
 const authorKey = a => { const p = (a || '').split(',')[0].trim().split(/\s+/); return `${p.pop() || ''} ${p.join(' ')}`.toLowerCase(); };
@@ -285,7 +285,7 @@ async function assignOrnaments() {
   if (ornamentsAssigned || !state.books.length) return;
   ornamentsAssigned = true;
   for (const b of state.books.filter(x => !ORN_IDS.includes(x.spineOrn))) await DB.updateBook(b, { spineOrn: ornOf(b) }).catch(() => {});
-  // Books meant for a world (like the Tolkien starters) get linked once that world is there.
+  // Books meant for a world (some starters) get linked once that world is there.
   for (const b of state.books.filter(x => x.worldTheme && !x.worldId)) {
     const w = state.worlds.find(x => x.theme === b.worldTheme);
     if (w) await DB.updateBook(b, { worldId: w.id }).catch(() => {});
@@ -1029,7 +1029,7 @@ function renderBooks() {
     <div class="bookcase${arranging ? ' arranging' : ''}" id="case">${shelvesOf().map(caseHtml).join('')}</div>
     ${arranging ? `<div class="arrange-bar"><span>Drag the pots, vines and books. Tap a plant to change or remove it.</span><button class="btn primary" id="adone">Done</button></div>` : ''}
     ${state.books.length ? '' : `<div class="side-empty"><p class="empty">No books yet</p>
-      <div class="side-empty-btns">${isOwner() ? '' : '<a class="btn" href="#/books/pick">Browse the library</a>'}<button class="btn ghost" id="e-add">Add a book</button></div></div>`}
+      <div class="side-empty-btns">${isOwner() || (state.settings && state.settings.trial) ? '' : '<a class="btn" href="#/books/pick">Browse the library</a>'}<button class="btn ghost" id="e-add">Add a book</button></div></div>`}
   </div>`;
 
   const addBook = () => { newBookShelf = hasShelf('reading') ? 'reading' : shelvesOf()[0].id; location.hash = '#/books/new'; };
@@ -2203,6 +2203,7 @@ function renderBookForm(book) {
       };
       if (coverMode === 'found') Object.assign(data, { coverUrl: found.url, coverThumb: found.thumb });
       if (coverMode === 'none' || coverMode === 'upload') Object.assign(data, { coverUrl: '', coverThumb: '' });
+      if (isNew) checkBookRoom(1);
       checkPhotoRoom((coverMode === 'upload' && !b.cover ? 1 : 0) + (lookPrepared && !look.photo ? 1 : 0));
       if (isNew) {
         const onShelf = state.books.filter(x => shelfOf(x) === c.shelf);
@@ -2375,6 +2376,7 @@ function offerBuddyRead(d) {
 }
 
 async function joinBuddyRead(d, me, shelf) {
+  checkBookRoom(1);
   await DB.joinShared(d.id, me);
   const B = d.book || {};
   const sec = d.sections || {};
@@ -2403,153 +2405,8 @@ async function joinBuddyRead(d, me, shelf) {
 // reviews. Everyone else picks from it the first time they sign in
 // (#/books/pick) and from "From the library" on Add a book after that.
 
-// The three books your bookcase starts with (added once, to your account only).
-const BOOK_STARTERS = [
-  {
-    title: 'A Court of Thorns and Roses', author: 'Sarah J. Maas', series: 'A Court of Thorns and Roses', seriesNo: '1', pages: 419,
-    coverUrl: 'https://covers.openlibrary.org/b/id/15102579-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/15102579-M.jpg',
-    blurb: 'When nineteen-year-old huntress Feyre kills a wolf in the woods, a beastly creature comes to demand a life for a life and carries her off to Prythian, the land of the faeries. Her captor isn’t what he seems, and the shadow spreading over the faerie lands may soon reach them all.',
-    theme: 'custom', look: { bg: '#2a1418', card: '#fbf1ee', ink: '#2e1a1c', accent: '#b3263a', font: 'Cinzel' },
-    spineFont: 'Cinzel', spineInk: '#f3e3c3', spineBg: '#8f1426', spineOrn: 'rose',
-  },
-  // The rest of A Court of Thorns and Roses (each spine the color of its cover).
-  {
-    title: 'A Court of Mist and Fury', author: 'Sarah J. Maas', series: 'A Court of Thorns and Roses', seriesNo: '2', pages: 626,
-    coverUrl: 'https://covers.openlibrary.org/b/id/13802801-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/13802801-M.jpg',
-    blurb: 'Feyre survived Under the Mountain, but she can’t shake what it cost her. As she struggles with the darkness she carried home, a bargain she once made pulls her to the Night Court and its High Lord, Rhysand, just as a threat from across the sea begins to stir.',
-    theme: 'custom', look: { bg: '#2a1418', card: '#fbf1ee', ink: '#2e1a1c', accent: '#b3263a', font: 'Cinzel' },
-    spineFont: 'Cinzel', spineInk: '#f3e3c3', spineBg: '#127a70', spineOrn: 'rose',
-  },
-  {
-    title: 'A Court of Wings and Ruin', author: 'Sarah J. Maas', series: 'A Court of Thorns and Roses', seriesNo: '3', pages: 720,
-    coverUrl: 'https://covers.openlibrary.org/b/id/15102352-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/15102352-M.jpg',
-    blurb: 'War is coming to Prythian. Feyre plays a dangerous game behind enemy lines while the High Lords must decide whose side they’re on before the King of Hybern’s armies arrive.',
-    theme: 'custom', look: { bg: '#2a1418', card: '#fbf1ee', ink: '#2e1a1c', accent: '#b3263a', font: 'Cinzel' },
-    spineFont: 'Cinzel', spineInk: '#f3e3c3', spineBg: '#9c2668', spineOrn: 'rose',
-  },
-  {
-    title: 'A Court of Frost and Starlight', author: 'Sarah J. Maas', series: 'A Court of Thorns and Roses', seriesNo: '3.5', pages: 259,
-    coverUrl: 'https://covers.openlibrary.org/b/id/14348662-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/14348662-M.jpg',
-    blurb: 'A short winter story set after the war: Feyre and her friends rebuild their city and celebrate the Winter Solstice, while old wounds quietly come to the surface.',
-    theme: 'custom', look: { bg: '#2a1418', card: '#fbf1ee', ink: '#2e1a1c', accent: '#b3263a', font: 'Cinzel' },
-    spineFont: 'Cinzel', spineInk: '#f3e3c3', spineBg: '#1f7fae', spineOrn: 'rose',
-  },
-  {
-    title: 'A Court of Silver Flames', author: 'Sarah J. Maas', series: 'A Court of Thorns and Roses', seriesNo: '4', pages: 768,
-    coverUrl: 'https://covers.openlibrary.org/b/id/13316179-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/13316179-M.jpg',
-    blurb: 'Nesta Archeron has been spiraling since the war: drinking, fighting, shutting everyone out. Sent to train with the warrior Cassian, she finds something she never expected, just as a new danger rises that could undo everything they fought for.',
-    theme: 'custom', look: { bg: '#2a1418', card: '#fbf1ee', ink: '#2e1a1c', accent: '#b3263a', font: 'Cinzel' },
-    spineFont: 'Cinzel', spineInk: '#f3e3c3', spineBg: '#c45a14', spineOrn: 'rose',
-  },
-  // Rebel of the Sands (desert, gunslingers and djinni).
-  {
-    title: 'Rebel of the Sands', author: 'Alwyn Hamilton', series: 'Rebel of the Sands', seriesNo: '1', pages: 314,
-    coverUrl: 'https://covers.openlibrary.org/b/id/8458747-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/8458747-M.jpg',
-    blurb: 'Amani Al’Hiza is a sharpshooter stuck in a dead-end desert town with no future. Desperate to get out, she enters a shooting contest, meets Jin, a mysterious foreigner on the run, and is swept across a desert full of djinni, magic and rebellion against the Sultan.',
-    theme: 'custom', look: { bg: '#2e1c12', card: '#f6ead6', ink: '#33200f', accent: '#d07a2a', font: 'Rye' },
-    spineFont: 'Rye', spineInk: '#f2d9a6', spineBg: '#5a2416', spineOrn: 'sun',
-  },
-  {
-    title: 'Traitor to the Throne', author: 'Alwyn Hamilton', series: 'Rebel of the Sands', seriesNo: '2', pages: 518,
-    coverUrl: 'https://covers.openlibrary.org/b/id/8738907-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/8738907-M.jpg',
-    blurb: 'Amani has become a legend of the rebellion. When a mission goes wrong and she lands inside the Sultan’s palace, she has to spy from within its walls, and starts to learn the Sultan may not be the villain she thought.',
-    theme: 'custom', look: { bg: '#2e1c12', card: '#f6ead6', ink: '#33200f', accent: '#d07a2a', font: 'Rye' },
-    spineFont: 'Rye', spineInk: '#f2d9a6', spineBg: '#8a5a2b', spineOrn: 'sun',
-  },
-  {
-    title: 'Hero at the Fall', author: 'Alwyn Hamilton', series: 'Rebel of the Sands', seriesNo: '3', pages: 466,
-    coverUrl: 'https://covers.openlibrary.org/b/id/8798051-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/8798051-M.jpg',
-    blurb: 'The rebellion has been shattered, and it falls to Amani to lead what’s left of it. To save the people she loves and the desert she calls home, she has to face the Sultan one last time, and decide what she’s willing to lose to win.',
-    theme: 'custom', look: { bg: '#2e1c12', card: '#f6ead6', ink: '#33200f', accent: '#d07a2a', font: 'Rye' },
-    spineFont: 'Rye', spineInk: '#f2d9a6', spineBg: '#3d2f4a', spineOrn: 'sun',
-  },
-  {
-    title: 'The 100', author: 'Kass Morgan', series: 'The 100', seriesNo: '1', pages: 323,
-    coverUrl: 'https://covers.openlibrary.org/b/id/9257624-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/9257624-M.jpg',
-    blurb: 'Centuries after nuclear war drove humanity into space, a hundred teenage prisoners are sent down to Earth to find out whether it can be lived on again. Clarke, Wells, Bellamy and Glass each carry secrets of their own, and as the hundred fight to survive on a planet no one has seen in three hundred years, those secrets threaten to tear them apart.',
-    theme: 'custom', look: { bg: '#0b0d17', card: '#1a1d30', ink: '#e7e9f3', accent: '#5fc4e8', font: 'Orbitron' },
-    spineFont: 'Orbitron', spineInk: '#e8edf2', spineBg: '#16181d', spineOrn: 'star',
-  },
-  // The rest of The 100 (each spine the color of its cover).
-  {
-    title: 'Day 21', author: 'Kass Morgan', series: 'The 100', seriesNo: '2', pages: 320,
-    coverUrl: 'https://covers.openlibrary.org/b/id/8999988-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/8999988-M.jpg',
-    blurb: 'Twenty-one days after landing, the hundred are still fighting to survive, and when one of them goes missing they start to suspect they aren’t alone on Earth. Up on the Colony, Glass and Luke race against an air supply that is running out.',
-    theme: 'custom', look: { bg: '#0b0d17', card: '#1a1d30', ink: '#e7e9f3', accent: '#5fc4e8', font: 'Orbitron' },
-    spineFont: 'Orbitron', spineInk: '#1d2328', spineBg: '#b9c6cc', spineOrn: 'star',
-  },
-  {
-    title: 'Homecoming', author: 'Kass Morgan', series: 'The 100', seriesNo: '3', pages: 352,
-    coverUrl: 'https://covers.openlibrary.org/b/id/10372364-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/10372364-M.jpg',
-    blurb: 'Ships from the Colony finally reach the ground, but the reunion is anything but peaceful. As the newcomers try to take charge, Clarke, Wells and Bellamy have to decide who they can trust, while Earth’s other survivors make a move of their own.',
-    theme: 'custom', look: { bg: '#0b0d17', card: '#1a1d30', ink: '#e7e9f3', accent: '#5fc4e8', font: 'Orbitron' },
-    spineFont: 'Orbitron', spineInk: '#e8edf2', spineBg: '#3a3029', spineOrn: 'star',
-  },
-  {
-    title: 'Rebellion', author: 'Kass Morgan', series: 'The 100', seriesNo: '4', pages: 305,
-    coverUrl: 'https://covers.openlibrary.org/b/id/8453489-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/8453489-M.jpg',
-    blurb: 'The hundred have finally made a home on Earth, until strangers attack the camp and carry some of them off. Clarke and Bellamy set out to bring their friends back and find a group with its own plans for the land and everyone on it.',
-    theme: 'custom', look: { bg: '#0b0d17', card: '#1a1d30', ink: '#e7e9f3', accent: '#5fc4e8', font: 'Orbitron' },
-    spineFont: 'Orbitron', spineInk: '#e8edf2', spineBg: '#4a5a3c', spineOrn: 'star',
-  },
-  // The Lord of the Rings and The Hobbit (the black ring editions; linked to the Lord of the Rings world).
-  {
-    title: 'The Hobbit', author: 'J.R.R. Tolkien', series: '', seriesNo: '', pages: 300,
-    coverUrl: 'https://covers.openlibrary.org/b/id/14624642-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/14624642-M.jpg',
-    blurb: 'Bilbo Baggins is a comfortable, unadventurous hobbit, until the wizard Gandalf and thirteen dwarves turn up at his door. Swept off on a quest to win back the dwarves’ treasure from the dragon Smaug, he finds trolls, goblins, giant spiders, a strange creature named Gollum, and a small gold ring that will change everything.',
-    theme: 'lotr', worldTheme: 'lotr',
-    spineFont: 'Cinzel', spineInk: '#d9a83a', spineBg: '#17150f', spineOrn: 'dragon',
-  },
-  {
-    title: 'The Fellowship of the Ring', author: 'J.R.R. Tolkien', series: 'The Lord of the Rings', seriesNo: '1', pages: 432,
-    coverUrl: 'https://covers.openlibrary.org/b/id/15173637-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/15173637-M.jpg',
-    blurb: 'The ring Bilbo found turns out to be the One Ring of the Dark Lord Sauron. Frodo Baggins inherits it, and with eight companions sets out on a desperate journey to destroy it in the fires of Mount Doom before Sauron can reclaim it.',
-    theme: 'lotr', worldTheme: 'lotr',
-    spineFont: 'Cinzel', spineInk: '#d9a83a', spineBg: '#17150f', spineOrn: 'leaf',
-  },
-  {
-    title: 'The Two Towers', author: 'J.R.R. Tolkien', series: 'The Lord of the Rings', seriesNo: '2', pages: 352,
-    coverUrl: 'https://covers.openlibrary.org/b/id/14349269-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/14349269-M.jpg',
-    blurb: 'The Fellowship is broken. While Aragorn, Legolas and Gimli chase the orcs who took their friends and are drawn into the war for Rohan, Frodo and Sam push on toward Mordor with a treacherous guide: Gollum.',
-    theme: 'lotr', worldTheme: 'lotr',
-    spineFont: 'Cinzel', spineInk: '#d6453b', spineBg: '#17150f', spineOrn: 'leaf',
-  },
-  {
-    title: 'The Return of the King', author: 'J.R.R. Tolkien', series: 'The Lord of the Rings', seriesNo: '3', pages: 416,
-    coverUrl: 'https://covers.openlibrary.org/b/isbn/9780547928197-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/isbn/9780547928197-M.jpg',
-    blurb: 'The war for Middle-earth reaches its end. As the armies of the West make their last stand against Sauron, Frodo and Sam take the final, hardest steps into Mordor carrying the Ring.',
-    theme: 'lotr', worldTheme: 'lotr',
-    spineFont: 'Cinzel', spineInk: '#6cb36c', spineBg: '#17150f', spineOrn: 'leaf',
-  },
-  {
-    title: 'Fourth Wing', author: 'Rebecca Yarros', series: 'The Empyrean', seriesNo: '1', pages: 518,
-    coverUrl: 'https://covers.openlibrary.org/b/id/14407898-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/14407898-M.jpg',
-    blurb: 'Violet Sorrengail expected a quiet life as a scribe, until her mother, the commanding general, orders her into Basgiath War College to train as a dragon rider. Smaller and more fragile than the other cadets, Violet has to outthink her rivals, earn a dragon’s bond, and survive Xaden Riorson, a wingleader with every reason to want her dead.',
-    theme: 'custom', look: { bg: '#e6d7b5', card: '#fbf4e2', ink: '#3a2c1b', accent: '#8c5a2b', font: 'Uncial Antiqua' },
-    spineFont: 'Uncial Antiqua', spineInk: '#2b2118', spineBg: '#e9dcc0', spineOrn: 'dragon',
-  },
-  {
-    title: 'House of Earth and Blood', author: 'Sarah J. Maas', series: 'Crescent City', seriesNo: '1', pages: 803,
-    coverUrl: 'https://covers.openlibrary.org/b/id/9289603-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/9289603-M.jpg',
-    blurb: 'Bryce Quinlan’s life in Crescent City is all late nights and half-Fae charm, until a demon murders her closest friends. Two years later the killings start again, and Bryce is forced to team up with Hunt Athalar, a fallen angel bound to serve the city’s rulers, to find the killer before the whole city burns.',
-    theme: 'custom', look: { bg: '#1a1020', card: '#f7f1ee', ink: '#2a1a22', accent: '#c8281e', font: 'Playfair Display' },
-    spineFont: 'Playfair Display', spineInk: '#b5121b', spineBg: '#f2ede6', spineOrn: 'moon',
-  },
-  {
-    title: 'One Dark Window', author: 'Rachel Gillig', series: 'The Shepherd King', seriesNo: '1', pages: 400,
-    coverUrl: 'https://covers.openlibrary.org/b/id/12431959-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/12431959-M.jpg',
-    blurb: 'Elspeth Spindle shares her head with an ancient, unpredictable spirit she calls the Nightmare. He keeps her safe and keeps her secrets, but magic always has a price. When she crosses paths with a mysterious highwayman on the forest road, she is pulled into a dangerous quest to rid her mist-bound kingdom of its dark magic, just as the Nightmare begins to take over her mind.',
-    theme: 'custom', look: { bg: '#1c2421', card: '#eef0ea', ink: '#1e2622', accent: '#a3272b', font: 'IM Fell English SC' },
-    spineFont: 'IM Fell English SC', spineInk: '#d8cfb4', spineBg: '#26332e', spineOrn: 'branches',
-  },
-  {
-    title: 'The Ever King', author: 'L.J. Andrews', series: 'The Ever Seas', seriesNo: '1', pages: 480,
-    coverUrl: 'https://covers.openlibrary.org/b/id/15259740-L.jpg', coverThumb: 'https://covers.openlibrary.org/b/id/15259740-M.jpg',
-    blurb: 'Princess Livia Ferus accidentally breaks open the magical barrier on the sea, setting free Erik Bloodsinger, the feared pirate king of the Ever. He takes her captive to use against her father, but the two share a childhood secret, matching magical marks, and a pull neither of them can ignore. Pirates, sea fae and old hatreds, ending on a cliffhanger.',
-    theme: 'custom', look: { bg: '#0f2f30', card: '#f1f4ef', ink: '#16292a', accent: '#c49a45', font: 'Cinzel' },
-    spineFont: 'Cinzel', spineInk: '#e2c27a', spineBg: '#14504f', spineOrn: 'sword',
-  },
-];
+// The books your bookcase starts with (family-data.js; added once, to your account only).
+const BOOK_STARTERS = (self.FAMILY && self.FAMILY.BOOK_STARTERS) || [];
 
 let seedingBooks = false;
 // settings.bookStarters remembers which starters were given (by title), so one you
@@ -2636,6 +2493,7 @@ async function addFromLibrary(e, shelf, worldIds = {}, end = '') {
     shelf, order: Math.max(-1, ...onShelf.map(x => x.order ?? 0)) + 1, rating: 0, page: 0, chapter: '', review: '', reviewSafe: '', ending: '',
     reads: [{ start: shelf === 'reading' ? today() : '', end: shelf === 'read' ? end : '', physical: true, audio: false }],
   };
+  checkBookRoom(1);
   checkPhotoRoom((e.cover ? 1 : 0) + (e.map ? 1 : 0) + (e.look && e.look.photo ? 1 : 0));
   const id = await DB.addBook(data);
   const patch = {};
