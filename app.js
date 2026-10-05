@@ -204,6 +204,7 @@ function wireFlip(to) {
 // The bottom of both sides' gear menus: your name, sign out, delete.
 const accountRows = nick => `${onTrial() ? '<button class="btn block primary" id="m-unlock">Unlock everything</button>' : ''}<button class="btn block ghost name-row" id="nick"><span class="muted small">Your name</span><span>${esc(nick || 'Add your name')}</span></button>
   <button class="btn block ghost" id="m-backup">Backup &amp; restore</button>
+  <a class="btn block ghost" href="https://glaynebrown.github.io/my-worlds/support.html" target="_blank" rel="noopener">Help &amp; privacy</a>
   <button class="btn block ghost" id="out">Sign out</button>
   <button class="linkish danger-text" id="gone">Delete my account</button>`;
 function wireAccount(root, close, keeps) {
@@ -349,12 +350,13 @@ async function openAccount(user) {
       state[key] = key === 'books' ? list.map(b => ({ ...b, _book: true, name: b.title })) : list;
       got[key] = true;
       if (key === 'worlds' || key === 'books') syncSharedWatches();
-      if (state.loaded) { setTimeout(savePhotosForOffline, 3000); if (key === 'books') publishBookLibrary(); return refresh(); }
+      if (state.loaded) { setTimeout(savePhotosForOffline, 3000); queueWidgetSync(); if (key === 'books') publishBookLibrary(); return refresh(); }
       if (got.worlds && got.items && got.books) {
         setTimeout(savePhotosForOffline, 3000);
         state.loaded = true;
         setTimeout(uploadWaitingPhotos, 2000);
         setTimeout(keepEpisodeTitles, 4000);
+        queueWidgetSync(); // widgets.js
         firstRun();
         route();
         setTimeout(assignOrnaments, 2500); // books.js: save a spine design on older books

@@ -1,0 +1,26 @@
+/* The privacy policy and support pages (privacy.html, support.html): the app's
+   dark walnut home look, as a plain readable page. */
+:root { --bg: #16110e; --ink: #f3e9d2; --muted: #c9b99a; --card: rgba(243, 233, 210, .06); --line: rgba(214, 175, 98, .28); --gold: #d6af62; }
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg) radial-gradient(ellipse at 50% -10%, rgba(120, 84, 38, .45), transparent 60%) no-repeat; color: var(--ink);
+  font: 17px/1.6 'Lora', Georgia, serif; -webkit-text-size-adjust: 100%; }
+.doc { max-width: 680px; margin: 0 auto; padding: calc(env(safe-area-inset-top) + 32px) 16px calc(env(safe-area-inset-bottom) + 40px); }
+.doc-head { text-align: center; margin-bottom: 24px; }
+.crest { color: var(--gold); }
+h1 { font: 600 2.4rem/1.1 'Cormorant Garamond', Georgia, serif; margin: 10px 0 6px; }
+.sub { margin: 0; color: var(--muted); font-style: italic; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 18px 20px; margin: 16px 0; }
+h2 { font: 600 1.45rem/1.2 'Cormorant Garamond', Georgia, serif; color: var(--gold); margin: 0 0 8px; }
+p { margin: 8px 0; }
+ul { margin: 8px 0; padding-left: 20px; }
+li { margin: 6px 0; }
+a { color: var(--gold); }
+strong { color: #fff6e3; }
+details { border-top: 1px solid var(--line); padding: 10px 0; }
+details:first-of-type { border-top: 0; }
+summary { cursor: pointer; font-weight: 600; list-style: none; }
+summary::-webkit-details-marker { display: none; }
+summary::before { content: '›'; display: inline-block; width: 18px; color: var(--gold); transition: transform .2s; }
+details[open] summary::before { transform: rotate(90deg); }
+details p { color: var(--muted); margin-left: 18px; }
+.foot { text-align: center; margin-top: 28px; }
