@@ -16,6 +16,8 @@ const empty = (world, text) => `<p class="empty">${esc(text || Themes.info(world
 const saidLine = q => (q.who && q.to ? `${q.who} to ${q.to}` : q.who || (q.to ? `To ${q.to}` : ''));
 // A quote that already has its own quote marks (typed, or from a photo) doesn't get a second pair.
 const quoteCls = t => (/^\s*["“„'‘]/.test(t || '') && /["”'’]\s*$/.test(t || '') ? 'quote-text own-marks' : 'quote-text');
+// A small cloud on a photo that was added offline and hasn't uploaded yet.
+const waitingBadge = photo => (photo && photo.pending ? '<span class="waiting-badge" title="Waiting to upload" aria-label="Waiting to upload"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18h10a4 4 0 0 0 .6-7.96A6 6 0 0 0 6.1 9.2 4.5 4.5 0 0 0 7 18z"/><path d="M12 15v-4M10 12.5l2-2 2 2"/></svg></span>' : '');
 const addBtn = (id, label) => `<button class="btn primary add-btn" id="${id}"><span aria-hidden="true">+</span> ${esc(label)}</button>`;
 
 function renderWorld(world, section) {
@@ -72,7 +74,7 @@ function photoBoard(world, body, pins, newItem, emptyText) {
   const key = `${newItem.kind}:${newItem.ship || world.id}`;
   body.insertAdjacentHTML('beforeend', `<label class="btn primary add-btn"><span aria-hidden="true">+</span> Add photos<input type="file" accept="image/*" multiple hidden class="pinfile"></label>
     <p class="muted small progress" ${uploads[key] ? '' : 'hidden'}>${esc(uploads[key] || '')}</p>
-    ${pins.length ? `<div class="board">${pins.map(p => `<button class="pin" data-id="${p.id}"><img src="${esc(p.photo && p.photo.thumbUrl)}" alt="${esc(p.caption || 'Photo')}" loading="lazy" ${p.photo ? `width="${p.photo.w}" height="${p.photo.h}"` : ''}>${p.caption || byLine(p) ? `<span class="pin-cap">${esc(p.caption || '')}${byLine(p)}</span>` : ''}</button>`).join('')}</div>` : empty(world, emptyText)}`);
+    ${pins.length ? `<div class="board">${pins.map(p => `<button class="pin" data-id="${p.id}"><img src="${esc(p.photo && p.photo.thumbUrl)}" alt="${esc(p.caption || 'Photo')}" loading="lazy" ${p.photo ? `width="${p.photo.w}" height="${p.photo.h}"` : ''}>${waitingBadge(p.photo)}${p.caption || byLine(p) ? `<span class="pin-cap">${esc(p.caption || '')}${byLine(p)}</span>` : ''}</button>`).join('')}</div>` : empty(world, emptyText)}`);
 
   $('.pinfile', body).onchange = async e => {
     const files = [...e.target.files];
@@ -196,7 +198,7 @@ function drawFavs(world, body) {
   body.innerHTML = `${addBtn('addf', 'Add a favorite')}
     ${list.length ? `<div class="favs">${list.map((f, i) => `<button class="fav card" data-id="${f.id}">
       <span class="fav-rank">${i + 1}</span>
-      <span class="fav-photo">${f.photo ? `<img src="${esc(f.photo.thumbUrl)}" alt="" loading="lazy">` : `<span class="fav-initials">${esc(initials(f.name))}</span>`}</span>
+      <span class="fav-photo">${f.photo ? `<img src="${esc(f.photo.thumbUrl)}" alt="" loading="lazy">${waitingBadge(f.photo)}` : `<span class="fav-initials">${esc(initials(f.name))}</span>`}</span>
       <span class="fav-name">${esc(f.name)}</span>${byLine(f)}
       ${f.quote ? `<span class="fav-quote">“${esc(f.quote)}”</span>` : ''}
       ${f.note ? `<span class="fav-note">${esc(f.note)}</span>` : ''}</button>`).join('')}</div>` : empty(world)}`;

@@ -522,3 +522,19 @@ body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
 .vhs-osd { top: calc(env(safe-area-inset-top) + 40px); left: 22px; }
 .vhs-time { bottom: calc(env(safe-area-inset-bottom) + 36px); right: 22px; font-size: 18px; }
 .vhs.vhs-on .vhs-time { display: none; }
+
+/* a photo added offline, waiting to upload (world.js waitingBadge) */
+.pin, .fav-photo { position: relative; }
+.waiting-badge { position: absolute; top: 6px; right: 6px; z-index: 1; display: grid; place-items: center; width: 24px; height: 24px; border-radius: 50%;
+  background: rgba(20,16,12,.72); color: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.35); pointer-events: none; }
+
+/* your name in a shared world / buddy read (together.js myShareNameHtml) */
+.inline-save { display: flex; gap: 8px; align-items: center; }
+.inline-save input { flex: 1; min-width: 0; }
+.share-me { margin-top: 12px; }
+/* the name box when joining: stands out so it isn't missed */
+.join-name input { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 25%, transparent); }
+
+/* restoring from a backup (backup.js) */
+.restore-bar { position: fixed; left: 50%; bottom: calc(env(safe-area-inset-bottom) + 20px); transform: translateX(-50%); z-index: 90;
+  padding: 10px 18px; border-radius: 999px; background: rgba(20,16,12,.88); color: #fff; font-weight: 600; font-size: .9rem; box-shadow: 0 4px 14px rgba(0,0,0,.3); }

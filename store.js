@@ -34,6 +34,32 @@
    When firebase-config.js hasn't been filled in yet, the app can run in
    "sample mode" instead (demo.js): same functions, kept in memory only. */
 
+// Photos added with no signal wait here (IndexedDB 'fw-pending') until they can
+// upload. Meanwhile the photo's links point at pending-photo/<id>.jpg, which
+// the service worker answers from this same store, so it shows right away.
+const PendingPhotos = (() => {
+  let dbp = null;
+  const open = () => dbp || (dbp = new Promise((res, rej) => {
+    const r = indexedDB.open('fw-pending', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('photos', { keyPath: 'pid' });
+    r.onsuccess = () => res(r.result);
+    r.onerror = () => { dbp = null; rej(r.error); };
+  }));
+  const run = async (mode, fn) => {
+    const db = await open();
+    return new Promise((res, rej) => {
+      const t = db.transaction('photos', mode), req = fn(t.objectStore('photos'));
+      t.oncomplete = () => res(req && req.result);
+      t.onerror = () => rej(t.error);
+    });
+  };
+  return {
+    put: rec => run('readwrite', st => st.put(rec)),
+    all: () => run('readonly', st => st.getAll()),
+    del: pid => run('readwrite', st => st.delete(pid)),
+  };
+})();
+
 const Store = (() => {
   const configured = typeof firebaseConfig !== 'undefined' && !/PASTE/.test(firebaseConfig.apiKey);
   if (!configured) return { configured: false };
@@ -67,7 +93,11 @@ const Store = (() => {
 
   const ignoreMissing = e => { if (e.code !== 'storage/object-not-found') throw e; };
   const removeFile = path => path ? storage.ref(path).delete().catch(ignoreMissing) : Promise.resolve();
-  const removePhoto = p => p ? Promise.all([removeFile(p.path), removeFile(p.thumbPath)]).catch(console.error) : Promise.resolve();
+  const removePhoto = p => {
+    if (!p) return Promise.resolve();
+    if (p.pending) PendingPhotos.del(p.pending).catch(() => {});
+    return Promise.all([removeFile(p.path), removeFile(p.thumbPath)]).catch(console.error);
+  };
 
   async function putBlob(path, blob) {
     const ref = storage.ref(path);
@@ -76,9 +106,19 @@ const Store = (() => {
   }
 
   // prepared = output of Photos.prepare(). Unique names so edits never collide.
+  // Offline: the photo waits on the phone and uploads later (flushPending).
   async function uploadPhoto(folder, id, prepared) {
-    needOnline('Uploading photos');
-    const base = `users/${uid()}/${folder}/${id}/${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const pid = `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const base = `users/${uid()}/${folder}/${id}/${pid}`;
+    if (!navigator.onLine) {
+      try {
+        await PendingPhotos.put({ pid, uid: uid(), base, full: prepared.full.blob, thumb: prepared.thumb.blob, w: prepared.full.w, h: prepared.full.h, t: Date.now() });
+      } catch {
+        throw new Error('You’re offline, and this phone couldn’t hold the photo for later. Try again with signal.');
+      }
+      if (typeof toast === 'function') toast('Saved on this phone. It uploads when you have signal.');
+      return { pending: pid, path: `${base}.jpg`, thumbPath: `${base}-thumb.jpg`, url: `pending-photo/${pid}.jpg`, thumbUrl: `pending-photo/${pid}-thumb.jpg`, w: prepared.full.w, h: prepared.full.h };
+    }
     const [url, thumbUrl] = await Promise.all([
       putBlob(`${base}.jpg`, prepared.full.blob),
       putBlob(`${base}-thumb.jpg`, prepared.thumb.blob),
@@ -86,9 +126,68 @@ const Store = (() => {
     return { path: `${base}.jpg`, thumbPath: `${base}-thumb.jpg`, url, thumbUrl, w: prepared.full.w, h: prepared.full.h };
   }
 
+  // Uploads photos that were added offline, then swaps their real links into
+  // whatever uses them (board photos, card photos, backgrounds, covers, maps,
+  // shared items). One that nothing uses any more is dropped after 30 days.
+  let flushing = false;
+  const swapPending = (v, pid, photo) => {
+    if (!v || typeof v !== 'object') return v;
+    if (v.pending === pid) return photo;
+    if (Array.isArray(v)) return v.map(x => swapPending(x, pid, photo));
+    const out = {};
+    for (const k of Object.keys(v)) out[k] = swapPending(v[k], pid, photo);
+    return out;
+  };
+  const usesPending = (v, pid) => !!v && typeof v === 'object' && (v.pending === pid || Object.values(v).some(x => usesPending(x, pid)));
+  function pendingUsers(pid) {
+    const out = [];
+    const add = (ref, data) => { if (usesPending(data, pid)) out.push({ ref, data }); };
+    state.worlds.forEach(w => add(worlds().doc(w.id), w));
+    state.items.forEach(i => add(items().doc(i.id), i));
+    state.books.forEach(b => add(books().doc(b.id), b));
+    Object.entries(state.shared || {}).forEach(([sid, v]) => {
+      if (!v) return;
+      const root = db.collection('shared').doc(sid);
+      if (v.doc && !v.doc.gone) add(root, v.doc);
+      (v.items || []).forEach(i => add(root.collection('items').doc(i.id), i));
+    });
+    return out;
+  }
+  async function flushPending() {
+    if (flushing || !navigator.onLine || !auth.currentUser || !state.loaded) return 0;
+    flushing = true;
+    let n = 0;
+    try {
+      const waiting = (await PendingPhotos.all().catch(() => [])).filter(r => r.uid === uid());
+      for (const r of waiting) {
+        const users = pendingUsers(r.pid);
+        if (!users.length) {
+          if (Date.now() - r.t > 30 * 864e5) await PendingPhotos.del(r.pid);
+          continue;
+        }
+        try {
+          const [url, thumbUrl] = await Promise.all([putBlob(`${r.base}.jpg`, r.full), putBlob(`${r.base}-thumb.jpg`, r.thumb)]);
+          const photo = { path: `${r.base}.jpg`, thumbPath: `${r.base}-thumb.jpg`, url, thumbUrl, w: r.w, h: r.h };
+          for (const { ref, data } of users) {
+            const patch = {};
+            for (const k of Object.keys(data)) if (usesPending(data[k], r.pid)) patch[k] = swapPending(data[k], r.pid, photo);
+            await ref.update(patch).catch(e => console.warn('Couldn’t swap in an uploaded photo', e));
+          }
+          await PendingPhotos.del(r.pid);
+          n++;
+        } catch (e) {
+          console.warn('Photo upload will try again later', e);
+          if (!navigator.onLine) break;
+        }
+      }
+    } finally { flushing = false; }
+    return n;
+  }
+
   return {
     configured: true,
     demo: false,
+    flushPending,
 
     onAuth: cb => auth.onAuthStateChanged(cb),
     signIn: (email, password) => auth.signInWithEmailAndPassword(email, password),
@@ -371,6 +470,9 @@ const Store = (() => {
       return uploadPhoto(folder, id, { full: { blob: full, w: photo.w, h: photo.h }, thumb: { blob: thumb } });
     },
     newId: kind => userDoc().collection(kind).doc().id,
+    // Backup & restore (backup.js): put a thing back under its old id; upload a restored photo.
+    restoreDoc: (kind, id, data) => write(userDoc().collection(kind).doc(id).set(data)),
+    uploadPhotoFor: (folder, id, prepared) => uploadPhoto(folder, id, prepared),
     setWorld: (id, data) => write(worlds().doc(id).set(data)),
     setItem: (id, data) => write(items().doc(id).set(data)),
   };

@@ -21,6 +21,23 @@ doors and books, a glowing spot, an arrow and an info bubble). Everyone sees
 both sides' tours once (settings.tourSeen), starting with the side they're on;
 after that, "Take the tour" in each side's gear menu replays that side.
 
+**Backup & restore** (backup.js; gear menu on both sides): "Download my data"
+saves one .zip on the phone (backup.json, a readable "My Worlds.html", and
+photos/ if "Include photos" is ticked). Nothing goes to Firebase. "Restore from
+backup" puts back only worlds, books and items whose ids aren't in the app now
+(photos re-uploaded from the zip, within the photo limit; shared worlds come
+back as your own).
+
+**Shared names:** everyone in a shared world or buddy read can change "Your
+name in this world" in its settings; notes and items show each person's current
+name (shared.names), so older notes update too.
+
+**Photos offline** (store.js PendingPhotos + sw.js): a photo added with no
+signal waits on the phone (IndexedDB) and shows right away (the service worker
+serves pending-photo/<id>.jpg); board and favorite photos get a small cloud.
+It uploads when there's signal and the app is open, then its real links are
+swapped in. Other phones in a shared world see a soft placeholder until then.
+
 **Accessories** (Worlds gear; decor.js + decor.css, fx.js): fairy lights, and
 how a world opens: Theater curtains (default), VHS tape (optional "Start with
 static"), Old TV (power on), Color bars, or None. "Exit effect" plays on
@@ -71,7 +88,7 @@ S5 E1, Zutara is on the Avatar ships list, Daryl/Rick/Glenn/Maggie are TWD favor
 
 ## Site files (upload these to GitHub)
 
-index.html, styles.css, themes.css, books.css, tour.css, decor.css, themes.js, app.js, world.js, share.js, library.js, together.js, books.js, tour.js, scan.js, decor.js, fx.js, store.js,
+index.html, styles.css, themes.css, books.css, tour.css, decor.css, themes.js, app.js, world.js, share.js, library.js, together.js, books.js, tour.js, scan.js, decor.js, fx.js, backup.js, store.js,
 demo.js, photos.js, firebase-config.js, sw.js, manifest.json,
 icon-192.png, icon-512.png, apple-touch-icon.png
 

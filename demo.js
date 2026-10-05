@@ -126,7 +126,16 @@ const DemoStore = (() => {
       setTimeout(() => cb(sharedView(sid)));
       return () => { sharedWatchers[sid] = (sharedWatchers[sid] || []).filter(f => f !== cb); };
     },
-    async updateShared(sid, patch) { Object.assign(shared[sid], clone(patch)); emitShared(sid); },
+    async updateShared(sid, patch) {
+      // Like Firestore: 'names.uid' sets one field inside names.
+      Object.entries(clone(patch)).forEach(([k, v]) => {
+        const keys = k.split('.'), last = keys.pop();
+        let o = shared[sid];
+        keys.forEach(key => { o = o[key] = { ...(o[key] || {}) }; });
+        o[last] = v;
+      });
+      emitShared(sid);
+    },
     async toggleSharedWatched(sid, i, on) {
       const w = new Set(shared[sid].watched || []);
       if (on) w.add(i); else w.delete(i);
@@ -151,6 +160,8 @@ const DemoStore = (() => {
     async inviteToShared(sid, email) { shared[sid].invited = [...new Set([...(shared[sid].invited || []), email])]; emitShared(sid); },
     pendingShares: async () => [],
     copyPhoto: async (folder, cid, photo) => photo,
+    async restoreDoc(kind, did, data) { ({ worlds, items, books })[kind].push({ ...clone(data), id: did }); emit(); },
+    uploadPhotoFor: async (folder, did, prepared) => localPhoto(prepared),
     joinShared: async () => {},
     declineShared: async () => {},
     async leaveShared(sid) { shared[sid].members = shared[sid].members.filter(m => m !== 'sample'); emitShared(sid); },

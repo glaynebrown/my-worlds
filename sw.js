@@ -8,10 +8,10 @@
    - Book covers from the book search: saved copy first, like photos.
    - Everything else (database, login, book search) goes straight to the network.
      Firestore keeps its own offline copy of your worlds. */
-const APP_CACHE = 'fw-app-v10';
+const APP_CACHE = 'fw-app-v12';
 const PHOTO_CACHE = 'fw-photos-v1';
 const APP_FILES = [
-  './', 'index.html', 'styles.css', 'themes.css', 'books.css', 'tour.css', 'decor.css', 'themes.js', 'app.js', 'world.js', 'share.js', 'library.js', 'together.js', 'books.js', 'tour.js', 'scan.js', 'decor.js', 'fx.js', 'store.js', 'demo.js', 'photos.js',
+  './', 'index.html', 'styles.css', 'themes.css', 'books.css', 'tour.css', 'decor.css', 'themes.js', 'app.js', 'world.js', 'share.js', 'library.js', 'together.js', 'books.js', 'tour.js', 'scan.js', 'decor.js', 'fx.js', 'backup.js', 'store.js', 'demo.js', 'photos.js',
   'firebase-config.js', 'manifest.json', 'icon-192.png', 'apple-touch-icon.png',
 ];
 const SDK = ['app', 'auth', 'firestore', 'storage']
@@ -76,12 +76,38 @@ async function photo(request) {
   }
 }
 
+// Photos added offline (store.js PendingPhotos): served from the phone until they upload.
+// On another phone (a shared world) they aren't there yet, so a soft placeholder shows.
+const WAITING_SVG = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120"><rect width="120" height="120" fill="#d9d2c5"/><path d="M42 74h36a13 13 0 0 0 2-25.9A19.5 19.5 0 0 0 43.3 44 14.6 14.6 0 0 0 42 74z" fill="none" stroke="#8a8072" stroke-width="4" stroke-linejoin="round"/></svg>';
+function pendingPhoto(url) {
+  const m = /pending-photo\/(.+?)(-thumb)?\.jpg$/.exec(url.pathname);
+  return new Promise(resolve => {
+    const fallback = () => resolve(new Response(WAITING_SVG, { headers: { 'Content-Type': 'image/svg+xml' } }));
+    if (!m) return fallback();
+    const open = indexedDB.open('fw-pending', 1);
+    open.onupgradeneeded = () => open.result.createObjectStore('photos', { keyPath: 'pid' });
+    open.onerror = fallback;
+    open.onsuccess = () => {
+      try {
+        const get = open.result.transaction('photos').objectStore('photos').get(decodeURIComponent(m[1]));
+        get.onsuccess = () => {
+          const rec = get.result;
+          rec ? resolve(new Response(m[2] ? rec.thumb : rec.full, { headers: { 'Content-Type': 'image/jpeg' } })) : fallback();
+        };
+        get.onerror = fallback;
+      } catch { fallback(); }
+    };
+  });
+}
+
 self.addEventListener('fetch', event => {
   const request = event.request;
   if (request.method !== 'GET') return;
   const url = new URL(request.url);
 
-  if (url.origin === self.location.origin) {
+  if (url.origin === self.location.origin && url.pathname.includes('/pending-photo/')) {
+    event.respondWith(pendingPhoto(url));
+  } else if (url.origin === self.location.origin) {
     event.respondWith(request.mode === 'navigate' ? networkFirst(request, HOME) : networkFirst(request));
   } else if ((url.hostname === 'www.gstatic.com' && url.pathname.startsWith('/firebasejs/'))
     || url.hostname === 'fonts.googleapis.com' || url.hostname === 'fonts.gstatic.com') {

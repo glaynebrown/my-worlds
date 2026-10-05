@@ -203,12 +203,14 @@ function wireFlip(to) {
 }
 // The bottom of both sides' gear menus: your name, sign out, delete.
 const accountRows = nick => `<button class="btn block ghost name-row" id="nick"><span class="muted small">Your name</span><span>${esc(nick || 'Add your name')}</span></button>
+  <button class="btn block ghost" id="m-backup">Backup &amp; restore</button>
   <button class="btn block ghost" id="out">Sign out</button>
   <button class="linkish danger-text" id="gone">Delete my account</button>`;
 function wireAccount(root, close, keeps) {
   $('#out', root).onclick = () => { close(); confirmBox('Sign out?', `Your ${keeps} stay saved in your account.`, 'Sign out', () => DB.signOut()); };
   $('#gone', root).onclick = () => { close(); deleteAccountFlow(); };
   $('#nick', root).onclick = () => { close(); nicknameForm(); };
+  $('#m-backup', root).onclick = () => { close(); backupMenu(); }; // backup.js
 }
 
 const THEME_COLOR = { library: '#16110e', avatar: '#efe3c8', twd: '#1f1e1a', hp: '#1a120c', disney: '#171a3d', lotr: '#121812', narnia: '#16222f', got: '#14161a', firefly: '#141a26', tlou: '#1b211c', potc: '#0f1f26' };
@@ -348,6 +350,7 @@ async function openAccount(user) {
       if (got.worlds && got.items && got.books) {
         setTimeout(savePhotosForOffline, 3000);
         state.loaded = true;
+        setTimeout(uploadWaitingPhotos, 2000);
         firstRun();
         route();
         setTimeout(assignOrnaments, 2500); // books.js: save a spine design on older books
@@ -580,6 +583,7 @@ function nicknameForm() {
     onSave: async v => {
       await DB.saveSettings({ displayName: v.name });
       state.settings.displayName = v.name;
+      setTimeout(() => offerNameInShares(v.name.trim()), 300);
       const [page, id] = parseHash();
       if (!page) renderLibrary();
       else if (page === 'books' && !id) renderBooks();
@@ -1111,7 +1115,15 @@ function renderWorldForm(world) {
 // A small bar while there's no signal. Everything still opens from the phone;
 // text changes save there and sync when the signal comes back.
 function drawOffline() { $('#offline-bar').hidden = navigator.onLine; }
-window.addEventListener('online', () => { drawOffline(); savePhotosForOffline(); });
+window.addEventListener('online', () => { drawOffline(); savePhotosForOffline(); uploadWaitingPhotos(); });
+document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') uploadWaitingPhotos(); });
+
+// Photos added with no signal (store.js) upload once there's signal again.
+async function uploadWaitingPhotos() {
+  if (!DB || DB.demo || !DB.flushPending) return;
+  const n = await DB.flushPending().catch(e => { console.warn(e); return 0; });
+  if (n) toast(n === 1 ? 'Your photo from offline is uploaded.' : `Your ${n} photos from offline are uploaded.`);
+}
 window.addEventListener('offline', drawOffline);
 drawOffline();
 

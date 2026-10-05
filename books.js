@@ -2280,11 +2280,13 @@ function buddyHtml(b) {
     <p class="small">${names.length ? `Reading with <b>${esc(names.join(', '))}</b>.` : 'Invite sent. No one has joined yet.'}</p>
     ${(d.invited || []).length ? `<p class="muted small">Waiting on: ${(d.invited || []).map(esc).join(', ')}</p>` : ''}
     <p class="muted small">Shared: ${esc(secs.join(', ') || 'nothing')}</p>
+    ${myShareNameHtml(b, 'Your name in this buddy read')}
     <div class="row-btns">${owner ? '<button type="button" class="btn small" id="buddy-go">Invite someone…</button><button type="button" class="btn small ghost danger-text" id="buddy-stop">Stop sharing</button>'
       : '<button type="button" class="btn small ghost danger-text" id="buddy-leave">Leave buddy read</button>'}</div>`;
 }
 
 function wireBuddy(b) {
+  if (b.sharedId) wireMyShareName(b);
   const go = $('#buddy-go'), stop = $('#buddy-stop'), leave = $('#buddy-leave');
   if (go) go.onclick = () => buddyFlow(b);
   if (stop) stop.onclick = () => confirmBox('Stop sharing?', 'Everyone keeps their own copy of the notes, quotes and pictures as they are now.', 'Stop sharing', async () => {
@@ -2358,7 +2360,7 @@ function offerBuddyRead(d) {
   return new Promise(resolve => openModal(`<form id="jf" novalidate><h2>${esc(from)} wants to read ${esc(d.name)} with you</h2>
     <p>You’ll share: <b>${esc(secs.join(', '))}</b>. Your stars, dates and reviews stay your own.</p>
     <label class="field"><span class="field-label">Put it on this shelf</span><select id="jshelf">${shelvesOf().map(s => `<option value="${esc(s.id)}" ${s.id === def ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
-    <label class="field"><span class="field-label">Your name (shown on your notes)</span><input id="me" value="${esc(myName())}"></label>
+    <label class="field join-name"><span class="field-label">Your name: this is how ${esc(from)} will see you</span><input id="me" value="${esc(myName())}"></label>
     <div class="actions"><button type="button" class="btn ghost" id="no">No thanks</button><button type="button" class="btn" data-close>Not now</button><span class="spacer"></span><button class="btn primary" id="yes">Join</button></div></form>`,
   (root, close) => {
     const done = () => { close(); resolve(); };

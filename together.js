@@ -36,6 +36,17 @@ function sharedWithLine(world) {
   const old = /\(with ([^)]*)\)\s*$/.exec(world.name);
   return old ? `Shared with ${old[1]}` : 'Shared';
 }
+// After changing your nickname: offer to use it in shares that still show another name.
+function offerNameInShares(name) {
+  const sids = Object.entries(state.shared || {}).filter(([, v]) => v && v.doc && !v.doc.gone && !v.doc.ended
+    && (v.doc.members || []).includes(DB.myUid()) && ((v.doc.names || {})[DB.myUid()] || '') !== name).map(([sid]) => sid);
+  if (!sids.length || !name) return;
+  confirmBox(`Use “${name}” in your shared worlds too?`, `${sids.length === 1 ? 'One shared world or buddy read shows' : `${sids.length} shared worlds and buddy reads show`} a different name for you. This updates it there, on your old notes too.`,
+    'Use it', async () => {
+      for (const sid of sids) await DB.updateShared(sid, { [`names.${DB.myUid()}`]: name });
+      toast('Updated in your shared worlds');
+    });
+}
 const isSharedOwner = world => {
   const sh = world.sharedId && state.shared[world.sharedId];
   return !!(sh && sh.doc && sh.doc.owner === DB.myUid());
@@ -145,6 +156,11 @@ function syncSharedWatches() {
   want.forEach(sid => {
     if (sharedStops[sid]) return;
     sharedStops[sid] = DB.watchShared(sid, view => {
+      // Notes and items show each person's current name for this share, so a
+      // renamed person's older notes update too (byName is only the fallback).
+      const names = (view.doc && view.doc.names) || {};
+      const named = x => (names[x.by] ? { ...x, byName: names[x.by] } : x);
+      view = { ...view, notes: (view.notes || []).map(named), items: (view.items || []).map(named) };
       state.shared[sid] = view;
       const world = state.worlds.find(w => w.sharedId === sid) || state.books.find(b => b.sharedId === sid);
       const d = view.doc;
@@ -157,6 +173,23 @@ function syncSharedWatches() {
 }
 
 // ---------- sharing a world ----------
+// "Your name in this world": everyone in a share can change their own name.
+const myShareNameHtml = (world, label) => `<label class="field share-me"><span class="field-label">${label}</span>
+    <span class="inline-save"><input id="share-me" value="${esc(shareName(world))}" autocomplete="off"><button type="button" class="btn small" id="share-me-save" hidden>Save</button></span></label>`;
+function wireMyShareName(world) {
+  const input = $('#share-me'), save = $('#share-me-save');
+  if (!input || !save) return;
+  input.oninput = () => { save.hidden = !input.value.trim() || input.value.trim() === shareName(world); };
+  input.onkeydown = e => { if (e.key === 'Enter') { e.preventDefault(); if (!save.hidden) save.click(); } };
+  save.onclick = () => busy(save, async () => {
+    const me = input.value.trim();
+    if (!me) throw new Error('Add your name.');
+    await DB.updateShared(world.sharedId, { [`names.${DB.myUid()}`]: me });
+    save.hidden = true;
+    toast('Name saved. Everyone sees it now, on your old notes too.');
+  }, 'Saving…');
+}
+
 function shareSettingsHtml(world) {
   const d = sharedDoc(world);
   if (!world.sharedId) {
@@ -172,6 +205,7 @@ function shareSettingsHtml(world) {
   return `<h2 class="form-h">Share</h2>
     <p class="small">${names.length ? `Shared with <b>${esc(names.join(', '))}</b>.` : 'Shared, but no one has joined yet.'}</p>
     ${pending.length ? `<p class="muted small">Waiting on: ${pending.map(esc).join(', ')}</p>` : ''}
+    ${myShareNameHtml(world, 'Your name in this world')}
     <span class="field-label" style="margin-top:12px">Shared sections</span>
     <div class="share-secs">${SHARE_SECTIONS.map(([k, label]) => `<label class="check"><input type="checkbox" data-secset="${k}" ${sec[k] ? 'checked' : ''} ${owner ? '' : 'disabled'}><span>${label}</span></label>`
       + (k === 'rewatch' ? `<label class="check sub-check"><input type="checkbox" data-secset="rewatchMarks" ${sec.rewatchMarks !== false ? 'checked' : ''} ${owner && sec.rewatch ? '' : 'disabled'}><span>Share watched marks too</span></label>` : '')).join('')}</div>
@@ -183,6 +217,7 @@ function shareSettingsHtml(world) {
 }
 
 function wireShareSettings(world) {
+  wireMyShareName(world);
   const go = $('#share-go'), stop = $('#share-stop'), leave = $('#share-leave'), secSave = $('#share-secs-save');
   if (secSave) {
     $$('[data-secset]').forEach(c => { c.onchange = () => { secSave.hidden = false; }; });
@@ -299,7 +334,7 @@ async function offerJoins() {
     const from = (d.names || {})[d.owner] || 'Someone';
     await new Promise(resolve => openModal(`<form id="jf" novalidate><h2>${esc(from)} shared ${esc(d.name)} with you</h2>
       <p>You’ll share: <b>${esc(sectionNames(d).join(', '))}</b>. Anything else in it stays private to each of you. It becomes a new door; your own worlds don’t change.</p>
-      <label class="field"><span class="field-label">Your name (shown on your notes)</span><input id="me" value="${esc(myName())}"></label>
+      <label class="field join-name"><span class="field-label">Your name: this is how ${esc(from)} will see you</span><input id="me" value="${esc(myName())}"></label>
       <div class="actions"><button type="button" class="btn ghost" id="no">No thanks</button><button type="button" class="btn" data-close>Not now</button><span class="spacer"></span><button class="btn primary" id="yes">Join</button></div></form>`,
     (root, close) => {
       const done = () => { close(); resolve(); };
