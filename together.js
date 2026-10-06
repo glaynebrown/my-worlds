@@ -162,6 +162,7 @@ function syncSharedWatches() {
       const named = x => (names[x.by] ? { ...x, byName: names[x.by] } : x);
       view = { ...view, notes: (view.notes || []).map(named), items: (view.items || []).map(named) };
       state.shared[sid] = view;
+      if (typeof queueWidgetSync === 'function') queueWidgetSync();
       const world = state.worlds.find(w => w.sharedId === sid) || state.books.find(b => b.sharedId === sid);
       const d = view.doc;
       // Ended by the owner, or no longer a member: keep a personal copy.

@@ -41,7 +41,9 @@ const DemoStore = (() => {
     signOut: async () => { try { sessionStorage.removeItem('fw-sample'); } catch {} location.hash = '#/'; location.reload(); },
     resetPassword: async () => {},
 
-    loadSettings: async () => clone(settings),
+    // Previewing the App Store app (?edition=store): a brand-new trial account.
+    loadSettings: async () => (STORE && !settings.trial ? null : clone(settings)),
+    async startTrial() { Object.assign(settings, { trial: true, seeded: true, booksPicked: true }); return clone(settings); },
     join: async invite => ({ invite, libraryMode: true }),
     createAccount: async () => {},
     loadWallpapers: async () => null,
@@ -181,7 +183,7 @@ const DemoStore = (() => {
       pins.forEach(([world, colors], i) => items.push({ id: id(), world, kind: 'pin', caption: '', photo: samplePhoto(i, colors), t: Date.now() - i }));
       items.push(
         { id: id(), world: twd, kind: 'headcanon', text: 'Sample headcanon: after S5E1, everyone makes it to Washington together.', t: Date.now() },
-        { id: id(), world: avatar, kind: 'fic', title: 'Sample fic title', author: 'sample_author', url: 'https://archiveofourown.org/works/1', ship: 'Zutara', note: 'Sample: the slow burn one.', t: Date.now() },
+        { id: id(), world: avatar, kind: 'fic', title: 'Sample fic title', author: 'sample_author', url: 'https://archiveofourown.org/works/1', ship: 'Sample ship', note: 'Sample: the slow burn one.', t: Date.now() },
         { id: id(), world: hp, kind: 'quote', text: 'Sample quote goes here.', who: 'Hermione', where: 'Prisoner of Azkaban', t: Date.now() },
       );
       emit();
