@@ -6,9 +6,12 @@
    - Their worlds start neutral (real endings, no favorites or ships, every
      section on) but wear your home-card photos and name colors, which your
      account publishes to library/wallpapers (publishWallpapers below).
-   Also here: the 500-photo limit for everyone but you, and deleting an account. */
+   Also here: the limits for every account, and deleting an account. */
 
-const PHOTO_CAP = 500;
+// Every account, yours too: 250 photos, 200 worlds, 200 books. A Firebase
+// function (functions/index.js) removes anything added past these, so they
+// hold even if someone gets around the app.
+const MAX = { photos: 250, worlds: 200, books: 200 };
 
 // Your account: the original one (not joined by invite, not made from a share).
 // (Accounts made in the App Store app have settings.trial and are never the owner.)
@@ -22,17 +25,15 @@ function photoCount() {
 }
 // ---------- the free trial (accounts made in the App Store app) ----------
 // 3 worlds, 3 books and 10 photos (card photos and backgrounds count too), then
-// "Unlock everything" ($4.99, once): any number of worlds and books, 250 photos.
+// "Unlock everything" ($4.99, once): up to 200 worlds, 200 books and 250 photos.
 // Accounts from before (your family's) have no trial. settings.trial and
 // settings.unlocked can't be changed from the app (firestore.rules).
 const TRIAL = { worlds: 3, books: 3, photos: 10 };
-const UNLOCKED_PHOTOS = 250;
 const onTrial = () => !!(state.settings && state.settings.trial && !state.settings.unlocked);
 function photoCap() {
   const s = state.settings || {};
-  if (isOwner() || (DB.demo && !s.trial)) return Infinity;
-  if (s.trial) return s.unlocked ? UNLOCKED_PHOTOS : TRIAL.photos;
-  return PHOTO_CAP;
+  if (DB.demo && !s.trial) return Infinity;
+  return onTrial() ? TRIAL.photos : MAX.photos;
 }
 // A limit reached on the trial: says so, and offers the unlock. Its message
 // still shows wherever the error lands (a form, a toast).
@@ -42,9 +43,11 @@ function trialLimit(what) {
 }
 function checkWorldRoom(n = 1) {
   if (onTrial() && state.worlds.length + n > TRIAL.worlds) throw trialLimit(`${TRIAL.worlds} worlds`);
+  if (state.worlds.length + n > MAX.worlds) throw new Error(`You’ve reached ${MAX.worlds} worlds. Delete one to add another.`);
 }
 function checkBookRoom(n = 1) {
   if (onTrial() && state.books.length + n > TRIAL.books) throw trialLimit(`${TRIAL.books} books`);
+  if (state.books.length + n > MAX.books) throw new Error(`You’ve reached ${MAX.books} books. Delete one to add another.`);
 }
 // Throws a friendly message when adding n photos would pass the limit.
 function checkPhotoRoom(n = 1) {
@@ -67,8 +70,8 @@ function showUnlock(reason) {
       <h2>Unlock everything</h2>
       ${reason ? `<p class="muted small">The free version holds ${esc(reason)}.</p>` : ''}
       <ul class="unlock-list">
-        <li>As many worlds and books as you like</li>
-        <li>Up to ${UNLOCKED_PHOTOS} photos</li>
+        <li>Up to ${MAX.worlds} shows and movies and ${MAX.books} books</li>
+        <li>Up to ${MAX.photos} photos</li>
         <li>One time. No subscription, no ads, ever.</li>
       </ul>
       <button type="button" class="btn primary block" id="buy">Unlock for $4.99</button>

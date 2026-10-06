@@ -244,7 +244,7 @@ function confirmRestore(plan) {
 
 async function runRestore({ data, files, worlds, books, items }) {
   if (!navigator.onLine) return toast('You’re offline. Restoring needs a connection.', true);
-  let room = isOwner() || DB.demo ? Infinity : Math.max(0, PHOTO_CAP - photoCount());
+  let room = DB.demo ? Infinity : Math.max(0, MAX.photos - photoCount());
   let skipped = 0, done = 0;
   const total = worlds.length + books.length + items.length;
   const bar = document.createElement('div');
