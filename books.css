@@ -652,3 +652,11 @@
 /* Dragging a whole stack or series: it keeps its shape. */
 .spine-ghost.book-pile { display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; height: var(--row); padding-bottom: var(--plank); }
 .spine-ghost.ser-grp { display: flex; align-items: flex-end; }
+
+/* Holding a book: the page doesn't scroll with your finger (books.js lockScroll). */
+html.drag-lock, html.drag-lock body { touch-action: none; overscroll-behavior: none; }
+
+/* Arrange bookcase: Undo / Redo beside Done. */
+.arrange-bar .arrange-undo { display: inline-flex; gap: 4px; flex: none; }
+.arrange-undo .btn { padding: 6px 9px; min-height: 0; line-height: 0; }
+.arrange-undo .btn:disabled { opacity: .35; }

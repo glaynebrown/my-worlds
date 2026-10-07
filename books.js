@@ -599,7 +599,7 @@ function applyGaps(root = document) {
 }
 // Where everything on the bookcase stands now (to hold things in place while dragging).
 const homesIn = caseEl => new Map($$('.case-row', caseEl).flatMap(row => rowItemsAll(row).map(el => {
-  const r = el.getBoundingClientRect(); return [el, { left: r.left, right: r.right, width: r.width, bottom: r.bottom }];
+  const r = el.getBoundingClientRect(); return [el, { left: r.left, right: r.right, width: r.width, bottom: r.bottom + scrollY }];
 })));
 // Puts el (a book, series, stack or plant) where you let go on a free shelf:
 // left = where its left edge should be, cy = the pointer's height. The thing
@@ -611,7 +611,10 @@ function freePlace(row, el, left, cy, keep = {}) {
   const padL = parseFloat(cs.paddingLeft) || 0, padR = parseFloat(cs.paddingRight) || 0;
   const items = rowItemsAll(row).filter(x => x !== el);
   // Where things stood when the drag began (things it bumped while passing don't count).
-  const at = x => (keep.home && keep.home.get(x)) || x.getBoundingClientRect();
+  const at = x => {
+    const h = keep.home && keep.home.get(x);
+    return h ? { ...h, bottom: h.bottom - scrollY } : x.getBoundingClientRect();
+  };
   let line = items.filter(x => { const r = at(x); return cy >= r.bottom - R && cy <= r.bottom + 2; });
   if (!line.length && items.length) line = [items[items.length - 1]]; // below the last row: after the last thing
   let prev = null;
@@ -648,6 +651,47 @@ function gapPatches(row, add) {
     if (b && (Number(b.gap) || 0) !== g) add(b, { gap: g });
   });
 }
+
+// ---------- undo / redo (rearranging the bookcase) ----------
+// Before each change (a drag, how a book sits, plants and vines, Tidy up), how
+// the bookcase stood is remembered. Undo puts it back; Redo goes forward again.
+const undoStack = [], redoStack = [];
+let lastRemember = 0;
+const arrangeState = () => JSON.parse(JSON.stringify({
+  books: Object.fromEntries(state.books.map(b => [b.id, { shelf: b.shelf ?? null, order: b.order ?? null, gap: b.gap || 0, sit: b.sit || 'up', reads: b.reads ?? null }])),
+  greens: (state.settings && state.settings.greens) || {},
+}));
+// (One change can call this twice in a row; that counts once.)
+function rememberArrange() {
+  if (Date.now() - lastRemember < 400) return;
+  lastRemember = Date.now();
+  undoStack.push(arrangeState());
+  if (undoStack.length > 40) undoStack.shift();
+  redoStack.length = 0;
+  drawUndo();
+}
+function restoreArrange(snap) {
+  const now = arrangeState(), writes = [];
+  state.books.forEach(b => {
+    const was = snap.books[b.id];
+    if (!was) return;
+    const patch = {};
+    Object.keys(was).forEach(k => { if (JSON.stringify(now.books[b.id][k]) !== JSON.stringify(was[k])) patch[k] = was[k]; });
+    if (Object.keys(patch).length) { Object.assign(b, patch); writes.push(DB.updateBook(b, patch)); }
+  });
+  if (JSON.stringify(now.greens) !== JSON.stringify(snap.greens)) { state.settings.greens = snap.greens; writes.push(DB.saveSettings({ greens: snap.greens })); }
+  renderBooks();
+  Promise.all(writes).catch(e => toast(friendlyError(e), true));
+}
+function undoArrange() { if (!undoStack.length) return; redoStack.push(arrangeState()); restoreArrange(undoStack.pop()); lastRemember = 0; }
+function redoArrange() { if (!redoStack.length) return; undoStack.push(arrangeState()); restoreArrange(redoStack.pop()); lastRemember = 0; }
+function drawUndo() {
+  const u = $('#aundo'), r = $('#aredo');
+  if (u) u.disabled = !undoStack.length;
+  if (r) r.disabled = !redoStack.length;
+}
+const UNDO_ICON = '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>';
+const REDO_ICON = UNDO_ICON.replace('<svg ', '<svg style="transform:scaleX(-1)" ');
 
 let arranging = false; // Arrange bookcase mode: move plants and books, tap a book to pick how it sits
 
@@ -808,6 +852,7 @@ function potsFromDom(row) {
 }
 const rowOfShelf = id => $(`.case[data-shelf="${CSS.escape(id)}"] .case-row`, view);
 function saveGreens(changes) {
+  rememberArrange();
   const all = { ...((state.settings || {}).greens || {}) };
   Object.entries(changes).forEach(([id, patch]) => {
     all[id] = { pots: null, drapes: null, side: null, sideKind: null, potSeed: 0, vineSeed: 0, ...(all[id] || {}), ...patch };
@@ -892,6 +937,7 @@ function wireArrange(caseEl) {
   caseEl.onclick = e => {
     const b = e.target.closest('[data-ga]');
     if (!b) return;
+    rememberArrange();
     const shelf = b.closest('.case').dataset.shelf, what = b.dataset.ga, seed = Math.floor(Math.random() * 1e9);
     if (what === 'tidy') {
       // Everything on this shelf back side by side.
@@ -936,6 +982,7 @@ function wireArrange(caseEl) {
     return Array.from({ length: n }, (_, i) => ({ row, i, y: b.top + (i ? i * r - P - 1 : 2), l: b.left, w: row.clientWidth }));
   });
   function start() {
+    rememberArrange();
     drag.moved = true;
     spineSorting = true;
     caseEl.classList.add('green-dragging');
@@ -1018,6 +1065,7 @@ function wireArrange(caseEl) {
       const books = {};
       Object.keys(changes).forEach(id => gapPatches(rowOfShelf(id), (b, p) => { books[b.id] = { b, p }; }));
       Object.values(books).forEach(({ b, p }) => { Object.assign(b, p); DB.updateBook(b, p).catch(e => toast(friendlyError(e), true)); });
+      lastRemember = Date.now(); // the whole drag is one step (remembered when it began)
       saveGreens(changes);
     } else if (d.drape && d.to) {
       const src = d.from.row.closest('.case').dataset.shelf, dst = d.to.edge.row.closest('.case').dataset.shelf;
@@ -1223,7 +1271,7 @@ function renderBooks() {
         ? `<span>${year} · ${done} of ${goal} books</span><span class="goal-bar"><span style="width:${Math.min(100, Math.round((done / goal) * 100))}%"></span></span>`
         : `<span>${done ? `${done} finished in ${year} · ` : ''}Set a ${year} reading goal ›</span>`}</a></header>
     <div class="bookcase${arranging ? ' arranging' : ''}" id="case" data-wood="${woodOf()}">${shelvesOf().map(caseHtml).join('')}</div>
-    ${arranging ? `<div class="arrange-bar"><span>Drag the books and plants. Tap a book to stand it upright, face its cover out or lay it flat. Tap a plant to change it.</span><button class="btn primary" id="adone">Done</button></div>` : ''}
+    ${arranging ? `<div class="arrange-bar"><span>Drag the books and plants. Tap a book to stand it upright, face its cover out or lay it flat. Tap a plant to change it.</span><span class="arrange-undo"><button type="button" class="btn small ghost" id="aundo" aria-label="Undo">${UNDO_ICON}</button><button type="button" class="btn small ghost" id="aredo" aria-label="Redo">${REDO_ICON}</button></span><button class="btn primary" id="adone">Done</button></div>` : ''}
     ${state.books.length ? '' : `<div class="side-empty"><p class="empty">No books yet</p>
       <div class="side-empty-btns">${isOwner() || (state.settings && state.settings.trial) ? '' : '<a class="btn" href="#/books/pick">Browse the library</a>'}<button class="btn ghost" id="e-add">Add a book</button></div></div>`}
   </div>`;
@@ -1251,6 +1299,9 @@ function renderBooks() {
   if (arranging) {
     wireArrange($('#case'));
     $('#adone').onclick = () => { arranging = false; renderBooks(); toast('Bookcase saved'); };
+    $('#aundo').onclick = undoArrange;
+    $('#aredo').onclick = redoArrange;
+    drawUndo();
   }
   maybeTour('books');
 }
@@ -1351,6 +1402,28 @@ function enableSpineDrag(caseEl) {
   const HOLD_MS = 450, SLOP = 10;
   // slot: what moves. A series moves together, and so does a stack.
   let timer = null, start = null, slot = null, ghost = null, offset = null, dragging = false, justDragged = false, from = null, fromRow = null;
+  let finger = null;
+  // While a book is held, the page stays still (a phone can otherwise scroll it
+  // along with your finger); near the top or bottom of the screen it scrolls
+  // slowly that way instead, so you can reach other shelves.
+  let lockedY = 0, edgeTimer = null;
+  const onScroll = () => { if (dragging && Math.abs(scrollY - lockedY) > 0.5) scrollTo(scrollX, lockedY); };
+  function lockScroll(on) {
+    clearInterval(edgeTimer);
+    document.documentElement.classList.toggle('drag-lock', on);
+    if (!on) { removeEventListener('scroll', onScroll); finger = null; return; }
+    lockedY = scrollY;
+    addEventListener('scroll', onScroll, { passive: true });
+    edgeTimer = setInterval(() => {
+      if (!finger) return;
+      const zone = 80, h = innerHeight;
+      const step = finger.y < zone ? -Math.ceil((zone - finger.y) / 8) : finger.y > h - zone ? Math.ceil((finger.y - (h - zone)) / 8) : 0;
+      if (!step) return;
+      lockedY = Math.max(0, Math.min(document.documentElement.scrollHeight - h, lockedY + step));
+      scrollTo(scrollX, lockedY);
+      moveTo(finger.x, finger.y);
+    }, 16);
+  }
   let keep = {}, stay = null; // free shelves: the thing after where it lands, and the thing after where it left
   const cancelHold = () => { clearTimeout(timer); timer = null; };
   const begin = (sp, x, y) => { slot = sp.parentElement; start = { x, y }; cancelHold(); timer = setTimeout(pickUp, HOLD_MS); };
@@ -1360,12 +1433,14 @@ function enableSpineDrag(caseEl) {
     if (!slot || !slot.isConnected) return;
     slot = slot.closest('.ser-grp') || slot.closest('.book-pile') || slot;
     dragging = spineSorting = true;
+    rememberArrange();
     from = slot.closest('.case').dataset.shelf;
     fromRow = slot.closest('.case-row');
     keep = { home: homesIn(caseEl) };
     // On a free shelf, the thing after it stays put when it's lifted out.
     const after = slot.nextElementSibling;
     stay = isFreeShelf(from) && after && rowItemsAll(fromRow).includes(after) ? { el: after, ...keep.home.get(after) } : null;
+    lockScroll(true);
     const r = slot.getBoundingClientRect();
     offset = { x: start.x - r.left, y: start.y - r.top };
     ghost = slot.cloneNode(true);
@@ -1379,6 +1454,7 @@ function enableSpineDrag(caseEl) {
 
   function moveTo(x, y) {
     if (!ghost) return;
+    finger = { x, y };
     ghost.style.left = `${x - offset.x}px`;
     ghost.style.top = `${y - offset.y}px`;
     const over = document.elementFromPoint(x, y);
@@ -1403,10 +1479,11 @@ function enableSpineDrag(caseEl) {
       }
     }
     // What stood after it before it was lifted stays where it was.
-    if (stay && stay.el !== keep.el && stay.el !== slot && stay.el.isConnected) holdAt(stay.el, stay.left, stay.bottom);
+    if (stay && stay.el !== keep.el && stay.el !== slot && stay.el.isConnected) holdAt(stay.el, stay.left, stay.bottom - scrollY);
   }
 
   function drop() {
+    lockScroll(false);
     if (ghost) ghost.remove();
     ghost = null;
     slot.classList.remove('slot-placeholder');
@@ -1496,6 +1573,7 @@ function sitMenu(b) {
     $('#sits', root).onclick = e => {
       const c = e.target.closest('[data-sit]');
       if (!c || c.dataset.sit === sitOf(b)) return;
+      rememberArrange();
       $$('#sits .chip', root).forEach(x => x.classList.toggle('on', x === c));
       b.sit = c.dataset.sit;
       DB.updateBook(b, { sit: c.dataset.sit }).catch(err => toast(friendlyError(err), true));
