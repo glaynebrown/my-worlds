@@ -396,6 +396,9 @@ function shelfMovePatch(b, shelfId, end) {
 // and drags go straight through to the books.
 const GREENERY = [['none', 'None'], ['vines', 'Trailing vines'], ['pots', 'Potted plants'], ['both', 'Both']];
 const greeneryOf = () => (state.settings && state.settings.greenery) || 'none';
+// The bookcase's wood (Edit shelves). Its colors are in books.css ([data-wood]).
+const WOODS = [['walnut', 'Walnut'], ['mahogany', 'Mahogany'], ['cherry', 'Cherry'], ['oak', 'Oak'], ['maple', 'Maple'], ['ebony', 'Ebony']];
+const woodOf = () => (state.settings && state.settings.wood) || 'walnut';
 const LEAF_FILLS = ['#7d9a5b', '#8ea866', '#6f8c50', '#9db274', '#86a062'];
 const LEAF_LINE = '#4d6337';
 const LEAF_SHAPES = {
@@ -1026,7 +1029,7 @@ function renderBooks() {
       <a class="goal-line" href="#/books/stats">${goal
         ? `<span>${year} · ${done} of ${goal} books</span><span class="goal-bar"><span style="width:${Math.min(100, Math.round((done / goal) * 100))}%"></span></span>`
         : `<span>${done ? `${done} finished in ${year} · ` : ''}Set a ${year} reading goal ›</span>`}</a></header>
-    <div class="bookcase${arranging ? ' arranging' : ''}" id="case">${shelvesOf().map(caseHtml).join('')}</div>
+    <div class="bookcase${arranging ? ' arranging' : ''}" id="case" data-wood="${woodOf()}">${shelvesOf().map(caseHtml).join('')}</div>
     ${arranging ? `<div class="arrange-bar"><span>Drag the pots, vines and books. Tap a plant to change or remove it.</span><button class="btn primary" id="adone">Done</button></div>` : ''}
     ${state.books.length ? '' : `<div class="side-empty"><p class="empty">No books yet</p>
       <div class="side-empty-btns">${isOwner() || (state.settings && state.settings.trial) ? '' : '<a class="btn" href="#/books/pick">Browse the library</a>'}<button class="btn ghost" id="e-add">Add a book</button></div></div>`}
@@ -1068,6 +1071,8 @@ function shelvesForm() {
   openModal(`<h2>Shelves</h2><div id="slist" class="shelf-edits"></div>
     <button type="button" class="btn small" id="sadd">+ Add a shelf</button>
     <label class="switch ribbon-switch"><input type="checkbox" id="ribbons" ${state.settings && state.settings.ribbons ? 'checked' : ''}><span class="track"></span><span>Bookmark ribbons show how far I’ve read</span></label>
+    <div class="field"><span class="field-label">Wood</span>
+      <div class="wood-pick" id="woods">${WOODS.map(([k, l]) => `<button type="button" class="wood${k === woodOf() ? ' on' : ''}" data-wood="${k}" aria-pressed="${k === woodOf()}"><span class="wood-dot"></span>${l}</button>`).join('')}</div></div>
     <div class="field greenery-pick"><span class="field-label">Greenery on the bookcase</span>
       <div class="chips bot-chips" id="greens">${GREENERY.map(([k, l]) => `<button type="button" class="chip${k === greeneryOf() ? ' on' : ''}" data-g="${k}">${l}</button>`).join('')}</div>
       <button type="button" class="btn small arrange-open" id="garr" ${greeneryOf() === 'none' ? 'disabled' : ''}>Arrange greenery</button></div>
@@ -1091,6 +1096,10 @@ function shelvesForm() {
     };
     draw();
     $('#sadd', root).onclick = () => { list.push({ id: `s${Date.now().toString(36)}`, name: '', sort: 'drag' }); draw(); $$('[data-i]', root).pop().focus(); };
+    $('#woods', root).onclick = e => {
+      const w = e.target.closest('[data-wood]');
+      if (w) $$('#woods .wood', root).forEach(x => { x.classList.toggle('on', x === w); x.setAttribute('aria-pressed', x === w); });
+    };
     $('#greens', root).onclick = e => {
       const c = e.target.closest('[data-g]');
       if (c) $$('#greens .chip', root).forEach(x => x.classList.toggle('on', x === c));
@@ -1121,6 +1130,8 @@ function shelvesForm() {
       if (ribbons !== !!state.settings.ribbons) { await DB.saveSettings({ ribbons }); state.settings.ribbons = ribbons; }
       const greenery = ($('#greens .chip.on', root) || {}).dataset?.g || 'none';
       if (greenery !== greeneryOf()) { await DB.saveSettings({ greenery }); state.settings.greenery = greenery; }
+      const wood = ($('#woods .wood.on', root) || {}).dataset?.wood || 'walnut';
+      if (wood !== woodOf()) { await DB.saveSettings({ wood }); state.settings.wood = wood; }
       const confettiOn = $('#confetti', root).checked;
       if (confettiOn !== (state.settings.confetti !== false)) { await DB.saveSettings({ confetti: confettiOn }); state.settings.confetti = confettiOn; }
       await Promise.all(moving.map(b => DB.updateBook(b, { shelf: firstOn.id })));
@@ -2901,7 +2912,7 @@ function renderStats() {
   const saved = ((state.settings || {}).statOrder || []).map(k => renamed[k] || k).filter(k => TILES[k]);
   const order = [...saved, ...Object.keys(TILES).filter(k => !saved.includes(k))];
   const tile = k => `<div class="card stat${(k === 'fav' && fav) || (k === 'want' && wantList.length) ? ' stat-fav' : ''}" data-stat="${k}"><span class="stat-v">${TILES[k][1]}</span><span class="stat-l">${TILES[k][0]}</span></div>`;
-  view.innerHTML = `<div class="page stats-page">
+  view.innerHTML = `<div class="page stats-page" data-wood="${woodOf()}">
     <header class="w-head"><a class="back" href="#/books">‹ Books</a></header>
     <h1 class="w-title small-title">Reading stats</h1>
     <div class="year-nav"><button class="rw-arrow" id="py" aria-label="Previous year" ${year <= minY ? 'disabled' : ''}>‹</button><span class="year">${year}</span><button class="rw-arrow" id="ny" aria-label="Next year" ${year >= maxY ? 'disabled' : ''}>›</button></div>

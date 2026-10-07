@@ -38,6 +38,16 @@
 .case-head { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; margin: 0 4px 8px; }
 .case-name { margin: 0; font-family: var(--font-head); font-weight: 500; font-size: 1.5rem; color: #ecd9ae; line-height: 1.1; }
 
+/* The wood (Edit shelves → Wood). Walnut is the original. --w-back is the
+   back panel, --w-frame/--w-frame-dk the edge, the rest the plank from its
+   lit top edge (--w-hi) down to its shadowed front (--w-edge). */
+[data-wood] { --w-back: #2a1b12; --w-frame: #4a2f1c; --w-frame-dk: #1e130b; --w-hi: #9a6e45; --w-mid: #7a5232; --w-lo: #5e3d24; --w-dk: #2c1b10; --w-edge: #1a100a; }
+[data-wood="mahogany"] { --w-back: #2a120d; --w-frame: #5c2418; --w-frame-dk: #1f0a06; --w-hi: #a4553a; --w-mid: #84402a; --w-lo: #632c1c; --w-dk: #2e130b; --w-edge: #1b0a06; }
+[data-wood="cherry"] { --w-back: #33160c; --w-frame: #6e2f18; --w-frame-dk: #250d06; --w-hi: #c0714a; --w-mid: #9f5534; --w-lo: #7a3c23; --w-dk: #36180c; --w-edge: #1e0c06; }
+[data-wood="oak"] { --w-back: #4d3823; --w-frame: #7d5d34; --w-frame-dk: #2a1d0f; --w-hi: #c39a5f; --w-mid: #a47c45; --w-lo: #7d5c31; --w-dk: #3a2914; --w-edge: #22170b; }
+[data-wood="maple"] { --w-back: #6e5639; --w-frame: #a8885a; --w-frame-dk: #33261a; --w-hi: #e0c08c; --w-mid: #c8a46c; --w-lo: #a3814f; --w-dk: #4d3b22; --w-edge: #2b2012; }
+[data-wood="ebony"] { --w-back: #151211; --w-frame: #2d2724; --w-frame-dk: #0a0807; --w-hi: #4d443e; --w-mid: #3a322d; --w-lo: #2a2420; --w-dk: #120f0d; --w-edge: #080605; }
+
 /* Each row of books is exactly --row tall, so the planks (a repeating stripe)
    always land under the books, however many rows a shelf wraps onto. */
 .case-row {
@@ -47,13 +57,13 @@
   background:
     repeating-linear-gradient(to bottom,
       transparent 0 calc(var(--row) - var(--plank)),
-      #9a6e45 calc(var(--row) - var(--plank)), #7a5232 calc(var(--row) - var(--plank) + 3px),
-      #5e3d24 calc(var(--row) - 5px), #2c1b10 calc(var(--row) - 1px), #1a100a var(--row)),
+      var(--w-hi, #9a6e45) calc(var(--row) - var(--plank)), var(--w-mid, #7a5232) calc(var(--row) - var(--plank) + 3px),
+      var(--w-lo, #5e3d24) calc(var(--row) - 5px), var(--w-dk, #2c1b10) calc(var(--row) - 1px), var(--w-edge, #1a100a) var(--row)),
     repeating-linear-gradient(to bottom, rgba(0,0,0,.45) 0, transparent 26px, transparent var(--row)),
     repeating-linear-gradient(90deg, rgba(255,255,255,.018) 0 2px, transparent 2px 11px),
     linear-gradient(90deg, rgba(0,0,0,.4), transparent 8%, transparent 92%, rgba(0,0,0,.4)),
-    #2a1b12;
-  box-shadow: inset 0 0 0 7px #4a2f1c, inset 0 0 0 9px #1e130b, 0 12px 26px rgba(0,0,0,.45);
+    var(--w-back, #2a1b12);
+  box-shadow: inset 0 0 0 7px var(--w-frame, #4a2f1c), inset 0 0 0 9px var(--w-frame-dk, #1e130b), 0 12px 26px rgba(0,0,0,.45);
 }
 .slot { position: relative; height: var(--row); display: flex; align-items: flex-end; padding-bottom: var(--plank); }
 .case-row > .slot:first-child { margin-left: 2px; }
@@ -354,7 +364,7 @@
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--si) 55%, transparent), inset -3px 0 0 color-mix(in srgb, var(--si) 55%, transparent), 0 1px 1px rgba(0,0,0,.35);
 }
 .stack-more { font: 700 .7rem/1 system-ui, sans-serif; color: var(--page-muted); margin-bottom: 3px; }
-.month-shelf { display: block; width: 92%; height: 6px; border-radius: 2px; background: linear-gradient(#9a6e45, #6b4529); box-shadow: 0 2px 3px rgba(0,0,0,.4); }
+.month-shelf { display: block; width: 92%; height: 6px; border-radius: 2px; background: linear-gradient(var(--w-hi, #9a6e45), var(--w-lo, #6b4529)); box-shadow: 0 2px 3px rgba(0,0,0,.4); }
 .month-name { display: block; width: 100%; margin-top: 7px; font-family: var(--font-head); font-style: italic; font-size: 1.2rem; line-height: 1.1; color: #ecd9ae; text-align: center; white-space: nowrap; overflow: hidden; }
 .month-count { font: 600 .7rem/1.4 system-ui, sans-serif; color: var(--page-muted); }
 .month-list { margin-top: 10px; }
@@ -593,3 +603,11 @@
 .case-add::before, .case-add::after { content: ''; position: absolute; left: 50%; top: 50%; width: 9px; height: 1.5px; border-radius: 1px; background: #ecd9ae; transform: translate(-50%, -50%); }
 .case-add::after { transform: translate(-50%, -50%) rotate(90deg); }
 .case-add:hover, .case-add:focus-visible { opacity: 1; border-color: rgba(236,217,174,.6); }
+
+/* Edit shelves → Wood: a swatch for each, with its name under it. */
+.wood-pick { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px 6px; }
+.wood { display: grid; justify-items: center; gap: 5px; background: none; border: 0; padding: 4px 0; color: var(--ink); font: inherit; font-size: .88rem; cursor: pointer; }
+.wood-dot { width: 40px; height: 40px; border-radius: 50%; box-shadow: inset 0 0 0 1px rgba(0,0,0,.25);
+  background: repeating-linear-gradient(100deg, rgba(255,255,255,.07) 0 2px, transparent 2px 6px), linear-gradient(160deg, var(--w-hi), var(--w-mid) 45%, var(--w-lo) 80%, var(--w-dk)); }
+.wood.on .wood-dot { outline: 2.5px solid var(--ink, #2b221a); outline-offset: 3px; }
+.wood.on { font-weight: 600; }
