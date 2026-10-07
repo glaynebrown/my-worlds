@@ -100,7 +100,7 @@ function showUnlock(reason) {
 // Tapping a look asks for the world's name (you type it), then makes the world
 // with that look and no tracker yet (set one up in its settings).
 function renderLooksPick() {
-  const looks = Object.entries(Themes.BUILT_IN);
+  const looks = Themes.pickable().map(k => [k, Themes.BUILT_IN[k]]);
   view.innerHTML = `<div class="library">
     <header class="w-head"><a class="back" href="#/">‹ Worlds</a></header>
     <header class="lib-head"><div class="lib-crest" aria-hidden="true">${CREST}</div>

@@ -29,7 +29,7 @@ const TOUR_STEPS = {
   ],
   books: [
     { scene: 'booksHome', target: '.slot', text: 'Tap a book to open it. Hold one to move it, even onto another shelf.' },
-    { scene: 'booksHome', target: '.case-add', text: 'Tap the + beside a shelf’s name to put a new book on it.' },
+    { scene: 'booksHome', target: '.case-add', text: 'Tap the + beside a shelf’s name to put a new book on it. Search by title, or tap Scan a book and point your camera at its barcode or cover.' },
     { scene: 'booksHome', target: '.home-gear', text: 'Add books, edit your shelves and set a reading goal here.' },
     { scene: 'booksRibbon', target: '.slot:has(.ribbon)', text: 'Turn on bookmark ribbons in Edit shelves to see how far you are in each book you’re reading.' },
     { scene: 'booksGreen', target: '.plant-slot', text: 'Add trailing vines and potted plants in Edit shelves, then use Arrange bookcase to move them wherever you like.' },
@@ -54,14 +54,14 @@ const TOUR_SAMPLE = (self.FAMILY && self.FAMILY.TOUR) || {
   world: { theme: 'avatar', now: 'The Mountain Temple', at: 'Season 1, Episode 3', total: 61 },
   canon: { theme: 'twd', endAt: 'S5 E1 · The Long Road', ending: 'They walk out of the city together, and nobody else gets left behind.', headcanon: 'Jonah keeps every one of the kids’ drawings in his saddlebag.' },
   books: [
-    { title: 'The Ember Crown', author: 'Mara Ellis', series: 'The Ember Court', seriesNo: '1', pages: 448, ...sampleLook('#2a1215', '#f6ece2', '#2a1a17', '#c9973f', 'Cinzel', '#5e1820', '#e6c27a') },
-    { title: 'The Smoke Throne', author: 'Mara Ellis', series: 'The Ember Court', seriesNo: '2', pages: 512, ...sampleLook('#1d1a24', '#f1edf6', '#221d2b', '#9a7bc8', 'Cinzel', '#2f2742', '#d9c7f2') },
-    { title: 'The Ash Queen', author: 'Mara Ellis', series: 'The Ember Court', seriesNo: '3', pages: 560, ...sampleLook('#2b2620', '#f3eee6', '#2b2620', '#b0823c', 'Cinzel', '#4a4036', '#efd9a8') },
+    { title: 'A Thief of Quiet Lanterns', author: 'Edessa Layne', series: 'The Court of Quiet Lanterns', seriesNo: '1', pages: 448, ...sampleLook('#2a1215', '#f6ece2', '#2a1a17', '#c9973f', 'Cinzel', '#5e1820', '#e6c27a') },
+    { title: 'A Prince of Unlit Stars', author: 'Edessa Layne', series: 'The Court of Quiet Lanterns', seriesNo: '2', pages: 512, ...sampleLook('#1d1a24', '#f1edf6', '#221d2b', '#9a7bc8', 'Cinzel', '#2f2742', '#d9c7f2') },
+    { title: 'A Queen of Last Embers', author: 'Edessa Layne', series: 'The Court of Quiet Lanterns', seriesNo: '3', pages: 560, ...sampleLook('#2b2620', '#f3eee6', '#2b2620', '#b0823c', 'Cinzel', '#4a4036', '#efd9a8') },
     { title: 'Tides of Glass', author: 'June Hartley', pages: 384, ...sampleLook('#d9e8ee', '#fbfdfd', '#1f3a48', '#3d7f99', 'Playfair Display', '#2f6f86', '#f2efe6') },
     { title: 'Starfall Academy', author: 'Theo Vance', pages: 420, ...sampleLook('#1c1a17', '#ebe3d3', '#231e18', '#7a2e2e', 'IM Fell English SC', '#232a3f', '#e9d9b0') },
   ],
-  quote: { text: '“Even the dark keeps a little starlight for the ones who look up.”', by: 'Kael to Wren, p. 312' },
-  notes: [['Sep 28', 'p. 112', 'The masked ball!! And the library scene was so creepy.'], ['Sep 30', 'p. 241', 'Not sure how I feel about this bargain.'], ['Oct 2', 'p. 356', 'Kael stealing every scene he’s in.']],
+  quote: { text: '“Even the dark keeps a little starlight for the ones who look up.”', by: 'Leon to Briar, p. 312' },
+  notes: [['Sep 28', 'p. 112', 'The masked ball!! And the library scene was so creepy.'], ['Sep 30', 'p. 241', 'Not sure how I feel about this bargain.'], ['Oct 2', 'p. 356', 'Leon stealing every scene he’s in.']],
 };
 const TOUR_DOORS = TOUR_SAMPLE.doors;
 function tourWorld(theme) {

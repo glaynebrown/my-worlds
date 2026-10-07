@@ -2252,7 +2252,7 @@ function renderBookForm(book) {
   let orn = isNew ? shuffleOrn(b) : ornOf(b), ornTouched = !isNew;
   let sBot = b.spineBottom || '', sTop = b.spineTop || '', sit = sitOf(b);
   const parts = { ending: true, ships: true, headcanons: true, ...(b.canonParts || {}) };
-  const worldKeys = Object.keys(Themes.BUILT_IN);
+  const worldKeys = Themes.pickable();
   const swatchRow = (id, list, cur) => `<div class="swatches ink-swatches" id="${id}">
       <button type="button" class="swatch auto${cur ? '' : ' on'}" data-c="" aria-label="Automatic" title="From the look">A</button>
       ${list.map(([c, n]) => `<button type="button" class="swatch${cur === c ? ' on' : ''}" style="--c:${c}" data-c="${c}" aria-label="${n}" title="${n}"></button>`).join('')}

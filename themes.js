@@ -93,6 +93,9 @@ const Themes = (() => {
   // Your family's names for these looks (family-data.js). The App Store app
   // shows them under the names above, with nothing borrowed from the shows.
   if (self.FAMILY && self.FAMILY.LOOKS) Object.entries(self.FAMILY.LOOKS).forEach(([k, v]) => Object.assign(BUILT_IN[k], v));
+  // Looks you can pick for a new world or book. The App Store app leaves out
+  // Wild city (worlds already wearing it keep it).
+  const pickable = () => Object.keys(BUILT_IN).filter(k => !(typeof STORE !== 'undefined' && STORE && k === 'tlou'));
 
   // "Add a world": starting looks you can then tweak.
   const PRESETS = [
@@ -294,5 +297,5 @@ const Themes = (() => {
   const STARTERS = (self.FAMILY && self.FAMILY.STARTERS) || [];
   const STARTER_ITEMS = (self.FAMILY && self.FAMILY.STARTER_ITEMS) || [];
 
-  return { parseEntry, BUILT_IN, PRESETS, BOOK_PRESETS, headFont, FONTS, apply, info, palette, steps, groupName, loadFont, isDark, STARTERS, STARTER_ITEMS };
+  return { parseEntry, BUILT_IN, pickable, PRESETS, BOOK_PRESETS, headFont, FONTS, apply, info, palette, steps, groupName, loadFont, isDark, STARTERS, STARTER_ITEMS };
 })();
