@@ -32,7 +32,7 @@ const TOUR_STEPS = {
     { scene: 'booksHome', target: '.case-add', text: 'Tap the + beside a shelf’s name to put a new book on it.' },
     { scene: 'booksHome', target: '.home-gear', text: 'Add books, edit your shelves and set a reading goal here.' },
     { scene: 'booksRibbon', target: '.slot:has(.ribbon)', text: 'Turn on bookmark ribbons in Edit shelves to see how far you are in each book you’re reading.' },
-    { scene: 'booksGreen', target: '.plant-slot', text: 'Add trailing vines and potted plants in Edit shelves, then use Arrange greenery to move them wherever you like.' },
+    { scene: 'booksGreen', target: '.plant-slot', text: 'Add trailing vines and potted plants in Edit shelves, then use Arrange bookcase to move them wherever you like.' },
     { scene: 'booksFinish', target: '[data-when="today"]', gap: 118, text: 'Moving a book to Read asks when you finished it. Only dated finishes count toward your goal, and each one gets a little confetti.' },
     { scene: 'book', target: '.w-tabs', gap: 170, text: 'Every book has About, Notes, Quotes and a Board. Reviews, a Map, My Canon and Fics are optional pages you can turn on or off in its settings.' },
     { scene: 'bookNotes', target: '.bnote', text: 'Add notes as you read. Each one gets the date and your page.' },

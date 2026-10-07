@@ -330,25 +330,68 @@ function spineHtml(b, opts = {}) {
       ${b.series && b.seriesNo ? `<span class="spine-no">${esc(b.seriesNo)}</span>` : ''}<span class="spine-title">${esc(b.title)}</span></button></div>`;
 }
 
+// ---------- how a book sits (its settings, or tap it while arranging) ----------
+// Upright (the spine), cover out (its front cover facing you), or lying flat.
+// Books lying flat next to each other make a stack; a plant can sit on top.
+const SITS = [['up', 'Upright'], ['cover', 'Cover out'], ['flat', 'Lying flat']];
+const sitOf = b => (b.sit === 'cover' || b.sit === 'flat' ? b.sit : 'up');
+const STACK_MAX = 150; // px of books in one stack, so a small plant still fits on top
+
+function faceHtml(b, h) {
+  const s = spineStyle(b), w = Math.round(h * 0.66);
+  return `<div class="slot face" style="--w:${w}px;--h:${h}px;--sb:${cssColor(s.bg)};--si:${cssColor(s.ink)}">
+    <button class="spine face-book" data-book="${esc(b.id)}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}">${coverHtml(b, 'face-cover')}</button></div>`;
+}
+function flatHtml(b) {
+  const s = spineStyle(b), t = Math.min(38, s.w), len = Math.round(s.h * 0.84), x = (hashOf(b.id) % 9) - 4;
+  Themes.loadFont(s.font);
+  const fs = Math.max(7.5, Math.min(t * 0.42, 12.5));
+  return `<div class="slot flat" style="--w:${len}px;--t:${t}px;--x:${x}px;--fs:${fs.toFixed(1)}px;--sb:${cssColor(s.bg)};--si:${cssColor(s.ink)};--sf:'${esc(s.font.replace(/'/g, ''))}'">
+    <button class="spine flat-book" data-book="${esc(b.id)}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}"><span class="flat-title">${esc(b.title)}</span></button></div>`;
+}
+// A run of books in order: upright and cover-out books stand on their own;
+// books lying flat side by side are piled into stacks (a new one past STACK_MAX).
+function booksHtml(list, hOf) {
+  let html = '', pile = [], tall = 0;
+  const flush = () => { if (pile.length) html += `<div class="stack">${pile.map(flatHtml).join('')}</div>`; pile = []; tall = 0; };
+  list.forEach(b => {
+    const sit = sitOf(b);
+    if (sit === 'flat') {
+      const t = Math.min(38, spineStyle(b).w);
+      if (pile.length && tall + t > STACK_MAX) flush();
+      pile.push(b); tall += t;
+      return;
+    }
+    flush();
+    html += sit === 'cover' ? faceHtml(b, hOf(b)) : spineHtml(b, { h: hOf(b) });
+  });
+  flush();
+  return html;
+}
+
 // A shelf's books, with each run of 2+ books from one series grouped together
 // and a little name plate for the series on the shelf's edge underneath.
 // Books that aren't a set never stand at the same height side by side: if one
 // would match its neighbor, it's made a little taller or shorter.
 function shelfRowHtml(list) {
-  let html = '', prevH = null;
+  let html = '', prevH = null, singles = [];
   const nudge = h => (prevH != null && Math.abs(h - prevH) < 5 ? (h > 152 ? h - 12 : h + 12) : h);
+  const hs = new Map();
+  const flushSingles = () => { if (singles.length) html += booksHtml(singles, b => hs.get(b.id)); singles = []; };
   for (let i = 0; i < list.length;) {
     const key = seriesKey(list[i]);
     let j = i + 1;
     while (key && j < list.length && seriesKey(list[j]) === key) j++;
     const h = nudge(spineStyle(list[i]).h);
     if (j - i >= 2) {
-      html += `<div class="ser-grp">${list.slice(i, j).map(b => spineHtml(b, { h })).join('')}
+      flushSingles();
+      html += `<div class="ser-grp">${booksHtml(list.slice(i, j), () => h)}
         <a class="ser-plate" href="${seriesHref(list[i].series)}" title="${esc(list[i].series)}" data-short="${esc(seriesShortOf(key))}">${esc(list[i].series)}</a></div>`;
-    } else html += spineHtml(list[i], { h });
-    prevH = h;
+    } else { hs.set(list[i].id, h); singles.push(list[i]); }
+    if (sitOf(list[i]) === 'up') prevH = h;
     i = j;
   }
+  flushSingles();
   return html;
 }
 
@@ -492,9 +535,9 @@ const POT_SIZES = [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']];
 const greensOf = id => (((state.settings || {}).greens) || {})[id] || {};
 const lastBookIn = el => { const s = $$('.spine[data-book]', el); return s.length ? s[s.length - 1].dataset.book : null; };
 const rowEnd = row => [...row.children].find(el => el.classList.contains('greenery') || el.classList.contains('end-pot')) || null;
-const shelfItems = row => [...row.children].filter(el => (el.classList.contains('slot') || el.classList.contains('ser-grp'))
+const shelfItems = row => [...row.children].filter(el => (el.classList.contains('slot') || el.classList.contains('ser-grp') || el.classList.contains('stack'))
   && !el.classList.contains('plant-slot'));
-let arranging = false; // Arrange greenery mode (the bookcase only)
+let arranging = false; // Arrange bookcase mode: move plants and books, tap a book to pick how it sits
 
 function plantSlotEl(p) {
   const k = POT_K[p.size] || POT_K.m, w = Math.round(46 * k);
@@ -540,6 +583,8 @@ function growGreenery(root = document, force) {
       const items = shelfItems(row);
       g.pots.forEach(p => {
         const i = p.after == null ? -1 : items.findIndex(el => lastBookIn(el) === p.after);
+        // On top of a stack of books lying flat (its "after" is that stack's top book).
+        if (p.top && i >= 0 && items[i].classList.contains('stack')) { items[i].appendChild(plantSlotEl(p)); return; }
         const ref = p.after == null ? items[0] : i >= 0 ? items[i + 1] : items[Math.min(p.index ?? items.length, items.length)];
         row.insertBefore(plantSlotEl(p), ref || null);
       });
@@ -635,9 +680,13 @@ window.addEventListener('hashchange', () => { const [p, id] = parseHash(); if (p
 function potsFromDom(row) {
   const out = [];
   let last = null, n = 0;
+  const pot = (el, top) => ({ kind: el.dataset.kind, size: el.dataset.size, seed: Number(el.dataset.seed), after: last, index: n, ...(top ? { top: true } : {}) });
   [...row.children].forEach(el => {
-    if (el.classList.contains('plant-slot')) out.push({ kind: el.dataset.kind, size: el.dataset.size, seed: Number(el.dataset.seed), after: last, index: n });
-    else if (el.classList.contains('slot') || el.classList.contains('ser-grp')) { last = lastBookIn(el) || last; n++; }
+    if (el.classList.contains('plant-slot')) out.push(pot(el));
+    else if (el.classList.contains('slot') || el.classList.contains('ser-grp') || el.classList.contains('stack')) {
+      last = lastBookIn(el) || last; n++;
+      $$(':scope > .plant-slot', el).forEach(p => out.push(pot(p, true)));
+    }
   });
   return out;
 }
@@ -692,13 +741,22 @@ function sideMenu(shelf) {
 
 function potMenu(el) {
   const row = el.closest('.case-row'), shelf = row.closest('.case').dataset.shelf;
+  const onStack = el.parentElement.classList.contains('stack');
+  const stackBeside = !onStack && el.previousElementSibling && el.previousElementSibling.classList.contains('stack');
   const save = () => saveGreens({ [shelf]: { ...keepShelf(shelf) } });
   openModal(`<h2>This plant</h2>
     <div class="field"><span class="field-label">Plant</span><div class="chips bot-chips" id="pk">${POT_KINDS.map(([k, l]) => `<button type="button" class="chip${k === el.dataset.kind ? ' on' : ''}" data-k="${k}">${l}</button>`).join('')}</div></div>
     <div class="field"><span class="field-label">Size</span><div class="chips bot-chips" id="ps">${POT_SIZES.map(([k, l]) => `<button type="button" class="chip${k === el.dataset.size ? ' on' : ''}" data-s="${k}">${l}</button>`).join('')}</div></div>
+    ${onStack || stackBeside ? `<label class="switch"><input type="checkbox" id="pontop" ${onStack ? 'checked' : ''}><span class="track"></span><span>Sit on top of the stack</span></label>` : ''}
     <div class="actions"><button type="button" class="btn ghost danger-text" id="prm">Remove</button><span class="spacer"></span><button type="button" class="btn primary" data-close>Done</button></div>`, (root, close) => {
     const idx = $$('.plant-slot', row).indexOf(el);
     const live = () => $$('.plant-slot', rowOfShelf(shelf))[idx];
+    if ($('#pontop', root)) $('#pontop', root).onchange = e => {
+      const p = live();
+      if (e.target.checked) { const st = p.previousElementSibling; if (st && st.classList.contains('stack')) st.appendChild(p); }
+      else p.parentElement.after(p);
+      save();
+    };
     $('#pk', root).onclick = e => { const c = e.target.closest('[data-k]'); if (!c) return; $$('#pk .chip', root).forEach(x => x.classList.toggle('on', x === c)); live().dataset.kind = c.dataset.k; save(); };
     $('#ps', root).onclick = e => { const c = e.target.closest('[data-s]'); if (!c) return; $$('#ps .chip', root).forEach(x => x.classList.toggle('on', x === c)); live().dataset.size = c.dataset.s; save(); };
     $('#prm', root).onclick = () => { live().remove(); save(); close(); };
@@ -1030,7 +1088,7 @@ function renderBooks() {
         ? `<span>${year} · ${done} of ${goal} books</span><span class="goal-bar"><span style="width:${Math.min(100, Math.round((done / goal) * 100))}%"></span></span>`
         : `<span>${done ? `${done} finished in ${year} · ` : ''}Set a ${year} reading goal ›</span>`}</a></header>
     <div class="bookcase${arranging ? ' arranging' : ''}" id="case" data-wood="${woodOf()}">${shelvesOf().map(caseHtml).join('')}</div>
-    ${arranging ? `<div class="arrange-bar"><span>Drag the pots, vines and books. Tap a plant to change or remove it.</span><button class="btn primary" id="adone">Done</button></div>` : ''}
+    ${arranging ? `<div class="arrange-bar"><span>Drag the books and plants. Tap a book to stand it upright, face its cover out or lay it flat. Tap a plant to change it.</span><button class="btn primary" id="adone">Done</button></div>` : ''}
     ${state.books.length ? '' : `<div class="side-empty"><p class="empty">No books yet</p>
       <div class="side-empty-btns">${isOwner() || (state.settings && state.settings.trial) ? '' : '<a class="btn" href="#/books/pick">Browse the library</a>'}<button class="btn ghost" id="e-add">Add a book</button></div></div>`}
   </div>`;
@@ -1050,12 +1108,13 @@ function renderBooks() {
   }, 'small-modal');
   fitSpines(view);
   fitPlates(view);
+  paintCovers(view);
   growGreenery(view);
   // Arranging greenery: books can still be held and dragged, to plan around them.
   enableSpineDrag($('#case'));
   if (arranging) {
     wireArrange($('#case'));
-    $('#adone').onclick = () => { arranging = false; renderBooks(); toast('Greenery saved'); };
+    $('#adone').onclick = () => { arranging = false; renderBooks(); toast('Bookcase saved'); };
   }
   maybeTour('books');
 }
@@ -1075,7 +1134,7 @@ function shelvesForm() {
       <div class="wood-pick" id="woods">${WOODS.map(([k, l]) => `<button type="button" class="wood${k === woodOf() ? ' on' : ''}" data-wood="${k}" aria-pressed="${k === woodOf()}"><span class="wood-dot"></span>${l}</button>`).join('')}</div></div>
     <div class="field greenery-pick"><span class="field-label">Greenery on the bookcase</span>
       <div class="chips bot-chips" id="greens">${GREENERY.map(([k, l]) => `<button type="button" class="chip${k === greeneryOf() ? ' on' : ''}" data-g="${k}">${l}</button>`).join('')}</div>
-      <button type="button" class="btn small arrange-open" id="garr" ${greeneryOf() === 'none' ? 'disabled' : ''}>Arrange greenery</button></div>
+      <button type="button" class="btn small arrange-open" id="garr">Arrange bookcase</button></div>
     <label class="switch ribbon-switch"><input type="checkbox" id="confetti" ${!state.settings || state.settings.confetti !== false ? 'checked' : ''}><span class="track"></span><span>Confetti when I finish a book</span></label>
     <p class="muted small">With My order, hold a book on the shelf to drag it. Books in a series always stand together, in order. A hidden shelf keeps its name and settings for later. Removing a shelf moves its books to the first one showing.</p>
     <div class="actions"><span class="spacer"></span><button class="btn" data-close>Cancel</button><button class="btn primary" id="ssave">Save</button></div>`, (root, close) => {
@@ -1103,7 +1162,6 @@ function shelvesForm() {
     $('#greens', root).onclick = e => {
       const c = e.target.closest('[data-g]');
       if (c) $$('#greens .chip', root).forEach(x => x.classList.toggle('on', x === c));
-      if (c) $('#garr', root).disabled = c.dataset.g === 'none';
     };
     // Saves these settings, then opens the bookcase for arranging.
     $('#garr', root).onclick = () => { arranging = true; $('#ssave', root).click(); };
@@ -1260,10 +1318,28 @@ function enableSpineDrag(caseEl) {
     const add = e.target.closest('[data-add]');
     if (add) { newBookShelf = add.dataset.add; location.hash = '#/books/new'; return; }
     const sp = e.target.closest('.spine[data-book]');
-    if (!sp || dragging || justDragged || arranging) return; // arranging: books move, but don't open
+    if (!sp || dragging || justDragged) return;
+    if (arranging) { sitMenu(bookById(sp.dataset.book)); return; } // arranging: books move, and a tap picks how one sits
     openBook(sp, bookById(sp.dataset.book));
   }, opts);
   caseEl.addEventListener('contextmenu', e => { if (e.target.closest('.spine')) e.preventDefault(); }, opts);
+}
+
+// While arranging: upright, cover out or lying flat.
+function sitMenu(b) {
+  if (!b) return;
+  openModal(`<h2>${esc(b.title)}</h2><div class="field"><span class="field-label">How it sits on the shelf</span>
+      <div class="chips bot-chips" id="sits">${SITS.map(([k, l]) => `<button type="button" class="chip${k === sitOf(b) ? ' on' : ''}" data-sit="${k}">${l}</button>`).join('')}</div></div>
+    <div class="actions"><span class="spacer"></span><button type="button" class="btn primary" data-close>Done</button></div>`, (root, close) => {
+    $('#sits', root).onclick = e => {
+      const c = e.target.closest('[data-sit]');
+      if (!c || c.dataset.sit === sitOf(b)) return;
+      $$('#sits .chip', root).forEach(x => x.classList.toggle('on', x === c));
+      b.sit = c.dataset.sit;
+      DB.updateBook(b, { sit: c.dataset.sit }).catch(err => toast(friendlyError(err), true));
+      renderBooks();
+    };
+  }, 'small-modal');
 }
 
 // ---------- pulling a book off the shelf ----------
@@ -1934,7 +2010,7 @@ function renderBookForm(book) {
   // The spine design: a new book gets one that fits its look (and a new one when the look
   // changes), until one is picked or shuffled by hand.
   let orn = isNew ? shuffleOrn(b) : ornOf(b), ornTouched = !isNew;
-  let sBot = b.spineBottom || '', sTop = b.spineTop || '';
+  let sBot = b.spineBottom || '', sTop = b.spineTop || '', sit = sitOf(b);
   const parts = { ending: true, ships: true, headcanons: true, ...(b.canonParts || {}) };
   const worldKeys = Object.keys(Themes.BUILT_IN);
   const swatchRow = (id, list, cur) => `<div class="swatches ink-swatches" id="${id}">
@@ -2000,6 +2076,8 @@ function renderBookForm(book) {
         <div class="chips bot-chips" id="toppick">${SPINE_TOPS.map(([k, l]) => `<button type="button" class="chip" data-top="${k}">${l}</button>`).join('')}</div></div>
       <div class="field"><span class="field-label">Bottom of the spine</span>
         <div class="chips bot-chips" id="botpick">${SPINE_BOTTOMS.map(([k, l]) => `<button type="button" class="chip${k === sBot ? ' on' : ''}" data-bot="${k}">${l}</button>`).join('')}</div></div>
+      <div class="field"><span class="field-label">How it sits on the shelf</span>
+        <div class="chips bot-chips" id="sitpick">${SITS.map(([k, l]) => `<button type="button" class="chip${k === sit ? ' on' : ''}" data-sit="${k}">${l}</button>`).join('')}</div></div>
       <label class="switch" id="serieswrap" hidden><input type="checkbox" id="allseries"><span class="track"></span><span id="serieslabel"></span></label>
 
       <h2 class="form-h">Linked world</h2>
@@ -2131,6 +2209,7 @@ function renderBookForm(book) {
   swatches('rcols', v => { rCol = v; });
   $$('#botpick .chip').forEach(ch => { ch.onclick = () => { sBot = ch.dataset.bot; draw(); }; });
   $$('#toppick .chip').forEach(ch => { ch.onclick = () => { sTop = ch.dataset.top; draw(); }; });
+  $$('#sitpick .chip').forEach(ch => { ch.onclick = () => { sit = ch.dataset.sit; $$('#sitpick .chip').forEach(x => x.classList.toggle('on', x === ch)); }; });
   $('#ornshuffle').onclick = () => { orn = shuffleOrn(current(), orn); ornTouched = true; draw(); };
   $('#bgfile').onchange = async e => {
     const f = e.target.files[0];
@@ -2207,7 +2286,7 @@ function renderBookForm(book) {
         totalChapters: Number($('#chapters').value) || null,
         blurb: $('#blurb').value.trim(), shelf: c.shelf, theme,
         look: theme === 'custom' ? { ...readLook(), photo: lookDrop ? null : (look.photo || null) } : (b.look || null),
-        spineFont: c.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, spineOrn: orn, spineBottom: sBot, spineTop: sTop, worldId: $('#world').value || null,
+        spineFont: c.spineFont, spineInk: sInk, spineBg: sBg, ribbonColor: rCol, spineOrn: orn, spineBottom: sBot, spineTop: sTop, sit, worldId: $('#world').value || null,
         mapOn: $('#mapon').checked, canonOn: $('#canon').checked, canonParts: canonPicked,
         reviewsOn: $('#reviewson').checked, ficsOn: $('#ficson').checked,
       };
