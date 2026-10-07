@@ -63,6 +63,18 @@ async function busy(btn, fn, text = 'Saving…') {
 // catches up when the pop-up closes.
 let modalOpen = 0, missedRefresh = false;
 
+// The iPhone keyboard slides over the bottom of the screen without shrinking
+// the page, so --kb (its height) lifts pop-ups up above it (styles.css).
+if (window.visualViewport) {
+  const keyboard = () => {
+    const v = visualViewport;
+    const h = Math.max(0, Math.round(window.innerHeight - v.height - v.offsetTop));
+    document.documentElement.style.setProperty('--kb', `${h}px`);
+  };
+  visualViewport.addEventListener('resize', keyboard);
+  visualViewport.addEventListener('scroll', keyboard);
+}
+
 // onClose: called once when it closes, however it was closed.
 function openModal(html, onMount, extraClass = '', onClose) {
   const bg = document.createElement('div');

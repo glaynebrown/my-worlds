@@ -418,9 +418,10 @@ a.ship { text-decoration: none; }
 .swatch.on { box-shadow: 0 0 0 2px var(--card), 0 0 0 4px var(--ink); }
 
 /* ---------- pop-ups & toast ---------- */
-.modal-bg { position: fixed; inset: 0; z-index: 50; background: rgba(10,8,6,.55); display: flex; align-items: flex-end; justify-content: center; animation: fade .15s; }
+.modal-bg { position: fixed; inset: 0; z-index: 50; background: rgba(10,8,6,.55); display: flex; align-items: flex-end; justify-content: center; animation: fade .15s;
+  padding-bottom: var(--kb, 0px); transition: padding-bottom .25s ease-out; }
 .modal {
-  width: 100%; max-width: 560px; max-height: 92vh; overflow-y: auto; -webkit-overflow-scrolling: touch;
+  width: 100%; max-width: 560px; max-height: calc(92vh - var(--kb, 0px)); overflow-y: auto; -webkit-overflow-scrolling: touch;
   background: var(--card); color: var(--ink); border-radius: 20px 20px 0 0; padding: 20px 18px calc(env(safe-area-inset-bottom) + 20px);
   animation: rise .2s ease-out;
 }
