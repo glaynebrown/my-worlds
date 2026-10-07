@@ -201,18 +201,54 @@ function wireFlip(to) {
     setTimeout(() => { flipIn = true; location.hash = to; }, 200);
   };
 }
-// The bottom of both sides' gear menus: your name, sign out, delete.
-const accountRows = nick => `${onTrial() ? '<button class="btn block primary" id="m-unlock">Unlock everything</button>' : ''}<button class="btn block ghost name-row" id="nick"><span class="muted small">Your name</span><span>${esc(nick || 'Add your name')}</span></button>
-  <button class="btn block ghost" id="m-backup">Backup &amp; restore</button>
-  <a class="btn block ghost" href="https://glaynebrown.github.io/my-worlds/support.html" target="_blank" rel="noopener">Help &amp; privacy</a>
-  <button class="btn block ghost" id="out">Sign out</button>
-  <button class="linkish danger-text" id="gone">Delete my account</button>`;
+// Both sides' gear menus: a list like iPhone Settings. Each row has a small
+// line icon, its name and a ›. On the free trial, the Unlock card sits on top;
+// then the side's own rows; then Account & help, which opens its own small
+// screen (your name, backup, help, sign out, delete).
+const MENU_ICONS = {
+  plus: '<path d="M12 5v14M5 12h14"/>',
+  star: '<path d="M12 3.5l2.6 5.3 5.8.8-4.2 4.1 1 5.8L12 16.8l-5.2 2.7 1-5.8-4.2-4.1 5.8-.8z"/>',
+  sparkle: '<path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"/><path d="M19 16v4M17 18h4"/>',
+  map: '<path d="M9 4L3 6v14l6-2 6 2 6-2V4l-6 2z"/><path d="M9 4v14M15 6v14"/>',
+  shelves: '<path d="M3 20h18M3 11h18"/><path d="M5 11V5h3v6M9.5 11V4h3v7M14.5 11l1.6-5.8 2.9.8-1.4 5"/><path d="M5 20v-6h3v6M10 20v-5h3v5"/>',
+  goal: '<path d="M4 20V11M10 20V5M16 20v-8M2 20h20"/>',
+  person: '<circle cx="12" cy="8" r="3.6"/><path d="M4.5 20.5c1.4-3.7 4.3-5.5 7.5-5.5s6.1 1.8 7.5 5.5"/>',
+  box: '<path d="M3.5 4.5h17v3.5h-17zM5 8v11.5h14V8M10 12h4"/>',
+  help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4M12 16.8v.2"/>',
+  out: '<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>',
+};
+// attrs: 'id="x"' or 'href="#/y" data-close' (a link). value: shown muted on the right.
+function menuRow(attrs, icon, label, { value = '', cls = '' } = {}) {
+  const tag = /\bhref=/.test(attrs) ? 'a' : 'button';
+  return `<${tag} class="menu-row${cls ? ` ${cls}` : ''}" ${attrs}${tag === 'button' ? ' type="button"' : ''}>`
+    + `<svg class="mi" viewBox="0 0 24 24" aria-hidden="true">${MENU_ICONS[icon]}</svg>`
+    + `<span class="mr-label">${label}</span>${value ? `<span class="mr-value">${value}</span>` : ''}</${tag}>`;
+}
+const gearMenu = sideRows => `<div class="gear-menu">
+  ${onTrial() ? `<div class="unlock-card"><h3>Unlock everything</h3>${unlockPerks()}</div>` : ''}
+  <div class="menu-group">${sideRows}</div>
+  <div class="menu-group">${menuRow('id="m-account"', 'person', 'Account &amp; help')}</div></div>`;
+// The bottom of both gear menus: the Unlock card's buttons and Account & help.
 function wireAccount(root, close, keeps) {
-  $('#out', root).onclick = () => { close(); confirmBox('Sign out?', `Your ${keeps} stay saved in your account.`, 'Sign out', () => DB.signOut()); };
-  $('#gone', root).onclick = () => { close(); deleteAccountFlow(); };
-  $('#nick', root).onclick = () => { close(); nicknameForm(); };
-  $('#m-backup', root).onclick = () => { close(); backupMenu(); }; // backup.js
-  if ($('#m-unlock', root)) $('#m-unlock', root).onclick = () => { close(); showUnlock(); }; // library.js
+  if ($('#buy', root)) wireUnlock(root, close); // library.js
+  $('#m-account', root).onclick = () => { close(); accountMenu(keeps); };
+}
+// Account & help: its own small screen. ‹ Back opens the gear menu again.
+function accountMenu(keeps) {
+  const nick = state.settings && state.settings.displayName;
+  openModal(`<div class="gear-menu">
+      <div class="menu-head"><button type="button" class="linkish" id="mback">‹ Back</button><h2>Account &amp; help</h2></div>
+      <div class="menu-group">${menuRow('id="nick"', 'person', 'Your name', { value: esc(nick || 'Add') })
+        + menuRow('id="m-backup"', 'box', 'Backup &amp; restore')
+        + menuRow('href="https://glaynebrown.github.io/my-worlds/support.html" target="_blank" rel="noopener"', 'help', 'Help &amp; privacy')
+        + menuRow('id="out"', 'out', 'Sign out')}</div>
+      <button type="button" class="linkish danger-text" id="gone">Delete my account</button></div>`, (root, close) => {
+    $('#mback', root).onclick = () => { close(); const g = $('#hgear'); if (g) g.click(); };
+    $('#nick', root).onclick = () => { close(); nicknameForm(); };
+    $('#m-backup', root).onclick = () => { close(); backupMenu(); }; // backup.js
+    $('#out', root).onclick = () => { close(); confirmBox('Sign out?', `Your ${keeps} stay saved in your account.`, 'Sign out', () => DB.signOut()); };
+    $('#gone', root).onclick = () => { close(); deleteAccountFlow(); };
+  }, 'small-modal');
 }
 
 const THEME_COLOR = { library: '#16110e', avatar: '#efe3c8', twd: '#1f1e1a', hp: '#1a120c', disney: '#171a3d', lotr: '#121812', narnia: '#16222f', got: '#14161a', firefly: '#141a26', tlou: '#1b211c', potc: '#0f1f26' };
@@ -581,12 +617,11 @@ function renderLibrary() {
   });
   wireFlip('#/books');
   // The gear hides everything that isn't a door.
-  $('#hgear').onclick = () => openModal(`<div class="crest-menu">
-      <a class="btn block" href="#/library" data-close>+ Add a world</a>
-      <a class="btn block" href="#/wishlist" data-close>Wishlist</a>
-      <button class="btn block" id="m-decor">Accessories</button>
-      <button class="btn block" id="m-tour">Take the tour</button>
-      <hr class="menu-rule">${accountRows(nick)}</div>`, (root, close) => {
+  $('#hgear').onclick = () => openModal(gearMenu(
+      menuRow('href="#/library" data-close', 'plus', 'Add a world')
+      + menuRow('href="#/wishlist" data-close', 'star', 'Wishlist')
+      + menuRow('id="m-decor"', 'sparkle', 'Accessories')
+      + menuRow('id="m-tour"', 'map', 'Take the tour')), (root, close) => {
     $('#m-tour', root).onclick = () => { close(); startTour(['worlds']); };
     $('#m-decor', root).onclick = () => { close(); accessoriesForm(); };
     wireAccount(root, close, 'worlds');

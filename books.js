@@ -1035,12 +1035,11 @@ function renderBooks() {
   const addBook = () => { newBookShelf = hasShelf('reading') ? 'reading' : shelvesOf()[0].id; location.hash = '#/books/new'; };
   if ($('#e-add')) $('#e-add').onclick = addBook;
   wireFlip('#/');
-  $('#hgear').onclick = () => openModal(`<div class="crest-menu">
-      <button class="btn block" id="m-add">+ Add a book</button>
-      <button class="btn block" id="m-shelves">Edit shelves</button>
-      <a class="btn block" href="#/books/stats" data-close>Reading goal &amp; stats</a>
-      <button class="btn block" id="m-tour">Take the tour</button>
-      <hr class="menu-rule">${accountRows(nick)}</div>`, (root, close) => {
+  $('#hgear').onclick = () => openModal(gearMenu(
+      menuRow('id="m-add"', 'plus', 'Add a book')
+      + menuRow('id="m-shelves"', 'shelves', 'Edit shelves')
+      + menuRow('href="#/books/stats" data-close', 'goal', 'Reading goal &amp; stats')
+      + menuRow('id="m-tour"', 'map', 'Take the tour')), (root, close) => {
     $('#m-add', root).onclick = () => { close(); addBook(); };
     $('#m-tour', root).onclick = () => { close(); startTour(['books']); };
     $('#m-shelves', root).onclick = () => { close(); shelvesForm(); };

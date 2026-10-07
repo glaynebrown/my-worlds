@@ -63,31 +63,35 @@ function checkPhotoRoom(n = 1) {
 }
 
 // "Unlock everything": the one-time purchase (wired to the App Store in Phase 3).
+// It pops up at a trial limit, and sits at the top of both gear menus (app.js).
+const unlockPerks = () => `<ul class="unlock-list">
+        <li>Up to ${MAX.worlds} shows/movies</li>
+        <li>Up to ${MAX.books} books</li>
+        <li>Up to ${MAX.photos} photos</li>
+        <li>One time purchase, no subscription, and no ads!</li>
+      </ul>
+      <button type="button" class="btn primary block" id="buy">Unlock for $4.99</button>
+      <button type="button" class="linkish" id="restore">Restore purchase</button>
+      <p class="error" id="uerr" hidden></p>`;
+function wireUnlock(root, close) {
+  const fail = m => { $('#uerr', root).textContent = m; $('#uerr', root).hidden = false; };
+  $('#buy', root).onclick = () => busy($('#buy', root), async () => {
+    if (!DB.buyUnlock) return fail('Purchases work in the App Store app.');
+    if (await DB.buyUnlock()) { close(); toast('Everything’s unlocked. Thank you!'); refresh(); }
+  }, 'Opening the App Store…');
+  $('#restore', root).onclick = () => busy($('#restore', root), async () => {
+    if (!DB.restoreUnlock) return fail('Purchases work in the App Store app.');
+    if (await DB.restoreUnlock()) { close(); toast('Your purchase is restored'); refresh(); } else fail('No purchase found for this Apple ID.');
+  }, 'Checking…');
+}
 function showUnlock(reason) {
   if ($('.unlock-modal')) return;
   openModal(`<div class="unlock">
       <div class="lib-crest" aria-hidden="true">${CREST}</div>
       <h2>Unlock everything</h2>
       ${reason ? `<p class="muted small">The free version holds ${esc(reason)}.</p>` : ''}
-      <ul class="unlock-list">
-        <li>Up to ${MAX.worlds} shows and movies and ${MAX.books} books</li>
-        <li>Up to ${MAX.photos} photos</li>
-        <li>One time. No subscription, no ads, ever.</li>
-      </ul>
-      <button type="button" class="btn primary block" id="buy">Unlock for $4.99</button>
-      <button type="button" class="linkish" id="restore">Restore purchase</button>
-      <p class="error" id="uerr" hidden></p>
-      <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-close>Not now</button></div></div>`, (root, close) => {
-    const fail = m => { $('#uerr', root).textContent = m; $('#uerr', root).hidden = false; };
-    $('#buy', root).onclick = () => busy($('#buy', root), async () => {
-      if (!DB.buyUnlock) return fail('Purchases work in the App Store app.');
-      if (await DB.buyUnlock()) { close(); toast('Everything’s unlocked. Thank you!'); refresh(); }
-    }, 'Opening the App Store…');
-    $('#restore', root).onclick = () => busy($('#restore', root), async () => {
-      if (!DB.restoreUnlock) return fail('Purchases work in the App Store app.');
-      if (await DB.restoreUnlock()) { close(); toast('Your purchase is restored'); refresh(); } else fail('No purchase found for this Apple ID.');
-    }, 'Checking…');
-  }, 'small-modal unlock-modal');
+      ${unlockPerks()}
+      <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-close>Not now</button></div></div>`, wireUnlock, 'small-modal unlock-modal');
 }
 
 // ---------- the App Store app's "Add a world": built-in looks, under their own names ----------
