@@ -632,7 +632,11 @@
 .spine.flat-book::before, .spine.flat-book::after { top: 3px; bottom: 3px; height: auto; width: 1.5px; right: auto; }
 .spine.flat-book::before { left: 9px; box-shadow: 4px 0 0 currentColor; }
 .spine.flat-book::after { left: auto; right: 9px; box-shadow: -4px 0 0 currentColor; }
-.flat-title { font-family: var(--sf), Georgia, serif; font-size: var(--fs, 12px); line-height: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(var(--w) - 34px); letter-spacing: .02em; }
+.flat-title { font-family: var(--sf), Georgia, serif; font-size: var(--fs, 12px); line-height: 1.05; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: calc(var(--w) - 30px); max-height: calc(var(--t) - 4px); letter-spacing: .02em; }
+.flat-title.two { white-space: normal; text-align: center; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+/* Its number in the series, at the left end (like the top of an upright spine). */
+.flat-no { position: absolute; left: 19px; top: 50%; transform: translateY(-50%); font: 700 9px/1 system-ui, sans-serif; opacity: .8; }
+.flat-book.has-no .flat-title { max-width: calc(var(--w) - 50px); margin-left: 12px; }
 @media (hover: hover) { .spine.flat-book[data-book]:hover { transform: translateX(calc(var(--x) + 6px)); } }
 .spine.flat-book[data-book]:active { transform: translateX(calc(var(--x) + 8px)); }
 .slot-placeholder .spine.flat-book, .slot-placeholder .spine.face-book { opacity: .2; }

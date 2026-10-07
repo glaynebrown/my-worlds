@@ -136,7 +136,24 @@ function fitSpines(root = document) {
     }
     while (over() && fs > min) { fs -= 0.5; el.style.fontSize = `${fs}px`; } // already two lines: just smaller
   };
-  const all = () => $$('.slot .spine-title', root).forEach(fit);
+  // A book lying flat: the same idea sideways. Shrinks to fit; a thick book
+  // wraps onto two lines before its title gets small.
+  const fitFlat = el => {
+    el.classList.remove('two');
+    el.style.fontSize = '';
+    let fs = parseFloat(getComputedStyle(el).fontSize);
+    const thick = el.parentElement.offsetHeight, two = thick >= 24;
+    // One line: only its width counts. Two lines: its height (two lines' worth) too.
+    const over = () => el.scrollWidth > el.clientWidth + 0.5 || (el.classList.contains('two') && el.scrollHeight > el.clientHeight + 1);
+    const size = v => { fs = v; el.style.fontSize = `${fs}px`; };
+    while (over() && fs > (two ? 10 : 7)) size(fs - 0.5);
+    if (over() && two) {
+      el.classList.add('two');
+      size(Math.min(parseFloat(getComputedStyle(el.parentElement).getPropertyValue('--fs')) || 12, (thick - 6) / 2.2));
+    }
+    while (over() && fs > 7) size(fs - 0.5);
+  };
+  const all = () => { $$('.slot .spine-title', root).forEach(fit); $$('.flat-title', root).forEach(fitFlat); };
   all();
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => { if (root === document || root.isConnected) all(); });
 }
@@ -343,11 +360,13 @@ function faceHtml(b, h) {
     <button class="spine face-book" data-book="${esc(b.id)}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}">${coverHtml(b, 'face-cover')}</button></div>`;
 }
 function flatHtml(b) {
-  const s = spineStyle(b), t = Math.min(38, s.w), len = Math.round(s.h * 0.84), x = (hashOf(b.id) % 9) - 4;
+  const s = spineStyle(b), t = Math.min(38, s.w), len = Math.round(s.h * 0.95), x = (hashOf(b.id) % 9) - 4;
   Themes.loadFont(s.font);
-  const fs = Math.max(7.5, Math.min(t * 0.42, 12.5));
+  // Starts as big as the book's thickness allows; fitSpines shrinks it (or wraps it) to fit.
+  const fs = Math.max(7.5, Math.min(t * 0.45, 13));
+  const no = b.series && b.seriesNo ? `<span class="flat-no">${esc(b.seriesNo)}</span>` : '';
   return `<div class="slot flat" style="--w:${len}px;--t:${t}px;--x:${x}px;--fs:${fs.toFixed(1)}px;--sb:${cssColor(s.bg)};--si:${cssColor(s.ink)};--sf:'${esc(s.font.replace(/'/g, ''))}'">
-    <button class="spine flat-book" data-book="${esc(b.id)}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}"><span class="flat-title">${esc(b.title)}</span></button></div>`;
+    <button class="spine flat-book${no ? ' has-no' : ''}" data-book="${esc(b.id)}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}">${no}<span class="flat-title">${esc(b.title)}</span></button></div>`;
 }
 // A run of books in order: upright and cover-out books stand on their own;
 // books lying flat side by side are piled into stacks (a new one past STACK_MAX).
