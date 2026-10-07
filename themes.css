@@ -174,7 +174,7 @@
 [data-theme="hp"] .chip.on { background: #d3a625; color: #1a120c; }
 /* library tile */
 [data-theme="hp"].tile .tile-art {
-  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Cpath d='M26 6 12 30h9l-6 24 17-30h-9z' fill='%23d3a625' opacity='.85'/%3E%3C/svg%3E") 50% 32% / 34% auto no-repeat,
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 40 60'%3E%3Cpath d='M20 14A13 13 0 1 0 20 40A16 16 0 0 1 20 14z' fill='%23d3a625' opacity='.9'/%3E%3Cpath d='M29 12l1.3 2.8 2.8 1.3-2.8 1.3-1.3 2.8-1.3-2.8-2.8-1.3 2.8-1.3z M27.5 30l.9 1.9 1.9.9-1.9.9-.9 1.9-.9-1.9-1.9-.9 1.9-.9z' fill='%23d3a625' opacity='.9'/%3E%3C/svg%3E") 50% 30% / 52% auto no-repeat,
     radial-gradient(ellipse at 50% 30%, rgba(255,184,80,.35), transparent 60%);
 }
 [data-theme="hp"].tile { box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px #b8891c; }
@@ -198,11 +198,11 @@
   --card-shadow: 0 0 0 1px rgba(201,164,92,.6), 0 8px 20px rgba(0,0,0,.5);
 }
 [data-theme="lotr"] .w-title { font-size: clamp(1.9rem, 8vw, 2.8rem); text-shadow: 0 0 16px rgba(216,184,106,.35); }
-/* A glowing gold ring between two lines. */
+/* A glowing gold leaf between two lines. */
 [data-theme="lotr"] .w-flourish {
   height: 26px;
   background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='26'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffd77a' stop-opacity='.55'/%3E%3Cstop offset='1' stop-color='%23ffd77a' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M10 13h86M144 13h86' stroke='%23c9a45c' stroke-width='1'/%3E%3Ccircle cx='120' cy='13' r='13' fill='url(%23g)'/%3E%3Cellipse cx='120' cy='13' rx='9' ry='7' fill='none' stroke='%23e0bd62' stroke-width='3'/%3E%3C/svg%3E") center / auto 26px no-repeat;
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='26'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffd77a' stop-opacity='.55'/%3E%3Cstop offset='1' stop-color='%23ffd77a' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Cpath d='M10 13h86M144 13h86' stroke='%23c9a45c' stroke-width='1'/%3E%3Ccircle cx='120' cy='13' r='13' fill='url(%23g)'/%3E%3Cpath d='M120 2C127 7 127 17 120 24C113 17 113 7 120 2z' fill='%23e0bd62'/%3E%3Cpath d='M120 5V22' stroke='%23121812' stroke-width='1' opacity='.6'/%3E%3C/svg%3E") center / auto 26px no-repeat;
 }
 [data-theme="lotr"] .card, [data-theme="lotr"] .rw-item, [data-theme="lotr"] .modal {
   background-color: var(--card);
@@ -224,7 +224,7 @@
 /* library tile */
 [data-theme="lotr"].tile .tile-art {
   background:
-    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffd77a' stop-opacity='.5'/%3E%3Cstop offset='1' stop-color='%23ffd77a' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='40' fill='url(%23g)'/%3E%3Cellipse cx='50' cy='50' rx='20' ry='15' fill='none' stroke='%23e0bd62' stroke-width='5'/%3E%3C/svg%3E") 50% 30% / 70% auto no-repeat,
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3CradialGradient id='g'%3E%3Cstop offset='0' stop-color='%23ffd77a' stop-opacity='.5'/%3E%3Cstop offset='1' stop-color='%23ffd77a' stop-opacity='0'/%3E%3C/radialGradient%3E%3C/defs%3E%3Ccircle cx='50' cy='50' r='40' fill='url(%23g)'/%3E%3Cpath d='M50 22C67 34 68 60 50 78C32 60 33 34 50 22z' fill='%23e0bd62'/%3E%3Cpath d='M50 27V86M50 44l-8-7M50 44l8-7M50 55l-10-8M50 55l10-8M50 66l-8-6M50 66l8-6' stroke='%23121812' stroke-width='1.6' stroke-linecap='round' fill='none' opacity='.75'/%3E%3Cpath d='M50 77v9' stroke='%23e0bd62' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E") 50% 30% / 70% auto no-repeat,
     url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 40'%3E%3Cpath d='M0 40 L14 22 L22 30 L36 10 L50 28 L60 18 L74 32 L86 20 L100 34 V40Z' fill='%23070a07' opacity='.8'/%3E%3C/svg%3E") bottom / 100% auto no-repeat;
 }
 [data-theme="lotr"].tile { box-shadow: 0 6px 18px rgba(0,0,0,.35), inset 0 0 0 1px rgba(201,164,92,.7); }
