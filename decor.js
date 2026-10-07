@@ -20,7 +20,7 @@ const BULBS = ['#ffe7a3', '#ffd27a', '#fff4d6', '#ffdca0'];
 function decorSpots(lib) {
   const shelf = $('.shelf', lib), box = lib.getBoundingClientRect();
   const rel = el => { const r = el.getBoundingClientRect(); return { l: r.left - box.left, t: r.top - box.top, r: r.right - box.left, b: r.bottom - box.top, w: r.width }; };
-  const doors = $$('.tile', shelf).map(el => ({ id: el.dataset.world, ...rel(el) }));
+  const doors = $$('.tile[data-world]', shelf).map(el => ({ id: el.dataset.world, ...rel(el) }));
   const rows = [];
   doors.forEach(d => { const row = rows.find(r => Math.abs(r.t - d.t) < 4); if (row) row.doors.push(d); else rows.push({ t: d.t, b: d.b, doors: [d] }); });
   const s = rel(shelf);

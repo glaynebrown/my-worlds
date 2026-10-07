@@ -615,6 +615,9 @@ function tileHtml(w) {
     <span class="tile-name">${esc(plainName(w))}${w.sharedId ? `<span class="tile-sub">${esc(sharedWithLine(w))}</span>` : ''}</span></div>`;
 }
 
+// The last door on the shelf adds a world (it never moves when you rearrange).
+const addDoorHtml = `<a class="tile add-tile" href="#/library"><span class="plus" aria-hidden="true">+</span><span class="tile-name">Add a world</span></a>`;
+
 function renderLibrary() {
   const worlds = sortedWorlds();
   const nick = (state.settings && state.settings.displayName) || '';
@@ -623,7 +626,7 @@ function renderLibrary() {
     ${nick ? `<p class="lib-me">${esc(nick)}</p>` : ''}${homeGear('Worlds settings')}
     <header class="lib-head">${sideFlip('worlds')}
       <h1 class="lib-title">My Worlds</h1><p class="lib-sub">Pick a door and step inside — there’s no knowing where you might be swept off to.</p></header>
-    <div class="shelf">${worlds.map(tileHtml).join('')}</div>
+    <div class="shelf">${worlds.map(tileHtml).join('')}${worlds.length ? addDoorHtml : ''}</div>
     ${worlds.length ? '' : `<div class="side-empty"><p class="empty">No worlds yet</p>
       <div class="side-empty-btns"><a class="btn" href="#/library">${STORE ? 'Add a world' : 'Browse the library'}</a><a class="btn ghost" href="#/new">Build your own</a></div></div>`}</div>`;
   // Each tile wears its own world's look.
