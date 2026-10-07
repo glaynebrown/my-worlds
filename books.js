@@ -556,6 +556,75 @@ const lastBookIn = el => { const s = $$('.spine[data-book]', el); return s.lengt
 const rowEnd = row => [...row.children].find(el => el.classList.contains('greenery') || el.classList.contains('end-pot')) || null;
 const shelfItems = row => [...row.children].filter(el => (el.classList.contains('slot') || el.classList.contains('ser-grp') || el.classList.contains('book-pile'))
   && !el.classList.contains('plant-slot'));
+// ---------- free spacing (shelves in My order) ----------
+// Each thing on a shelf (a book, a series, a stack, a plant) can have empty
+// space before it: book.gap (on the first book of a series or stack) or a
+// plant's gap, in px. Dragging into empty space keeps the gap where you let go.
+const isFreeShelf = id => ((shelvesOf().find(s => s.id === id) || {}).sort || 'drag') === 'drag';
+const rowItemsAll = row => [...row.children].filter(el => !el.classList.contains('greenery') && !el.classList.contains('end-pot'));
+const firstBookIn = el => { const sp = $('.spine[data-book]', el); return sp ? bookById(sp.dataset.book) : null; };
+function applyGaps(root = document) {
+  $$('.case', root).forEach(caseEl => {
+    const free = isFreeShelf(caseEl.dataset.shelf), row = $('.case-row', caseEl);
+    if (!row) return;
+    shelfItems(row).forEach(el => {
+      const b = firstBookIn(el), g = free && b ? Math.max(0, Number(b.gap) || 0) : 0;
+      el.style.marginLeft = g ? `${g}px` : '';
+    });
+  });
+}
+// Where everything on the bookcase stands now (to hold things in place while dragging).
+const homesIn = caseEl => new Map($$('.case-row', caseEl).flatMap(row => rowItemsAll(row).map(el => {
+  const r = el.getBoundingClientRect(); return [el, { left: r.left, right: r.right, width: r.width, bottom: r.bottom }];
+})));
+// Puts el (a book, series, stack or plant) where you let go on a free shelf:
+// left = where its left edge should be, cy = the pointer's height. The thing
+// after it stays where it was if there's room. keep remembers that thing.
+function freePlace(row, el, left, cy, keep = {}) {
+  if (keep.el) { keep.el.style.marginLeft = keep.orig; keep.el = null; }
+  const R = parseFloat(getComputedStyle(row).getPropertyValue('--row')) || 196;
+  const cs = getComputedStyle(row), box = row.getBoundingClientRect();
+  const padL = parseFloat(cs.paddingLeft) || 0, padR = parseFloat(cs.paddingRight) || 0;
+  const items = rowItemsAll(row).filter(x => x !== el);
+  // Where things stood when the drag began (things it bumped while passing don't count).
+  const at = x => (keep.home && keep.home.get(x)) || x.getBoundingClientRect();
+  let line = items.filter(x => { const r = at(x); return cy >= r.bottom - R && cy <= r.bottom + 2; });
+  if (!line.length && items.length) line = [items[items.length - 1]]; // below the last row: after the last thing
+  let prev = null;
+  line.forEach(x => { const r = at(x); if (r.left + r.width / 2 < left + el.offsetWidth / 2) prev = x; });
+  // What comes after it (not counting itself, wherever it is right now).
+  const next = prev ? items[items.indexOf(prev) + 1] : line[0];
+  const nextEl = next && line.includes(next) ? next : null;
+  // Where it stood when the drag began (keep.home), so passing back and forth doesn't nudge it.
+  const nr = nextEl && at(nextEl);
+  row.insertBefore(el, prev ? (prev.nextSibling === el ? el.nextSibling : prev.nextSibling) : (line[0] || rowEnd(row)));
+  el.style.marginLeft = '0px';
+  const startX = el.getBoundingClientRect().left;
+  const room = box.right - padR - el.offsetWidth - startX;
+  el.style.marginLeft = `${Math.round(Math.max(0, Math.min(left - startX, room)))}px`;
+  if (nextEl) {
+    keep.el = nextEl; keep.orig = nextEl.style.marginLeft;
+    holdAt(nextEl, nr.left, nr.bottom);
+  }
+}
+// Keeps a thing at left (page px) on the line ending at bottom, if it still fits
+// there; otherwise it packs in right after whatever is before it.
+function holdAt(el, left, bottom) {
+  el.style.marginLeft = '0px';
+  const r = el.getBoundingClientRect();
+  const want = Math.abs(r.bottom - bottom) < 4 ? Math.round(left - r.left) : 0;
+  el.style.marginLeft = `${Math.max(0, want)}px`;
+  if (Math.abs(el.getBoundingClientRect().bottom - bottom) >= 4) el.style.marginLeft = '0px'; // didn't fit after all
+}
+// The gaps as they stand now, for every book on a free shelf.
+function gapPatches(row, add) {
+  if (!row || !isFreeShelf(row.closest('.case').dataset.shelf)) return;
+  shelfItems(row).forEach(el => {
+    const b = firstBookIn(el), g = Math.round(parseFloat(el.style.marginLeft) || 0);
+    if (b && (Number(b.gap) || 0) !== g) add(b, { gap: g });
+  });
+}
+
 let arranging = false; // Arrange bookcase mode: move plants and books, tap a book to pick how it sits
 
 function plantSlotEl(p) {
@@ -565,6 +634,7 @@ function plantSlotEl(p) {
   el.setAttribute('aria-label', `${(POT_KINDS.find(x => x[0] === p.kind) || POT_KINDS[0])[1]} plant`);
   Object.assign(el.dataset, { kind: p.kind, size: p.size, seed: p.seed });
   el.style.setProperty('--w', `${w}px`);
+  if (p.gap) el.style.marginLeft = `${p.gap}px`;
   el.innerHTML = `<svg width="${w}" height="${Math.round(60 * k)}" viewBox="0 0 46 60">${potSvg(p.kind, seeded(`pot:${p.seed}`))}</svg>`;
   return el;
 }
@@ -699,7 +769,10 @@ window.addEventListener('hashchange', () => { const [p, id] = parseHash(); if (p
 function potsFromDom(row) {
   const out = [];
   let last = null, n = 0;
-  const pot = (el, top) => ({ kind: el.dataset.kind, size: el.dataset.size, seed: Number(el.dataset.seed), after: last, index: n, ...(top ? { top: true } : {}) });
+  const pot = (el, top) => {
+    const gap = top ? 0 : Math.round(parseFloat(el.style.marginLeft) || 0);
+    return { kind: el.dataset.kind, size: el.dataset.size, seed: Number(el.dataset.seed), after: last, index: n, ...(top ? { top: true } : {}), ...(gap ? { gap } : {}) };
+  };
   [...row.children].forEach(el => {
     if (el.classList.contains('plant-slot')) out.push(pot(el));
     else if (el.classList.contains('slot') || el.classList.contains('ser-grp') || el.classList.contains('book-pile')) {
@@ -782,10 +855,11 @@ function potMenu(el) {
   }, 'small-modal');
 }
 
-const arrangeBtns = () => {
+const arrangeBtns = sh => {
   const m = greeneryOf(), v = m === 'vines' || m === 'both', p = m === 'pots' || m === 'both';
+  const tidy = sh && isFreeShelf(sh.id) ? '<span class="ab-group"><button type="button" class="chip" data-ga="tidy" aria-label="Remove the gaps on this shelf">Tidy up</button></span>' : '';
   const group = (label, shuffle, add, what) => `<span class="ab-group"><span class="ab-label">${label}:</span><button type="button" class="chip" data-ga="${shuffle}" aria-label="Shuffle ${what}">Shuffle</button><button type="button" class="chip ab-plus" data-ga="${add}" aria-label="Add ${what === 'vines' ? 'a vine' : 'a plant'}">+</button></span>`;
-  return `<div class="arrange-btns">${v ? group('Vines', 'vines', 'vine', 'vines') : ''}${p ? group('Pots', 'pots', 'add', 'pots') : ''}</div>`;
+  return `<div class="arrange-btns">${v ? group('Vines', 'vines', 'vine', 'vines') : ''}${p ? group('Pots', 'pots', 'add', 'pots') : ''}${tidy}</div>`;
 };
 function wireArrange(caseEl) {
   if (!arranging || !caseEl) return;
@@ -795,6 +869,16 @@ function wireArrange(caseEl) {
     const b = e.target.closest('[data-ga]');
     if (!b) return;
     const shelf = b.closest('.case').dataset.shelf, what = b.dataset.ga, seed = Math.floor(Math.random() * 1e9);
+    if (what === 'tidy') {
+      // Everything on this shelf back side by side.
+      const spaced = booksOn(shelf).filter(x => Number(x.gap) > 0);
+      spaced.forEach(x => { x.gap = 0; DB.updateBook(x, { gap: 0 }).catch(err => toast(friendlyError(err), true)); });
+      const kept = keepShelf(shelf);
+      if (kept.pots.some(x => x.gap)) saveGreens({ [shelf]: { ...kept, pots: kept.pots.map(({ gap, ...x }) => x) } });
+      else applyGaps(view);
+      toast('Tidied up');
+      return;
+    }
     if (what === 'pots') saveGreens({ [shelf]: { pots: null, potSeed: seed } });
     if (what === 'vines') saveGreens({ [shelf]: { drapes: null, side: null, vineSeed: seed } });
     if (what === 'vine') {
@@ -839,6 +923,7 @@ function wireArrange(caseEl) {
       Object.assign(drag.ghost.style, { left: `${r.left}px`, top: `${r.top}px`, width: `${r.width}px`, height: `${r.height}px` });
       document.body.appendChild(drag.ghost);
       drag.pot.classList.add('pot-holding');
+      drag.keep = { home: homesIn(caseEl) };
       drag.src = drag.pot.closest('.case').dataset.shelf;
       if (drag.pot.classList.contains('end-pot')) {
         drag.pot.classList.remove('end-pot');
@@ -870,10 +955,13 @@ function wireArrange(caseEl) {
       const row = over && over.closest('.case-row');
       if (!row) return;
       const item = over.closest('.case-row > *');
-      if (item && item !== drag.pot && !item.classList.contains('greenery')) {
-        if (item.classList.contains('end-pot')) row.insertBefore(drag.pot, rowEnd(row));
-        else { const r = item.getBoundingClientRect(); row.insertBefore(drag.pot, e.clientX > r.left + r.width / 2 ? item.nextSibling : item); }
-      } else if (!item) row.insertBefore(drag.pot, rowEnd(row));
+      const free = isFreeShelf(row.closest('.case').dataset.shelf);
+      if (item && item !== drag.pot && !item.classList.contains('greenery') && !item.classList.contains('end-pot')) {
+        if (drag.keep && drag.keep.el) { drag.keep.el.style.marginLeft = drag.keep.orig; drag.keep.el = null; }
+        drag.pot.style.marginLeft = '';
+        const r = item.getBoundingClientRect(); row.insertBefore(drag.pot, e.clientX > r.left + r.width / 2 ? item.nextSibling : item);
+      } else if (free) freePlace(row, drag.pot, e.clientX - drag.off.x, e.clientY, drag.keep || (drag.keep = {}));
+      else { drag.pot.style.marginLeft = ''; row.insertBefore(drag.pot, rowEnd(row)); }
     } else if (drag.drape) {
       // Height locked to a shelf's top edge: slides along it, or snaps to another shelf's.
       const want = drag.from.y + (e.clientY - drag.y);
@@ -902,6 +990,10 @@ function wireArrange(caseEl) {
       // Only the shelf it left and the shelf it landed on are saved; the rest stay as they were.
       const changes = {};
       new Set([d.src, d.pot.closest('.case').dataset.shelf]).forEach(id => { changes[id] = keepShelf(id); });
+      // A book it slid in front of keeps its spot (its gap shrank to make room).
+      const books = {};
+      Object.keys(changes).forEach(id => gapPatches(rowOfShelf(id), (b, p) => { books[b.id] = { b, p }; }));
+      Object.values(books).forEach(({ b, p }) => { Object.assign(b, p); DB.updateBook(b, p).catch(e => toast(friendlyError(e), true)); });
       saveGreens(changes);
     } else if (d.drape && d.to) {
       const src = d.from.row.closest('.case').dataset.shelf, dst = d.to.edge.row.closest('.case').dataset.shelf;
@@ -1095,7 +1187,7 @@ function renderBooks() {
   const caseHtml = sh => {
     const list = booksOn(sh.id);
     return `<section class="case" data-shelf="${esc(sh.id)}">
-      <header class="case-head"><div class="case-title"><h2 class="case-name">${esc(sh.name)}</h2>${arranging ? '' : `<button type="button" class="case-add" data-add="${esc(sh.id)}" aria-label="Add a book to ${esc(sh.name)}">+</button>`}</div>${arranging ? arrangeBtns() : ''}</header>
+      <header class="case-head"><div class="case-title"><h2 class="case-name">${esc(sh.name)}</h2>${arranging ? '' : `<button type="button" class="case-add" data-add="${esc(sh.id)}" aria-label="Add a book to ${esc(sh.name)}">+</button>`}</div>${arranging ? arrangeBtns(sh) : ''}</header>
       <div class="case-row">${shelfRowHtml(list)}</div>
     </section>`;
   };
@@ -1128,6 +1220,7 @@ function renderBooks() {
   fitSpines(view);
   fitPlates(view);
   paintCovers(view);
+  applyGaps(view);
   growGreenery(view);
   // Arranging greenery: books can still be held and dragged, to plan around them.
   enableSpineDrag($('#case'));
@@ -1232,20 +1325,28 @@ function enableSpineDrag(caseEl) {
   spineSorting = false;
 
   const HOLD_MS = 450, SLOP = 10;
-  let timer = null, start = null, slot = null, ghost = null, offset = null, dragging = false, justDragged = false, from = null;
+  // slot: what moves. A series moves together, and so does a stack.
+  let timer = null, start = null, slot = null, ghost = null, offset = null, dragging = false, justDragged = false, from = null, fromRow = null;
+  let keep = {}, stay = null; // free shelves: the thing after where it lands, and the thing after where it left
   const cancelHold = () => { clearTimeout(timer); timer = null; };
   const begin = (sp, x, y) => { slot = sp.parentElement; start = { x, y }; cancelHold(); timer = setTimeout(pickUp, HOLD_MS); };
 
   function pickUp() {
     timer = null;
     if (!slot || !slot.isConnected) return;
+    slot = slot.closest('.ser-grp') || slot.closest('.book-pile') || slot;
     dragging = spineSorting = true;
     from = slot.closest('.case').dataset.shelf;
+    fromRow = slot.closest('.case-row');
+    keep = { home: homesIn(caseEl) };
+    // On a free shelf, the thing after it stays put when it's lifted out.
+    const after = slot.nextElementSibling;
+    stay = isFreeShelf(from) && after && rowItemsAll(fromRow).includes(after) ? { el: after, ...keep.home.get(after) } : null;
     const r = slot.getBoundingClientRect();
     offset = { x: start.x - r.left, y: start.y - r.top };
     ghost = slot.cloneNode(true);
     ghost.classList.add('spine-ghost');
-    Object.assign(ghost.style, { left: `${r.left}px`, top: `${r.top}px` });
+    Object.assign(ghost.style, { left: `${r.left}px`, top: `${r.top}px`, marginLeft: '0' });
     document.body.appendChild(ghost);
     slot.classList.add('slot-placeholder');
     caseEl.classList.add('sorting');
@@ -1259,17 +1360,26 @@ function enableSpineDrag(caseEl) {
     const over = document.elementFromPoint(x, y);
     const row = over && over.closest('.case-row');
     if (!row || !caseEl.contains(row)) return;
-    let target = over.closest('.slot');
-    // Only a book lying flat goes into a stack; anything else stands beside it.
-    const stack = over.closest('.book-pile');
-    if (stack && (!slot.classList.contains('flat') || !target || target.classList.contains('plant-slot'))) target = stack;
-    const tail = rowEnd(row); // the shelf's end (after the last book)
-    if (target && target !== slot && !target.classList.contains('end-pot')) {
+    // Over a book (or a series, stack or plant): next to it. Over empty shelf: right there
+    // on a shelf in My order, or at the end of a sorted one.
+    const hit = over.closest('.case-row > *');
+    const target = hit && rowItemsAll(row).includes(hit) && hit !== slot ? hit : null;
+    const free = isFreeShelf(row.closest('.case').dataset.shelf);
+    if (target) {
+      if (keep.el) { keep.el.style.marginLeft = keep.orig; keep.el = null; }
+      slot.style.marginLeft = '';
       const r = target.getBoundingClientRect();
-      target.parentElement.insertBefore(slot, x > r.left + r.width / 2 ? target.nextSibling : target);
-    } else if (!target || target.classList.contains('end-pot')) {
-      if (slot.parentElement !== row || slot.nextElementSibling !== tail) row.insertBefore(slot, tail);
+      row.insertBefore(slot, x > r.left + r.width / 2 ? target.nextSibling : target);
+    } else if (!hit || hit === slot) {
+      if (free) freePlace(row, slot, x - offset.x, y, keep);
+      else {
+        slot.style.marginLeft = '';
+        const tail = rowEnd(row);
+        if (slot.parentElement !== row || slot.nextElementSibling !== tail) row.insertBefore(slot, tail);
+      }
     }
+    // What stood after it before it was lifted stays where it was.
+    if (stay && stay.el !== keep.el && stay.el !== slot && stay.el.isConnected) holdAt(stay.el, stay.left, stay.bottom);
   }
 
   function drop() {
@@ -1283,28 +1393,34 @@ function enableSpineDrag(caseEl) {
     const row = slot.closest('.case-row');
     const shelfId = row.closest('.case').dataset.shelf;
     const sh = shelvesOf().find(s => s.id === shelfId);
-    const book = bookById($('.spine', slot).dataset.book);
+    const moving = $$('.spine[data-book]', slot).map(el => bookById(el.dataset.book)).filter(Boolean);
+    const book = moving[0];
+    const changing = moving.filter(b => shelfOf(b) !== shelfId);
     const order = $$('.spine[data-book]', row).map(el => bookById(el.dataset.book));
     const commit = end => {
       const patches = {};
       const add = (b, p) => { patches[b.id] = { b, p: { ...(patches[b.id] || {}).p, ...p } }; };
-      if (book && shelfOf(book) !== shelfId) add(book, shelfMovePatch(book, shelfId, end));
+      changing.forEach(b => add(b, shelfMovePatch(b, shelfId, end)));
       if ((sh.sort || 'drag') === 'drag') {
         order.forEach((b, k) => { if (b && (b.order !== k || patches[b.id])) add(b, { order: k }); });
+        gapPatches(row, add);
+        if (fromRow !== row) gapPatches(fromRow, add);
+        Object.values(patches).forEach(({ b, p }) => Object.assign(b, p));
       } else if (from === shelfId) {
         toast(`“${sh.name}” is sorted by ${SORT_SHORT[sh.sort].toLowerCase()}. To arrange it by hand, pick My order for it in Edit shelves.`);
       }
       const list = Object.values(patches);
       if (list.length) {
         Promise.all(list.map(({ b, p }) => DB.updateBook(b, p)))
-          .then(() => { if (book && from !== shelfId) toast(`Moved to ${sh.name}`); }, e => { toast(friendlyError(e), true); refresh(); });
+          .then(() => { if (changing.length) toast(`Moved to ${sh.name}`); }, e => { toast(friendlyError(e), true); refresh(); });
       } else setTimeout(refresh, 0);
     };
     // Onto Read: when did you finish it? (Cancel puts it back where it was.)
-    if (book && shelfOf(book) !== shelfId && asksFinish(book, shelfId)) {
-      askFinish([book.title]).then(end => {
+    const finishing = changing.filter(b => asksFinish(b, shelfId));
+    if (finishing.length) {
+      askFinish(finishing.map(b => b.title)).then(end => {
         if (end === null) { refresh(); return; }
-        celebrateFinish([book], end);
+        celebrateFinish(finishing, end);
         commit(end);
       });
     } else commit();

@@ -646,3 +646,7 @@
 /* Add a book → Scan a book (scan.js scanBook). */
 .scan-book { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px; }
 .scan-note { margin: 8px 0 0; }
+
+/* Dragging a whole stack or series: it keeps its shape. */
+.spine-ghost.book-pile { display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; height: var(--row); padding-bottom: var(--plank); }
+.spine-ghost.ser-grp { display: flex; align-items: flex-end; }
