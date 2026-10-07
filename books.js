@@ -353,7 +353,7 @@ function flatHtml(b) {
 // books lying flat side by side are piled into stacks (a new one past STACK_MAX).
 function booksHtml(list, hOf) {
   let html = '', pile = [], tall = 0;
-  const flush = () => { if (pile.length) html += `<div class="stack">${pile.map(flatHtml).join('')}</div>`; pile = []; tall = 0; };
+  const flush = () => { if (pile.length) html += `<div class="book-pile">${pile.map(flatHtml).join('')}</div>`; pile = []; tall = 0; };
   list.forEach(b => {
     const sit = sitOf(b);
     if (sit === 'flat') {
@@ -535,7 +535,7 @@ const POT_SIZES = [['s', 'Small'], ['m', 'Medium'], ['l', 'Large']];
 const greensOf = id => (((state.settings || {}).greens) || {})[id] || {};
 const lastBookIn = el => { const s = $$('.spine[data-book]', el); return s.length ? s[s.length - 1].dataset.book : null; };
 const rowEnd = row => [...row.children].find(el => el.classList.contains('greenery') || el.classList.contains('end-pot')) || null;
-const shelfItems = row => [...row.children].filter(el => (el.classList.contains('slot') || el.classList.contains('ser-grp') || el.classList.contains('stack'))
+const shelfItems = row => [...row.children].filter(el => (el.classList.contains('slot') || el.classList.contains('ser-grp') || el.classList.contains('book-pile'))
   && !el.classList.contains('plant-slot'));
 let arranging = false; // Arrange bookcase mode: move plants and books, tap a book to pick how it sits
 
@@ -584,7 +584,7 @@ function growGreenery(root = document, force) {
       g.pots.forEach(p => {
         const i = p.after == null ? -1 : items.findIndex(el => lastBookIn(el) === p.after);
         // On top of a stack of books lying flat (its "after" is that stack's top book).
-        if (p.top && i >= 0 && items[i].classList.contains('stack')) { items[i].appendChild(plantSlotEl(p)); return; }
+        if (p.top && i >= 0 && items[i].classList.contains('book-pile')) { items[i].appendChild(plantSlotEl(p)); return; }
         const ref = p.after == null ? items[0] : i >= 0 ? items[i + 1] : items[Math.min(p.index ?? items.length, items.length)];
         row.insertBefore(plantSlotEl(p), ref || null);
       });
@@ -683,7 +683,7 @@ function potsFromDom(row) {
   const pot = (el, top) => ({ kind: el.dataset.kind, size: el.dataset.size, seed: Number(el.dataset.seed), after: last, index: n, ...(top ? { top: true } : {}) });
   [...row.children].forEach(el => {
     if (el.classList.contains('plant-slot')) out.push(pot(el));
-    else if (el.classList.contains('slot') || el.classList.contains('ser-grp') || el.classList.contains('stack')) {
+    else if (el.classList.contains('slot') || el.classList.contains('ser-grp') || el.classList.contains('book-pile')) {
       last = lastBookIn(el) || last; n++;
       $$(':scope > .plant-slot', el).forEach(p => out.push(pot(p, true)));
     }
@@ -741,8 +741,8 @@ function sideMenu(shelf) {
 
 function potMenu(el) {
   const row = el.closest('.case-row'), shelf = row.closest('.case').dataset.shelf;
-  const onStack = el.parentElement.classList.contains('stack');
-  const stackBeside = !onStack && el.previousElementSibling && el.previousElementSibling.classList.contains('stack');
+  const onStack = el.parentElement.classList.contains('book-pile');
+  const stackBeside = !onStack && el.previousElementSibling && el.previousElementSibling.classList.contains('book-pile');
   const save = () => saveGreens({ [shelf]: { ...keepShelf(shelf) } });
   openModal(`<h2>This plant</h2>
     <div class="field"><span class="field-label">Plant</span><div class="chips bot-chips" id="pk">${POT_KINDS.map(([k, l]) => `<button type="button" class="chip${k === el.dataset.kind ? ' on' : ''}" data-k="${k}">${l}</button>`).join('')}</div></div>
@@ -753,7 +753,7 @@ function potMenu(el) {
     const live = () => $$('.plant-slot', rowOfShelf(shelf))[idx];
     if ($('#pontop', root)) $('#pontop', root).onchange = e => {
       const p = live();
-      if (e.target.checked) { const st = p.previousElementSibling; if (st && st.classList.contains('stack')) st.appendChild(p); }
+      if (e.target.checked) { const st = p.previousElementSibling; if (st && st.classList.contains('book-pile')) st.appendChild(p); }
       else p.parentElement.after(p);
       save();
     };
@@ -1240,7 +1240,10 @@ function enableSpineDrag(caseEl) {
     const over = document.elementFromPoint(x, y);
     const row = over && over.closest('.case-row');
     if (!row || !caseEl.contains(row)) return;
-    const target = over.closest('.slot');
+    let target = over.closest('.slot');
+    // Only a book lying flat goes into a stack; anything else stands beside it.
+    const stack = over.closest('.book-pile');
+    if (stack && (!slot.classList.contains('flat') || !target || target.classList.contains('plant-slot'))) target = stack;
     const tail = rowEnd(row); // the shelf's end (after the last book)
     if (target && target !== slot && !target.classList.contains('end-pot')) {
       const r = target.getBoundingClientRect();

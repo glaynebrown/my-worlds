@@ -623,10 +623,9 @@
 .spine.face-book .gc-author { font-size: .7rem; }
 
 /* A stack: the first book at the bottom; a plant can sit on top. */
-.case-row .stack { position: relative; height: var(--row); display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; padding: 0 3px var(--plank); }
-.stack > .slot { height: auto; padding-bottom: 0; }
-.stack > .plant-slot { margin-bottom: -1px; }
-.slot.flat { display: block; }
+.case-row .book-pile { position: relative; height: var(--row); display: flex; flex-direction: column-reverse; align-items: center; justify-content: flex-start; padding: 0 3px var(--plank); }
+.book-pile > .slot { height: auto; padding-bottom: 0; }
+.book-pile > .plant-slot { margin-bottom: -1px; }
 .spine.flat-book { width: var(--w); height: var(--t); transform: translateX(var(--x)); border-radius: 1px 3px 3px 1px; flex-direction: row;
   background: linear-gradient(180deg, rgba(255,255,255,.14), rgba(255,255,255,.03) 35%, rgba(0,0,0,.08) 70%, rgba(0,0,0,.34)), var(--sb);
   box-shadow: inset 1px 0 0 rgba(255,255,255,.1), 0 2px 3px rgba(0,0,0,.4); }
