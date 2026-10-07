@@ -216,9 +216,9 @@ function scanPage(file, opts = {}) {
 }
 
 // ---------- Scan a book (Add a book → Scan) ----------
-// In the iPhone app: Apple's live scanner looks for the barcode on the back
-// (BookScannerPlugin). On the website, or with "Photo of the cover or spine":
-// a photo. A barcode in it is read first; if there isn't one, the biggest words
+// In the iPhone app: Apple's live scanner (BookScannerPlugin), fully automatic:
+// it catches the barcode on the back, or reads the cover or spine once it's
+// held steady. On the website (or an older phone): a photo. A barcode in it is read first; if there isn't one, the biggest words
 // (the title and author on a cover or spine) are read and searched instead.
 // Resolves { isbn }, { text, parts (its lines) } or null. The photo stays on the phone.
 const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
@@ -320,9 +320,12 @@ async function scanBook(status = () => {}) {
   const native = nativeScanner();
   let file = null;
   if (native) {
+    // One camera screen, fully automatic: a barcode, or the cover or spine read once it's steady.
     const got = await native.scan();
     if (got.isbn) return { isbn: got.isbn };
+    if (got.lines) { const words = titleFromLines(got.lines); return words.text ? words : { none: true }; }
     if (got.mode !== 'photo') return null;
+    // A phone too old to scan live: a photo instead.
     // The camera has to open from a tap, so ask for one.
     let taking = false;
     file = await new Promise(resolve => openModal(`<h2>Photo of the book</h2>
