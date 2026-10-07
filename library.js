@@ -26,9 +26,11 @@ function photoCount() {
 // ---------- the free trial (accounts made in the App Store app) ----------
 // 3 worlds, 3 books and 10 photos (card photos and backgrounds count too), then
 // "Unlock everything" ($4.99, once): up to 200 worlds, 200 books and 250 photos.
-// Accounts from before (your family's) have no trial. settings.trial and
-// settings.unlocked can't be changed from the app (firestore.rules).
+// Accounts from before (your family's) have no trial. settings.trial can't be
+// changed from the app; settings.unlocked only turns on, after buying (firestore.rules).
 const TRIAL = { worlds: 3, books: 3, photos: 10 };
+// Apple's price in the buyer's own currency, once DB.checkUnlock has asked (app.js).
+let unlockPrice = '$4.99';
 const onTrial = () => !!(state.settings && state.settings.trial && !state.settings.unlocked);
 function photoCap() {
   const s = state.settings || {};
@@ -62,7 +64,7 @@ function checkPhotoRoom(n = 1) {
     : `You’ve reached ${cap} photos. Delete a few to add more.`);
 }
 
-// "Unlock everything": the one-time purchase (wired to the App Store in Phase 3).
+// "Unlock everything": the one-time purchase, through Apple (store.js).
 // It pops up at a trial limit, and sits at the top of both gear menus (app.js).
 const unlockPerks = () => `<ul class="unlock-list">
         <li>Up to ${MAX.worlds} shows/movies</li>
@@ -70,18 +72,18 @@ const unlockPerks = () => `<ul class="unlock-list">
         <li>Up to ${MAX.photos} photos</li>
         <li>One time purchase, no subscription, and no ads!</li>
       </ul>
-      <button type="button" class="btn primary block" id="buy">Unlock for $4.99</button>
+      <button type="button" class="btn primary block" id="buy">Unlock for ${esc(unlockPrice)}</button>
       <button type="button" class="linkish" id="restore">Restore purchase</button>
       <p class="error" id="uerr" hidden></p>`;
 function wireUnlock(root, close) {
   const fail = m => { $('#uerr', root).textContent = m; $('#uerr', root).hidden = false; };
   $('#buy', root).onclick = () => busy($('#buy', root), async () => {
     if (!DB.buyUnlock) return fail('Purchases work in the App Store app.');
-    if (await DB.buyUnlock()) { close(); toast('Everything’s unlocked. Thank you!'); refresh(); }
+    if (await DB.buyUnlock()) { state.settings.unlocked = true; close(); toast('Everything’s unlocked. Thank you!'); refresh(); }
   }, 'Opening the App Store…');
   $('#restore', root).onclick = () => busy($('#restore', root), async () => {
     if (!DB.restoreUnlock) return fail('Purchases work in the App Store app.');
-    if (await DB.restoreUnlock()) { close(); toast('Your purchase is restored'); refresh(); } else fail('No purchase found for this Apple ID.');
+    if (await DB.restoreUnlock()) { state.settings.unlocked = true; close(); toast('Your purchase is restored'); refresh(); } else fail('No purchase found for this Apple ID.');
   }, 'Checking…');
 }
 function showUnlock(reason) {

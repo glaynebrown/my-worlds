@@ -86,6 +86,45 @@ const Store = (() => {
 
   const uid = () => auth.currentUser.uid;
   const userDoc = () => db.collection('users').doc(uid());
+
+  // "Unlock everything" in the App Store app: Apple takes the payment
+  // (PurchasePlugin.swift), then the account is marked unlocked
+  // (firestore.rules lets a trial account turn that on, never off).
+  const UNLOCK_ID = 'com.glaynebrown.myworlds.unlock';
+  const Purchase = window.Capacitor && Capacitor.isNativePlatform && Capacitor.isNativePlatform()
+    ? Capacitor.registerPlugin('Purchase') : null;
+  const markUnlocked = () => userDoc().set({ unlocked: true }, { merge: true });
+  const purchases = !Purchase ? {} : {
+    // true once bought and saved; false if they backed out.
+    async buyUnlock() {
+      needOnline('Buying');
+      const r = await Purchase.buy({ productId: UNLOCK_ID });
+      if (r.pending) throw new Error('Your purchase is waiting for approval. It unlocks as soon as it’s approved.');
+      if (!r.unlocked) return false;
+      await markUnlocked();
+      return true;
+    },
+    async restoreUnlock() {
+      needOnline('Restoring');
+      const r = await Purchase.restore({ productId: UNLOCK_ID });
+      if (r.unlocked) await markUnlocked();
+      return !!r.unlocked;
+    },
+    // At sign-in: { unlocked, price } from Apple. Saves the unlock if Apple
+    // has a purchase the account doesn't know about yet (bought offline, or
+    // approved later), and tells onChange when that happens later on.
+    async checkUnlock(onChange) {
+      if (!this.unlockWatch) {
+        this.unlockWatch = Purchase.addListener('changed', async r => {
+          if (r.unlocked) { await markUnlocked().catch(console.error); if (this.onUnlock) this.onUnlock(); }
+        });
+      }
+      this.onUnlock = onChange;
+      const r = await Purchase.status({ productId: UNLOCK_ID });
+      if (r.unlocked) await markUnlocked();
+      return r;
+    },
+  };
   const worlds = () => userDoc().collection('worlds');
   const items = () => userDoc().collection('items');
   const books = () => userDoc().collection('books');
@@ -188,6 +227,7 @@ const Store = (() => {
     configured: true,
     demo: false,
     flushPending,
+    ...purchases,
 
     onAuth: cb => auth.onAuthStateChanged(cb),
     signIn: (email, password) => auth.signInWithEmailAndPassword(email, password),

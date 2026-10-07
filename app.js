@@ -375,6 +375,14 @@ async function openAccount(user) {
       state.settings = code ? await DB.join(code).catch(() => null) : null;
       if (!state.settings) { state.needsInvite = true; return route(); }
     }
+    // On the trial in the App Store app: Apple's price, and a purchase this
+    // account doesn't know about yet (bought on another phone, or offline).
+    if (onTrial() && DB.checkUnlock) {
+      const unlocked = () => { state.settings.unlocked = true; refresh(); };
+      DB.checkUnlock(() => { unlocked(); toast('Everything’s unlocked. Thank you!'); })
+        .then(r => { if (r.price) unlockPrice = r.price; if (r.unlocked) unlocked(); })
+        .catch(e => console.warn('Purchase check failed', e));
+    }
     // The book library (your bookcase, for everyone else to pick from).
     state.bookLibraryP = !isOwner() && DB.loadBookLibrary ? DB.loadBookLibrary().catch(() => null) : Promise.resolve(null);
     if (state.settings.libraryMode || state.settings.sharedFrom) {
