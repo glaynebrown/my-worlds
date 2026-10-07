@@ -2025,6 +2025,8 @@ function renderBookForm(book) {
     <div class="card form-card">
       <h2 class="form-h" id="findh">${isNew ? 'Find it' : 'Find the cover &amp; details'}</h2>
       <form id="sf" class="search-row" novalidate><input id="q" type="search" placeholder="Title or author" value="${isNew ? '' : esc(b.title)}" autocomplete="off" enterkeyhint="search"><button class="btn small primary" id="go">Search</button></form>
+      <button type="button" class="btn small scan-book" id="scanb">${CAMERA_ICON}<span>Scan a book</span></button>
+      <p class="muted small scan-note" id="scannote" hidden></p>
       <div id="results" class="results"></div>
       ${isNew ? '<p class="muted small">Or type it in yourself below.</p>' : ''}
     </div>
@@ -2229,34 +2231,81 @@ function renderBookForm(book) {
 
   // ----- search -----
   let results = [];
+  const usePick = r => {
+    $('#title').value = r.title;
+    if (r.author) $('#author').value = r.author;
+    if (r.pages) $('#pages').value = r.pages;
+    if (isNew || !$('#blurb').value.trim()) {
+      pickDetails(r).then(text => { if (text && (isNew || !$('#blurb').value.trim())) $('#blurb').value = text; });
+    }
+    if (r.thumb) { found = { url: r.big, thumb: r.thumb }; coverMode = 'found'; coverPrepared = null; }
+    $('#results').innerHTML = '';
+    $('#scannote').hidden = true;
+    draw();
+    toast(isNew ? 'Filled in. Pick a look, then put it on the shelf.' : 'Found it. Save to keep the new details.');
+    $('#bf').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const showResults = (list, none = 'Nothing found. Try fewer words, or type it in below.') => {
+    results = list;
+    $('#results').innerHTML = results.length ? results.map((r, i) => `<button type="button" class="result" data-r="${i}">
+        ${r.thumb ? `<img src="${esc(r.thumb)}" alt="" loading="lazy">` : '<span class="result-blank"></span>'}
+        <span class="result-txt"><span class="result-title">${esc(r.title)}</span><span class="muted small">${esc([r.author, r.year, r.pages ? `${r.pages} pages` : ''].filter(Boolean).join(' · '))}</span></span></button>`).join('')
+      : `<p class="muted small">${esc(none)}</p>`;
+    $$('.result').forEach(el => { el.onclick = () => usePick(results[+el.dataset.r]); });
+  };
   $('#sf').onsubmit = e => {
     e.preventDefault();
     const q = $('#q').value.trim();
     if (!q) return;
     $('#q').blur();
-    busy($('#go'), async () => {
-      results = await searchBooks(q);
-      $('#results').innerHTML = results.length ? results.map((r, i) => `<button type="button" class="result" data-r="${i}">
-          ${r.thumb ? `<img src="${esc(r.thumb)}" alt="" loading="lazy">` : '<span class="result-blank"></span>'}
-          <span class="result-txt"><span class="result-title">${esc(r.title)}</span><span class="muted small">${esc([r.author, r.year, r.pages ? `${r.pages} pages` : ''].filter(Boolean).join(' · '))}</span></span></button>`).join('')
-        : '<p class="muted small">Nothing found. Try fewer words, or type it in below.</p>';
-      $$('.result').forEach(el => {
-        el.onclick = async () => {
-          const r = results[+el.dataset.r];
-          $('#title').value = r.title;
-          if (r.author) $('#author').value = r.author;
-          if (r.pages) $('#pages').value = r.pages;
-          if (isNew || !$('#blurb').value.trim()) {
-            pickDetails(r).then(text => { if (text && (isNew || !$('#blurb').value.trim())) $('#blurb').value = text; });
-          }
-          if (r.thumb) { found = { url: r.big, thumb: r.thumb }; coverMode = 'found'; coverPrepared = null; }
-          $('#results').innerHTML = '';
-          draw();
-          toast(isNew ? 'Filled in. Pick a look, then put it on the shelf.' : 'Found it. Save to keep the new details.');
-          $('#bf').scrollIntoView({ behavior: 'smooth', block: 'start' });
-        };
-      });
-    }, 'Searching…');
+    $('#scannote').hidden = true;
+    busy($('#go'), async () => showResults(await searchBooks(q)), 'Searching…');
+  };
+  // Scan a book (scan.js): a barcode finds the exact book (filled in straight
+  // away when there's just one match); words from a cover or spine are searched,
+  // and you tap the right one.
+  $('#scanb').addEventListener('pointerdown', () => { loadZxing().catch(() => {}); loadTesseract().catch(() => {}); }, { once: true });
+  $('#scanb').onclick = () => {
+    const btn = $('#scanb'), label = $('span', btn), note = $('#scannote');
+    const say = t => { label.textContent = t; };
+    const scanning = scanBook(say);
+    btn.disabled = true;
+    scanning.then(async got => {
+      if (!got) return;
+      if (got.isbn) {
+        say('Finding the book…');
+        const code = got.isbn.replace(/\D/g, '');
+        let list = await searchBooks(`isbn:${code}`).catch(() => []);
+        if (!list.length) list = await searchGoogle(`isbn:${code}`).catch(() => []);
+        if (list.length === 1) { usePick(list[0]); return; }
+        note.textContent = list.length ? 'Tap your book.' : '';
+        note.hidden = !list.length;
+        showResults(list, 'Couldn’t find that barcode. Try searching the title, or type it in below.');
+      } else if (got.text) {
+        say('Searching…');
+        $('#q').value = got.text;
+        // All the words, and each line on its own (the reader can get a word wrong),
+        // then the books whose title and author share the most words with the photo first.
+        const qs = [...new Set([got.text, ...(got.parts || [])])].filter(q => q && q.replace(/\W/g, '').length >= 3);
+        const seen = new Map();
+        (await Promise.all(qs.map(q => searchBooks(q).catch(() => [])))).flat().forEach(r => {
+          const k = `${r.title}|${r.author}`.toLowerCase();
+          if (!seen.has(k)) seen.set(k, r);
+        });
+        const photoWords = got.text.toLowerCase().split(' ').filter(w => w.length >= 3);
+        const score = r => { const t = `${r.title} ${r.author}`.toLowerCase(); return photoWords.filter(w => t.includes(w)).reduce((n, w) => n + w.length, 0); };
+        let list = [...seen.values()].map((r, i) => ({ r, s: score(r), i })).sort((a, b) => b.s - a.s || a.i - b.i);
+        if (list.some(x => x.s > 0)) list = list.filter(x => x.s > 0);
+        list = list.slice(0, 12).map(x => x.r);
+        note.textContent = `Found “${got.text}” on the photo. Tap your book, or fix the words and search again.`;
+        note.hidden = false;
+        showResults(list, 'No match for those words. Fix them above and tap Search, or type it in below.');
+      } else {
+        note.textContent = 'Couldn’t read that photo. Try a closer, brighter one, or search by title.';
+        note.hidden = false;
+      }
+      $('#findh').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }).catch(e => toast(friendlyError(e), true)).finally(() => { btn.disabled = false; say('Scan a book'); });
   };
 
   draw();

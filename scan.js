@@ -214,3 +214,122 @@ function scanPage(file, opts = {}) {
     })();
   });
 }
+
+// ---------- Scan a book (Add a book → Scan) ----------
+// In the iPhone app: Apple's live scanner looks for the barcode on the back
+// (BookScannerPlugin). On the website, or with "Photo of the cover or spine":
+// a photo. A barcode in it is read first; if there isn't one, the biggest words
+// (the title and author on a cover or spine) are read and searched instead.
+// Resolves { isbn }, { text, parts (its lines) } or null. The photo stays on the phone.
+const ZXING_URL = 'https://cdn.jsdelivr.net/npm/@zxing/library@0.21.3/umd/index.min.js';
+let zxingP = null;
+function loadZxing() {
+  if (window.ZXing) return Promise.resolve(window.ZXing);
+  if (!zxingP) {
+    zxingP = new Promise((resolve, reject) => {
+      const s = document.createElement('script');
+      s.src = ZXING_URL;
+      s.onload = () => resolve(window.ZXing);
+      s.onerror = () => { zxingP = null; reject(new Error('Couldn’t load the scanner. Check your connection and try again.')); };
+      document.head.appendChild(s);
+    });
+  }
+  return zxingP;
+}
+const nativeScanner = () => (typeof isNativeApp !== 'undefined' && isNativeApp ? window.Capacitor.registerPlugin('BookScanner') : null);
+
+// Opens the phone's camera or photo picker. Must start from a tap.
+function pickBookPhoto() {
+  return new Promise(resolve => {
+    const pick = document.createElement('input');
+    pick.type = 'file';
+    pick.accept = 'image/*';
+    pick.onchange = () => resolve(pick.files[0] || null);
+    pick.addEventListener('cancel', () => resolve(null));
+    pick.click();
+  });
+}
+// The photo turned by deg (and scaled by k).
+const turned = (canvas, deg, k = 1) => {
+  const c = document.createElement('canvas'), side = deg % 180 !== 0;
+  const w = Math.round(canvas.width * k), h = Math.round(canvas.height * k);
+  c.width = side ? h : w;
+  c.height = side ? w : h;
+  const g = c.getContext('2d');
+  g.translate(c.width / 2, c.height / 2);
+  g.rotate((deg * Math.PI) / 180);
+  g.drawImage(canvas, -w / 2, -h / 2, w, h);
+  return c;
+};
+async function readBarcode(canvas) {
+  const Z = await loadZxing();
+  const hints = new Map([[Z.DecodeHintType.POSSIBLE_FORMATS, [Z.BarcodeFormat.EAN_13, Z.BarcodeFormat.EAN_8, Z.BarcodeFormat.UPC_A, Z.BarcodeFormat.UPC_E]], [Z.DecodeHintType.TRY_HARDER, true]]);
+  const reader = new Z.MultiFormatReader();
+  reader.setHints(hints);
+  for (const c of [canvas, turned(canvas, 90)]) {
+    try { return reader.decode(new Z.BinaryBitmap(new Z.HybridBinarizer(new Z.HTMLCanvasElementLuminanceSource(c)))).getText(); } catch {}
+  }
+  return null;
+}
+// The title and author: the biggest, clearest lines of text (marketing lines
+// like "New York Times bestselling author" skipped). lines: { text, h, y, conf },
+// h and y as a share of the photo's height, conf 0–1.
+const BLURB_LINE = /(best ?-?sell|usa ?today|new york times|sunday times|times best|international|#\s?1|author of|a novel|now a (major|netflix)|isbn|www\.|\.com)/i;
+function titleFromLines(lines) {
+  const ok = lines.map(l => ({ ...l, text: l.text.replace(/[^\p{L}\p{N}'’&:,. -]/gu, ' ').replace(/\s+/g, ' ').trim() }))
+    .filter(l => l.conf >= 0.5 && (l.text.match(/\p{L}/gu) || []).length >= 2 && !BLURB_LINE.test(l.text));
+  const top = [...ok].sort((a, b) => b.h * b.conf - a.h * a.conf).slice(0, 2).sort((a, b) => a.y - b.y);
+  const parts = top.map(l => l.text.replace(/[-.]/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
+  return { text: parts.join(' ').split(' ').slice(0, 10).join(' '), parts };
+}
+async function readCoverWords(canvas) {
+  // The iPhone app: Apple's own text recognition (BookScannerPlugin.readText).
+  const native = nativeScanner();
+  if (native) {
+    const image = canvas.toDataURL('image/jpeg', 0.85).split(',')[1];
+    const { lines = [] } = await native.readText({ image });
+    return titleFromLines(lines);
+  }
+  // Elsewhere: Tesseract, upright and turned both ways (a spine reads sideways).
+  const big = Math.max(canvas.width, canvas.height) < 1600 ? turned(canvas, 0, 1600 / Math.max(canvas.width, canvas.height)) : canvas;
+  const T = await loadTesseract();
+  const worker = await T.createWorker('eng', 1);
+  try {
+    let best = { score: 0, lines: [] };
+    for (const deg of [0, 90, 270]) {
+      const c = deg ? turned(big, deg) : big;
+      const { data } = await worker.recognize(c);
+      const lines = (data.lines || []).map(l => ({ text: l.text, h: (l.bbox.y1 - l.bbox.y0) / c.height, y: l.bbox.y0 / c.height, conf: l.confidence / 100 }));
+      const score = lines.reduce((n, l) => n + l.text.trim().length * l.conf * l.conf, 0);
+      if (score > best.score) best = { score, lines };
+    }
+    return titleFromLines(best.lines);
+  } finally { worker.terminate().catch(() => {}); }
+}
+async function readBookPhoto(file, status) {
+  const canvas = await pageImage(file);
+  status('Looking for a barcode…');
+  const code = await readBarcode(canvas).catch(() => null);
+  if (code) return { isbn: code };
+  status('Reading the cover…');
+  const words = await readCoverWords(canvas);
+  return words.text ? words : { none: true };
+}
+// status(text): shows what it's doing. Web: opens the camera straight away (called from a tap).
+async function scanBook(status = () => {}) {
+  const native = nativeScanner();
+  let file = null;
+  if (native) {
+    const got = await native.scan();
+    if (got.isbn) return { isbn: got.isbn };
+    if (got.mode !== 'photo') return null;
+    // The camera has to open from a tap, so ask for one.
+    let taking = false;
+    file = await new Promise(resolve => openModal(`<h2>Photo of the book</h2>
+        <p class="muted">Take a photo of the front cover or the spine, close up and straight on.</p>
+        <div class="actions"><button type="button" class="btn" data-close>Cancel</button><span class="spacer"></span><button type="button" class="btn primary" id="bpshot">${CAMERA_ICON} Take the photo</button></div>`,
+      (root, close) => { $('#bpshot', root).onclick = () => { taking = true; const shot = pickBookPhoto(); close(); shot.then(resolve); }; }, 'small-modal', () => { if (!taking) resolve(null); }));
+  } else file = await pickBookPhoto();
+  if (!file) return null;
+  return readBookPhoto(file, status);
+}

@@ -637,3 +637,7 @@
 @media (hover: hover) { .spine.flat-book[data-book]:hover { transform: translateX(calc(var(--x) + 6px)); } }
 .spine.flat-book[data-book]:active { transform: translateX(calc(var(--x) + 8px)); }
 .slot-placeholder .spine.flat-book, .slot-placeholder .spine.face-book { opacity: .2; }
+
+/* Add a book → Scan a book (scan.js scanBook). */
+.scan-book { display: inline-flex; align-items: center; gap: 7px; margin-top: 10px; }
+.scan-note { margin: 8px 0 0; }
