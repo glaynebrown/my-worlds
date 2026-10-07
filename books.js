@@ -77,11 +77,35 @@ const formatName = r => (r.physical && r.audio ? 'physical book + audiobook' : r
 const inReading = b => shelfOf(b) === 'reading';
 
 // A cover picture (or one drawn in the book's look when there's none).
-function coverHtml(b, cls = '', big) {
-  const src = big ? coverOf(b) : coverSmall(b);
-  const fallback = big ? coverSmall(b) : null;
-  if (src) return `<img class="cover-img ${cls}" src="${esc(src)}" ${fallback && fallback !== src ? `onerror="this.onerror=null;this.src='${esc(fallback)}'"` : ''} alt="Cover of ${esc(b.title)}" loading="lazy">`;
+// A cover that won't load (the cover sites can be slow or down for a moment)
+// tries once more, then the other size, then shows the drawn cover instead.
+function coverHtml(b, cls = '', big, drawn) {
+  const src = drawn ? null : big ? coverOf(b) : coverSmall(b);
+  if (src) {
+    const other = big ? coverSmall(b) : coverOf(b);
+    const again = `${src}${src.includes('?') ? '&' : '?'}retry=1`;
+    const alts = [again, other && other !== src ? other : ''].filter(Boolean).join('|');
+    return `<img class="cover-img ${cls}" src="${esc(src)}" data-alts="${esc(alts)}" data-cover-book="${esc(b.id)}" data-cls="${esc(cls)}" onerror="coverFail(this)" onload="this.style.opacity=''" alt="Cover of ${esc(b.title)}" loading="lazy">`;
+  }
   return `<span class="gen-cover ${cls}" data-cover-for="${esc(b.id)}"><span class="gc-title">${esc(b.title)}</span>${b.author ? `<span class="gc-author">${esc(b.author)}</span>` : ''}</span>`;
+}
+function coverFail(img) {
+  const tries = Number(img.dataset.tries || 0), alts = (img.dataset.alts || '').split('|').filter(Boolean);
+  img.style.opacity = '0'; // never the broken-picture icon
+  if (tries < alts.length) {
+    img.dataset.tries = tries + 1;
+    setTimeout(() => { if (img.isConnected) img.src = alts[tries]; }, tries ? 0 : 800);
+    return;
+  }
+  img.onerror = null;
+  if (img.classList.contains('face-cover')) { img.remove(); return; } // its drawn cover is already underneath
+  const b = bookById(img.dataset.coverBook);
+  if (!b) { img.style.visibility = 'hidden'; return; }
+  const box = document.createElement('span');
+  box.innerHTML = coverHtml(b, img.dataset.cls || '', false, true);
+  const drawnCover = box.firstElementChild;
+  img.replaceWith(drawnCover);
+  Themes.apply(drawnCover, b);
 }
 // Drawn covers wear their book's look.
 function paintCovers(root = document) {
@@ -357,7 +381,7 @@ const STACK_MAX = 150; // px of books in one stack, so a small plant still fits 
 function faceHtml(b, h) {
   const s = spineStyle(b), w = Math.round(h * 0.66);
   return `<div class="slot face" style="--w:${w}px;--h:${h}px;--sb:${cssColor(s.bg)};--si:${cssColor(s.ink)}">
-    <button class="spine face-book" data-book="${esc(b.id)}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}">${coverHtml(b, 'face-cover')}</button></div>`;
+    <button class="spine face-book" data-book="${esc(b.id)}" aria-label="${esc(b.title)}${b.author ? ` by ${esc(b.author)}` : ''}">${coverHtml(b, 'face-drawn', false, true)}${coverSmall(b) ? coverHtml(b, 'face-cover') : ''}</button></div>`;
 }
 function flatHtml(b) {
   const s = spineStyle(b), t = Math.min(38, s.w), len = Math.round(s.h * 0.95), x = (hashOf(b.id) % 9) - 4;
