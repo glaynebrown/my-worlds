@@ -278,9 +278,14 @@ const BLURB_LINE = /(best ?-?sell|usa ?today|new york times|sunday times|times b
 function titleFromLines(lines) {
   const ok = lines.map(l => ({ ...l, text: l.text.replace(/[^\p{L}\p{N}'’&:,. -]/gu, ' ').replace(/\s+/g, ' ').trim() }))
     .filter(l => l.conf >= 0.5 && (l.text.match(/\p{L}/gu) || []).length >= 2 && !BLURB_LINE.test(l.text));
-  const top = [...ok].sort((a, b) => b.h * b.conf - a.h * a.conf).slice(0, 2).sort((a, b) => a.y - b.y);
-  const parts = top.map(l => l.text.replace(/[-.]/g, ' ').replace(/\s+/g, ' ').trim()).filter(Boolean);
-  return { text: parts.join(' ').split(' ').slice(0, 10).join(' '), parts };
+  const clean = t => t.replace(/[-—–.:]/g, ' ').replace(/\s+/g, ' ').trim();
+  const ranked = [...ok].sort((a, b) => b.h * b.conf - a.h * a.conf);
+  // The three most prominent lines (a series name, the title under it, the author) to search with…
+  const parts = ranked.slice(0, 3).sort((a, b) => a.y - b.y).map(l => clean(l.text)).filter(Boolean);
+  // …and every clear line that isn't tiny print, to pick the right match.
+  const big = ranked.length ? ranked[0].h : 0;
+  const words = ranked.filter(l => l.h >= big * 0.2).map(l => clean(l.text)).join(' ');
+  return { text: parts.join(' ').split(' ').slice(0, 12).join(' '), parts, words };
 }
 async function readCoverWords(canvas) {
   // The iPhone app: Apple's own text recognition (BookScannerPlugin.readText).

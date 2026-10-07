@@ -2308,14 +2308,22 @@ function renderBookForm(book) {
         $('#q').value = got.text;
         // All the words, and each line on its own (the reader can get a word wrong),
         // then the books whose title and author share the most words with the photo first.
-        const qs = [...new Set([got.text, ...(got.parts || [])])].filter(q => q && q.replace(/\W/g, '').length >= 3);
+        const parts = got.parts || [];
+        const pairs = parts.flatMap((a, i) => parts.slice(i + 1).map(b => `${a} ${b}`));
+        const qs = [...new Set([got.text, ...pairs, ...parts])].filter(q => q && q.replace(/\W/g, '').length >= 3);
         const seen = new Map();
         (await Promise.all(qs.map(q => searchBooks(q).catch(() => [])))).flat().forEach(r => {
           const k = `${r.title}|${r.author}`.toLowerCase();
           if (!seen.has(k)) seen.set(k, r);
         });
-        const photoWords = got.text.toLowerCase().split(' ').filter(w => w.length >= 3);
-        const score = r => { const t = `${r.title} ${r.author}`.toLowerCase(); return photoWords.filter(w => t.includes(w)).reduce((n, w) => n + w.length, 0); };
+        const photoWords = [...new Set((got.words || got.text).toLowerCase().replace(/[’']/g, "'").split(' ').filter(w => w.length >= 3))];
+        // Points for each word from the photo in its title or author (longer words count more),
+        // minus a little for title words that aren't on the photo (so a box set doesn't win).
+        const score = r => {
+          const t = `${r.title} ${r.author}`.toLowerCase().replace(/[’']/g, "'");
+          const extra = r.title.toLowerCase().replace(/[’']/g, "'").split(/[^\p{L}\p{N}']+/u).filter(w => w.length >= 3 && !photoWords.includes(w)).length;
+          return photoWords.filter(w => t.includes(w)).reduce((n, w) => n + w.length, 0) - extra * 3;
+        };
         let list = [...seen.values()].map((r, i) => ({ r, s: score(r), i })).sort((a, b) => b.s - a.s || a.i - b.i);
         if (list.some(x => x.s > 0)) list = list.filter(x => x.s > 0);
         list = list.slice(0, 12).map(x => x.r);
