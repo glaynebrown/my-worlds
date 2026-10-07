@@ -2196,13 +2196,13 @@ async function searchBooks(q) {
 }
 
 async function searchOpenLibrary(q) {
-  const fields = 'key,title,author_name,first_publish_year,number_of_pages_median,cover_i';
+  const fields = 'key,title,author_name,first_publish_year,number_of_pages_median,cover_i,readinglog_count';
   const r = await fetch(`https://openlibrary.org/search.json?q=${encodeURIComponent(q)}&limit=12&fields=${fields}`);
   if (!r.ok) throw new Error(`Open Library ${r.status}`);
   const data = await r.json();
   return (data.docs || []).map(d => ({
     title: d.title || '', author: (d.author_name || []).slice(0, 2).join(', '), pages: d.number_of_pages_median || '',
-    year: d.first_publish_year ? String(d.first_publish_year) : '', blurb: '', olKey: d.key || '',
+    year: d.first_publish_year ? String(d.first_publish_year) : '', blurb: '', olKey: d.key || '', readers: d.readinglog_count || 0,
     thumb: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-M.jpg` : '',
     big: d.cover_i ? `https://covers.openlibrary.org/b/id/${d.cover_i}-L.jpg` : '',
   })).filter(x => x.title);
@@ -2493,8 +2493,38 @@ function renderBookForm(book) {
       : `<p class="muted small">${esc(none)}</p>`;
     $$('.result').forEach(el => { el.onclick = () => usePick(results[+el.dataset.r]); });
   };
+  // Results while typing: after a short pause, from Open Library only (Search
+  // also tries Google Books). The last word may be half typed, so it's searched
+  // as typed and as the start of a word. Books matching more of the words go
+  // first, then the ones more people have on their Open Library shelves.
+  // A newer search makes an older, slower one drop its answer.
+  let liveTimer = 0, liveSeq = 0;
+  const words = s => s.toLowerCase().replace(/[’']/g, '').split(/[^a-z0-9]+/).filter(Boolean);
+  const matches = (r, qw) => {
+    const have = words(`${r.title} ${r.author}`);
+    return qw.filter((w, i) => have.some(h => (i === qw.length - 1 ? h.startsWith(w) : h === w))).length;
+  };
+  $('#q').oninput = () => {
+    clearTimeout(liveTimer);
+    const seq = ++liveSeq, q = $('#q').value.trim();
+    if (!q) { $('#results').innerHTML = ''; return; }
+    if (q.length < 3 || !navigator.onLine) return;
+    liveTimer = setTimeout(async () => {
+      if (!$('.result')) $('#results').innerHTML = '<p class="muted small">Searching…</p>';
+      const [plain, start] = await Promise.all([q, `${q}*`].map(x => searchOpenLibrary(x).catch(() => [])));
+      if (seq !== liveSeq) return;
+      const qw = words(q), seen = new Set();
+      const list = [...start, ...plain].filter(r => {
+        const k = `${r.title}|${r.author}`.toLowerCase();
+        return !seen.has(k) && seen.add(k);
+      }).map((r, i) => ({ r, i, n: matches(r, qw) })).sort((a, b) => b.n - a.n || b.r.readers - a.r.readers || a.i - b.i).map(x => x.r).slice(0, 12);
+      showResults(list, 'Nothing yet. Keep typing, or tap Search.');
+    }, 500);
+  };
   $('#sf').onsubmit = e => {
     e.preventDefault();
+    clearTimeout(liveTimer);
+    liveSeq++;
     const q = $('#q').value.trim();
     if (!q) return;
     $('#q').blur();
