@@ -327,12 +327,19 @@ async function startSharing(world, me, email, secs = ['rewatch', 'rewatchMarks']
 }
 
 // ---------- being invited ----------
-let offered = false;
+// Checked once per account each time the app opens (signing into another
+// account checks again). An invite waits for the welcome tour to finish, so it
+// isn't hidden behind it.
+let offeredFor = null;
+const tourDone = async () => { while (typeof tourOpen !== 'undefined' && tourOpen) await new Promise(r => setTimeout(r, 400)); };
 async function offerJoins() {
-  if (offered || !DB.pendingShares) return;
-  offered = true;
+  const me = state.user && state.user.uid;
+  if (!me || offeredFor === me || !DB.pendingShares) return;
+  offeredFor = me;
   const list = await DB.pendingShares().catch(() => []);
   for (const d of list) {
+    await tourDone();
+    if (!state.user || state.user.uid !== me) return; // signed out meanwhile
     if (state.worlds.some(w => w.sharedId === d.id) || state.books.some(b => b.sharedId === d.id)) continue;
     if (isBlocked(d.owner)) { DB.declineShared(d.id).catch(() => {}); continue; } // from someone you blocked
     if (d.type === 'book') { await offerBuddyRead(d); continue; } // books.js
