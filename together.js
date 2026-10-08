@@ -214,7 +214,8 @@ function shareSettingsHtml(world) {
     <div class="row-btns">
       ${owner ? '<button type="button" class="btn small" id="share-go">Invite someone…</button><button type="button" class="btn small ghost danger-text" id="share-stop">Stop sharing</button>'
         : '<button type="button" class="btn small ghost danger-text" id="share-leave">Leave shared world</button>'}
-    </div>`;
+    </div>
+    ${othersIn(d).length ? safetyHtml(d) : ''}`;
 }
 
 function wireShareSettings(world) {
@@ -249,6 +250,8 @@ function wireShareSettings(world) {
     }, 'Saving…');
   }
   if (go) go.onclick = () => shareWorldFlow(world);
+  const d = sharedDoc(world);
+  if (d && !d.gone) wireSafety(document, d, () => { location.hash = `#/w/${world.id}/rewatch`; });
   if (stop) stop.onclick = () => confirmBox('Stop sharing?', 'Everyone keeps their own copy of the tracker and all the notes, but it stops being shared.', 'Stop sharing', async () => {
     await DB.updateShared(world.sharedId, { ended: true });
     await detachShared(world, state.shared[world.sharedId]);
@@ -331,16 +334,19 @@ async function offerJoins() {
   const list = await DB.pendingShares().catch(() => []);
   for (const d of list) {
     if (state.worlds.some(w => w.sharedId === d.id) || state.books.some(b => b.sharedId === d.id)) continue;
+    if (isBlocked(d.owner)) { DB.declineShared(d.id).catch(() => {}); continue; } // from someone you blocked
     if (d.type === 'book') { await offerBuddyRead(d); continue; } // books.js
     const from = (d.names || {})[d.owner] || 'Someone';
     await new Promise(resolve => openModal(`<form id="jf" novalidate><h2>${esc(from)} shared ${esc(d.name)} with you</h2>
       <p>You’ll share: <b>${esc(sectionNames(d).join(', '))}</b>. Anything else in it stays private to each of you. It becomes a new door; your own worlds don’t change.</p>
       <label class="field join-name"><span class="field-label">Your name: this is how ${esc(from)} will see you</span><input id="me" value="${esc(myName())}"></label>
-      <div class="actions"><button type="button" class="btn ghost" id="no">No thanks</button><button type="button" class="btn" data-close>Not now</button><span class="spacer"></span><button class="btn primary" id="yes">Join</button></div></form>`,
+      <div class="actions"><button type="button" class="btn ghost" id="no">No thanks</button><button type="button" class="btn" data-close>Not now</button><span class="spacer"></span><button class="btn primary" id="yes">Join</button></div>
+      ${safetyHtml(d)}</form>`,
     (root, close) => {
       const done = () => { close(); resolve(); };
       root.addEventListener('click', e => { if (e.target === root || e.target.closest('[data-close]')) resolve(); });
       $('#no', root).onclick = () => { DB.declineShared(d.id).catch(() => {}); done(); };
+      wireSafety(root, d, () => { DB.declineShared(d.id).catch(() => {}); done(); });
       $('#jf', root).onsubmit = e => {
         e.preventDefault();
         const me = $('#me', root).value.trim() || myName();
@@ -422,4 +428,86 @@ async function detachShared(world, view) {
     if (world._book) await DB.updateBook(world, patch); else await DB.updateWorld(world, patch);
     toast(`${world.name} is your own again`);
   } catch (e) { console.error(e); toast(friendlyError(e), true); detached.delete(sid); }
+}
+
+// ---------- Report and Block ----------
+// Block: no more invites from that person, and you leave (or stop, if you
+// started it) any world or buddy read you share with them. It asks first, and
+// Account & help → Blocked people undoes it. Report: an email to the app's
+// maker about a share, with what's needed to find it.
+const REPORT_EMAIL = 'keepsakeapps@gmail.com';
+const blockedList = () => (state.settings && state.settings.blocked) || [];
+const isBlocked = uid => blockedList().some(b => b.uid === uid);
+// Everyone in a share but you (the person who started it too), as [uid, name].
+const othersIn = d => [...new Set([d.owner, ...(d.members || [])])].filter(u => u && u !== DB.myUid())
+  .map(u => [u, (d.names || {})[u] || 'Someone']);
+
+function reportShare(d) {
+  const who = othersIn(d).map(([u, n]) => `${n} (${u})`).join(', ');
+  const body = `What happened? Write it here:\n\n\n\n(Please keep the lines below so I can find it.)\nShared: ${d.name}\nPeople: ${who}\nShare: ${d.id}\nMy account: ${DB.myUid()}`;
+  openModal(`<h2>Report this</h2>
+    <p>Something offensive or unwanted in <b>${esc(d.name)}</b>? Tell me and I’ll look into it. I can remove people who misuse sharing.</p>
+    <p class="muted small">It opens an email to ${REPORT_EMAIL} with the details filled in. You can also block them so they can’t send you anything again.</p>
+    <div class="actions"><button type="button" class="btn" data-close>Cancel</button><span class="spacer"></span>
+      <a class="btn primary" data-close href="mailto:${REPORT_EMAIL}?subject=${encodeURIComponent(`My Worlds report: ${d.name}`)}&body=${encodeURIComponent(body)}">Write the email</a></div>`, null, 'small-modal');
+}
+
+// Leaves every world and buddy read shared with uid (or stops it, if it's yours).
+async function leaveSharesWith(uid) {
+  for (const item of [...state.worlds, ...state.books].filter(x => x.sharedId)) {
+    const sh = state.shared[item.sharedId], d = sh && sh.doc;
+    if (!d || d.gone || d.ended || !othersIn(d).some(([u]) => u === uid)) continue;
+    const sid = item.sharedId;
+    if (d.owner === DB.myUid()) { await DB.updateShared(sid, { ended: true }); await detachShared(item, sh); }
+    else { await detachShared(item, sh); await DB.leaveShared(sid).catch(e => console.warn(e)); }
+  }
+}
+
+function blockPerson(uid, name, after) {
+  confirmBox(`Block ${name}?`, `You won’t get invites from ${name} anymore, and you’ll leave anything you share with them. You can unblock them anytime in Account & help.`, 'Block', async () => {
+    const blocked = [...blockedList().filter(b => b.uid !== uid), { uid, name }];
+    await DB.saveSettings({ blocked });
+    state.settings.blocked = blocked;
+    await leaveSharesWith(uid);
+    if (after) after();
+    toast(`${name} is blocked`);
+    refresh();
+  });
+}
+
+// The Report · Block links under an invite, or in a shared world's / buddy read's settings.
+const safetyHtml = d => `<p class="safety-row"><button type="button" class="linkish" data-report>Report</button>`
+  + `<span aria-hidden="true">·</span><button type="button" class="linkish danger-text" data-block>Block${othersIn(d).length === 1 ? ` ${esc(othersIn(d)[0][1])}` : '…'}</button></p>`;
+function wireSafety(root, d, after) {
+  const rep = $('[data-report]', root), blk = $('[data-block]', root);
+  if (rep) rep.onclick = () => reportShare(d);
+  if (blk) blk.onclick = () => {
+    const people = othersIn(d);
+    if (people.length === 1) return blockPerson(people[0][0], people[0][1], after);
+    openModal(`<h2>Block who?</h2><div class="block-pick">${people.map(([u, n]) => `<button type="button" class="btn block" data-u="${esc(u)}">${esc(n)}</button>`).join('')}</div>
+      <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-close>Cancel</button></div>`, (r, close) => {
+      $$('[data-u]', r).forEach(b => { b.onclick = () => { close(); const p = people.find(([u]) => u === b.dataset.u); blockPerson(p[0], p[1], after); }; });
+    }, 'small-modal');
+  };
+}
+
+// Account & help → Blocked people: unblock someone.
+function blockedMenu() {
+  const list = blockedList();
+  openModal(`<h2>Blocked people</h2>
+    ${list.length ? `<p class="muted small">They can’t send you invites. Unblock someone to let them share with you again.</p>
+      <div class="blocked-list">${list.map(b => `<div class="blocked-row"><span>${esc(b.name)}</span><button type="button" class="btn small" data-unblock="${esc(b.uid)}">Unblock</button></div>`).join('')}</div>`
+      : '<p class="muted small">No one is blocked.</p>'}
+    <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-close>Done</button></div>`, (root, close) => {
+    $$('[data-unblock]', root).forEach(btn => {
+      btn.onclick = () => busy(btn, async () => {
+        const blocked = blockedList().filter(b => b.uid !== btn.dataset.unblock);
+        await DB.saveSettings({ blocked });
+        state.settings.blocked = blocked;
+        close();
+        toast('Unblocked');
+        blockedMenu();
+      }, 'Unblocking…');
+    });
+  }, 'small-modal');
 }

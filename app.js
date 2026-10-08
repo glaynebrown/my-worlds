@@ -228,6 +228,7 @@ const MENU_ICONS = {
   box: '<path d="M3.5 4.5h17v3.5h-17zM5 8v11.5h14V8M10 12h4"/>',
   help: '<circle cx="12" cy="12" r="8.5"/><path d="M9.6 9.6a2.5 2.5 0 1 1 3.4 2.3c-.6.3-1 .8-1 1.5v.4M12 16.8v.2"/>',
   out: '<path d="M14 4h5v16h-5M10 8l-4 4 4 4M6 12h10"/>',
+  block: '<circle cx="12" cy="12" r="8.5"/><path d="M6 6l12 12"/>',
 };
 // attrs: 'id="x"' or 'href="#/y" data-close' (a link). value: shown muted on the right.
 function menuRow(attrs, icon, label, { value = '', cls = '' } = {}) {
@@ -252,12 +253,14 @@ function accountMenu(keeps) {
       <div class="menu-head"><button type="button" class="linkish" id="mback">‹ Back</button><h2>Account &amp; help</h2></div>
       <div class="menu-group">${menuRow('id="nick"', 'person', 'Your name', { value: esc(nick || 'Add') })
         + menuRow('id="m-backup"', 'box', 'Backup &amp; restore')
+        + (blockedList().length ? menuRow('id="m-blocked"', 'block', 'Blocked people', { value: String(blockedList().length) }) : '')
         + menuRow('href="https://glaynebrown.github.io/my-worlds/support.html" target="_blank" rel="noopener"', 'help', 'Help &amp; privacy')
         + menuRow('id="out"', 'out', 'Sign out')}</div>
       <button type="button" class="linkish danger-text" id="gone">Delete my account</button></div>`, (root, close) => {
     $('#mback', root).onclick = () => { close(); const g = $('#hgear'); if (g) g.click(); };
     $('#nick', root).onclick = () => { close(); nicknameForm(); };
     $('#m-backup', root).onclick = () => { close(); backupMenu(); }; // backup.js
+    if ($('#m-blocked', root)) $('#m-blocked', root).onclick = () => { close(); blockedMenu(); }; // together.js
     $('#out', root).onclick = () => { close(); confirmBox('Sign out?', `Your ${keeps} stay saved in your account.`, 'Sign out', () => DB.signOut()); };
     $('#gone', root).onclick = () => { close(); deleteAccountFlow(); };
   }, 'small-modal');

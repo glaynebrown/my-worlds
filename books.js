@@ -2699,13 +2699,16 @@ function buddyHtml(b) {
     <p class="muted small">Shared: ${esc(secs.join(', ') || 'nothing')}</p>
     ${myShareNameHtml(b, 'Your name in this buddy read')}
     <div class="row-btns">${owner ? '<button type="button" class="btn small" id="buddy-go">Invite someone…</button><button type="button" class="btn small ghost danger-text" id="buddy-stop">Stop sharing</button>'
-      : '<button type="button" class="btn small ghost danger-text" id="buddy-leave">Leave buddy read</button>'}</div>`;
+      : '<button type="button" class="btn small ghost danger-text" id="buddy-leave">Leave buddy read</button>'}</div>
+    ${othersIn(d).length ? safetyHtml(d) : ''}`;
 }
 
 function wireBuddy(b) {
   if (b.sharedId) wireMyShareName(b);
   const go = $('#buddy-go'), stop = $('#buddy-stop'), leave = $('#buddy-leave');
   if (go) go.onclick = () => buddyFlow(b);
+  const d = sharedDoc(b);
+  if (d && !d.gone) wireSafety(document, d, () => { location.hash = `#/b/${b.id}`; }); // together.js
   if (stop) stop.onclick = () => confirmBox('Stop sharing?', 'Everyone keeps their own copy of the notes, quotes and pictures as they are now.', 'Stop sharing', async () => {
     await DB.updateShared(b.sharedId, { ended: true });
     await detachShared(b, state.shared[b.sharedId]);
@@ -2771,6 +2774,7 @@ async function startBuddyRead(book, me, email, secs) {
 
 // Someone invited you to read a book together (from offerJoins in together.js).
 function offerBuddyRead(d) {
+  if (isBlocked(d.owner)) { DB.declineShared(d.id).catch(() => {}); return Promise.resolve(); } // from someone you blocked (together.js)
   const from = (d.names || {})[d.owner] || 'Someone';
   const secs = BOOK_SHARE.filter(([k]) => (d.sections || {})[k]).map(([, l]) => l);
   const def = hasShelf('reading') ? 'reading' : shelvesOf()[0].id;
@@ -2778,11 +2782,13 @@ function offerBuddyRead(d) {
     <p>You’ll share: <b>${esc(secs.join(', '))}</b>. Your stars, dates and reviews stay your own.</p>
     <label class="field"><span class="field-label">Put it on this shelf</span><select id="jshelf">${shelvesOf().map(s => `<option value="${esc(s.id)}" ${s.id === def ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
     <label class="field join-name"><span class="field-label">Your name: this is how ${esc(from)} will see you</span><input id="me" value="${esc(myName())}"></label>
-    <div class="actions"><button type="button" class="btn ghost" id="no">No thanks</button><button type="button" class="btn" data-close>Not now</button><span class="spacer"></span><button class="btn primary" id="yes">Join</button></div></form>`,
+    <div class="actions"><button type="button" class="btn ghost" id="no">No thanks</button><button type="button" class="btn" data-close>Not now</button><span class="spacer"></span><button class="btn primary" id="yes">Join</button></div>
+    ${safetyHtml(d)}</form>`,
   (root, close) => {
     const done = () => { close(); resolve(); };
     root.addEventListener('click', e => { if (e.target === root || e.target.closest('[data-close]')) resolve(); });
     $('#no', root).onclick = () => { DB.declineShared(d.id).catch(() => {}); done(); };
+    wireSafety(root, d, () => { DB.declineShared(d.id).catch(() => {}); done(); });
     $('#jf', root).onsubmit = e => {
       e.preventDefault();
       const me = $('#me', root).value.trim() || myName();

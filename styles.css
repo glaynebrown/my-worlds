@@ -578,3 +578,10 @@ body:has(#banner:not([hidden])) .w-tabs { top: 29px; }
 @keyframes spin { to { transform: rotate(360deg); } }
 .add-btn.is-busy { opacity: .55; pointer-events: none; }
 .pin-failed { display: block; padding: 28px 12px; font-size: .85rem; color: var(--muted); text-align: center; }
+/* Report · Block (together.js): small links under an invite or in share settings. */
+.safety-row { display: flex; justify-content: center; align-items: center; gap: 2px; margin: 14px 0 0; color: color-mix(in srgb, var(--ink) 45%, transparent); }
+.safety-row .linkish { font-size: .85rem; padding: 6px; color: color-mix(in srgb, var(--ink) 62%, transparent); }
+.safety-row .linkish.danger-text { color: #a8352a; }
+.block-pick { display: grid; gap: 8px; margin-top: 12px; }
+.blocked-list { margin-top: 12px; }
+.blocked-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; padding: 10px 0; border-bottom: 1px solid var(--line); }
