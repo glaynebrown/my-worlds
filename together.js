@@ -347,8 +347,8 @@ async function offerJoins() {
     await new Promise(resolve => openModal(`<form id="jf" novalidate><h2>${esc(from)} shared ${esc(d.name)} with you</h2>
       <p>You’ll share: <b>${esc(sectionNames(d).join(', '))}</b>. Anything else in it stays private to each of you. It becomes a new door; your own worlds don’t change.</p>
       <label class="field join-name"><span class="field-label">Your name: this is how ${esc(from)} will see you</span><input id="me" value="${esc(myName())}"></label>
-      <div class="actions"><button type="button" class="btn ghost" id="no">No thanks</button><button type="button" class="btn" data-close>Not now</button><span class="spacer"></span><button class="btn primary" id="yes">Join</button></div>
-      ${safetyHtml(d)}</form>`,
+      <div class="invite-btns"><button class="btn primary block" id="yes">Join</button><button type="button" class="btn block" data-close>Ask me later</button></div>
+      ${safetyHtml(d, true)}</form>`,
     (root, close) => {
       const done = () => { close(); resolve(); };
       root.addEventListener('click', e => { if (e.target === root || e.target.closest('[data-close]')) resolve(); });
@@ -483,7 +483,7 @@ function blockPerson(uid, name, after) {
 }
 
 // The Report · Block links under an invite, or in a shared world's / buddy read's settings.
-const safetyHtml = d => `<p class="safety-row"><button type="button" class="linkish" data-report>Report</button>`
+const safetyHtml = (d, decline = false) => `<p class="safety-row">${decline ? '<button type="button" class="linkish" id="no">Decline</button><span aria-hidden="true">·</span>' : ''}<button type="button" class="linkish" data-report>Report</button>`
   + `<span aria-hidden="true">·</span><button type="button" class="linkish danger-text" data-block>Block${othersIn(d).length === 1 ? ` ${esc(othersIn(d)[0][1])}` : '…'}</button></p>`;
 function wireSafety(root, d, after) {
   const rep = $('[data-report]', root), blk = $('[data-block]', root);
@@ -507,14 +507,15 @@ function blockedMenu() {
       : '<p class="muted small">No one is blocked.</p>'}
     <div class="actions"><span class="spacer"></span><button type="button" class="btn" data-close>Done</button></div>`, (root, close) => {
     $$('[data-unblock]', root).forEach(btn => {
-      btn.onclick = () => busy(btn, async () => {
-        const blocked = blockedList().filter(b => b.uid !== btn.dataset.unblock);
+      const who = blockedList().find(b => b.uid === btn.dataset.unblock);
+      btn.onclick = () => confirmBox(`Unblock ${who.name}?`, `${who.name} will be able to send you invites again.`, 'Unblock', async () => {
+        const blocked = blockedList().filter(b => b.uid !== who.uid);
         await DB.saveSettings({ blocked });
         state.settings.blocked = blocked;
         close();
-        toast('Unblocked');
+        toast(`${who.name} is unblocked`);
         blockedMenu();
-      }, 'Unblocking…');
+      });
     });
   }, 'small-modal');
 }

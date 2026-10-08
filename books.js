@@ -2782,8 +2782,8 @@ function offerBuddyRead(d) {
     <p>You’ll share: <b>${esc(secs.join(', '))}</b>. Your stars, dates and reviews stay your own.</p>
     <label class="field"><span class="field-label">Put it on this shelf</span><select id="jshelf">${shelvesOf().map(s => `<option value="${esc(s.id)}" ${s.id === def ? 'selected' : ''}>${esc(s.name)}</option>`).join('')}</select></label>
     <label class="field join-name"><span class="field-label">Your name: this is how ${esc(from)} will see you</span><input id="me" value="${esc(myName())}"></label>
-    <div class="actions"><button type="button" class="btn ghost" id="no">No thanks</button><button type="button" class="btn" data-close>Not now</button><span class="spacer"></span><button class="btn primary" id="yes">Join</button></div>
-    ${safetyHtml(d)}</form>`,
+    <div class="invite-btns"><button class="btn primary block" id="yes">Join</button><button type="button" class="btn block" data-close>Ask me later</button></div>
+    ${safetyHtml(d, true)}</form>`,
   (root, close) => {
     const done = () => { close(); resolve(); };
     root.addEventListener('click', e => { if (e.target === root || e.target.closest('[data-close]')) resolve(); });
